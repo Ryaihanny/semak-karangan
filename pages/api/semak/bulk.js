@@ -1,7 +1,7 @@
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
-import { ImageAnnotatorClient } from '@google-cloud/vision';
+import { ImageAnnotatorClient as BulkVisionClient } from '@google-cloud/vision';
 import { analyseKarangan } from '@/lib/analyseKarangan';
 import admin from 'firebase-admin';
 import { generateUlasan } from '@/lib/analyseKarangan'; // ✅ NEW
@@ -20,7 +20,7 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-const visionClient = new ImageAnnotatorClient();
+const bulkVisionClient = new BulkVisionClient();
 export const config = { api: { bodyParser: false } };
 
 // ✅ Simpan hasil analisis ke Firestore (ID: set_id)
