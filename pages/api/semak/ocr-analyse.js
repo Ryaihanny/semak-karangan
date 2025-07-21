@@ -11,9 +11,11 @@ export const config = {
   },
 };
 
-process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(process.cwd(), 'google-credentials.json');
+import { ImageAnnotatorClient } from '@google-cloud/vision';
 
-const visionClient = new ImageAnnotatorClient();
+const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const visionClient = new ImageAnnotatorClient({ credentials });
+
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
