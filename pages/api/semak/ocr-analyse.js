@@ -11,8 +11,6 @@ export const config = {
   },
 };
 
-import { ImageAnnotatorClient } from '@google-cloud/vision';
-
 const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
 const visionClient = new ImageAnnotatorClient({ credentials });
 
