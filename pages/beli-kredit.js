@@ -53,19 +53,25 @@ export default function BeliKredit() {
     return () => unsubscribe();
   }, [router]);
 
-  const handleCheckout = async (priceId) => {
-    const res = await fetch('/api/checkout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ priceId, uid: user.uid, email: user.email }),
-    });
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
-    }
-  };
+ const handleCheckout = async (priceId) => {
+  const plan = plans.find(p => p.id === priceId);
+  if (!plan || !user) return;
+
+  const res = await fetch('/api/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      priceId: plan.id,
+      uid: user.uid,
+      credits: plan.credits,  // Pass credits here
+    }),
+  });
+
+  const data = await res.json();
+  if (data.url) {
+    window.location.href = data.url;
+  }
+};
 
   if (loading) return <p>Loading...</p>;
 
