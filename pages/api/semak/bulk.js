@@ -181,7 +181,7 @@ const filesArray = Array.isArray(fileItems) ? fileItems.slice(0, 5) : [fileItems
               if (!filepath) continue;
 
               const fileBuffer = fs.readFileSync(filepath);
-              const [visionResult] = await visionClient.textDetection({
+              const [visionResult] = await bulkVisionClient.textDetection({
                 image: { content: fileBuffer },
               });
 
