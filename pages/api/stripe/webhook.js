@@ -7,9 +7,9 @@ import Stripe from 'stripe';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-const serviceAccount = require('../../../google-credentials.json');
-
 if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
