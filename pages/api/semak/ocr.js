@@ -1,6 +1,6 @@
 import formidable from 'formidable';
 import fs from 'fs';
-import { ImageAnnotatorClient } from '@google-cloud/vision';
+import { ImageAnnotatorClient as VisionClientOCR } from '@google-cloud/vision';
 
 export const config = {
   api: {
@@ -9,7 +9,7 @@ export const config = {
 };
 
 // Init Google Vision client
-const visionClient = new ImageAnnotatorClient();
+const ocrVisionClient = new OcrVisionClient();
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
