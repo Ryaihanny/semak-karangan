@@ -1,7 +1,7 @@
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
-import { ImageAnnotatorClient } from '@google-cloud/vision';
+import { ImageAnnotatorClient as VisionClient } from '@google-cloud/vision';
 import { generateUlasan } from '@/lib/analyseKarangan'; // ✅ NEW
 
 
@@ -11,9 +11,9 @@ export const config = {
   },
 };
 
-process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(process.cwd(), 'google-credentials.json');
+const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+const visionClient = new VisionClient({ credentials });
 
-const visionClient = new ImageAnnotatorClient();
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

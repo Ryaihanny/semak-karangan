@@ -7,9 +7,10 @@ import Stripe from 'stripe';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-const serviceAccount = require('../../../google-credentials.json');
-
+// Initialize Firebase Admin SDK once, using environment variable
 if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
@@ -17,7 +18,7 @@ if (!admin.apps.length) {
 
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: false, // Stripe needs raw body for webhook verification
   },
 };
 
@@ -53,8 +54,7 @@ export default async function handler(req, res) {
     await admin.firestore().runTransaction(async (t) => {
       const doc = await t.get(userRef);
       const current = doc.exists ? doc.data().credits || 0 : 0;
-t.set(userRef, { credits: current + credits }, { merge: true });
-
+      t.set(userRef, { credits: current + credits }, { merge: true });
     });
 
     console.log(`✅ Added ${credits} credits to user ${uid}`);
