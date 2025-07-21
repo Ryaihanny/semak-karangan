@@ -12,7 +12,7 @@ export const config = {
 };
 
 const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-const visionClient = new ImageAnnotatorClient({ credentials });
+const visionClient = new VisionClient({ credentials });
 
 
 export default async function handler(req, res) {
