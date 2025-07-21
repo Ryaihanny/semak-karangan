@@ -1,7 +1,7 @@
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
-import { ImageAnnotatorClient } from '@google-cloud/vision';
+import { ImageAnnotatorClient as VisionClient } from '@google-cloud/vision';
 import { generateUlasan } from '@/lib/analyseKarangan'; // ✅ NEW
 
 
