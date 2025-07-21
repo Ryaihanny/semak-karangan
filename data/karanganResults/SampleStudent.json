@@ -1,0 +1,12 @@
+// data/karanganResults/student1.json
+{
+  "nama": "Amir",
+  "set": "Set A",
+  "karangan": "Ini karangan Amir...",
+  "markahIsi": 15,
+  "markahBahasa": 14,
+  "markahKeseluruhan": 29,
+  "kesalahanBahasa": [ ... ],
+  "gayaBahasa": ["simile", "personifikasi"],
+  "ulasan": { "kekuatan": "Karangan Amir sangat kreatif dan teratur." }
+}
