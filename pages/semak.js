@@ -24,28 +24,29 @@ const [creditBalance, setCreditBalance] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 const [includeKarangan, setIncludeKarangan] = useState(true);
 
-
-const fetchCredit = async () => {
-  const user = auth.currentUser;
-  if (!user) return;
-
+const fetchCredit = async (uid) => {
   const db = getFirestore();
-  const docRef = doc(db, 'users', user.uid);
+  const docRef = doc(db, 'users', uid);
   const docSnap = await getDoc(docRef);
 
   if (docSnap.exists()) {
     const data = docSnap.data();
-    setCreditBalance(data.credits ?? 0);  // <-- CHANGE here from creditBalance to credits
+    setCreditBalance(data.credits ?? 0);
   } else {
     setCreditBalance(0);
   }
 };
 
-
-
 useEffect(() => {
-  fetchCredit();
+  const unsubscribe = auth.onAuthStateChanged((user) => {
+    if (user) {
+      fetchCredit(user.uid);
+    }
+  });
+
+  return () => unsubscribe(); // optional cleanup
 }, []);
+
 
   // Add new pupil row
   const addPupil = () => {
