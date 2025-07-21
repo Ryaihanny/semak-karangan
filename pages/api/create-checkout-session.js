@@ -9,9 +9,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { priceId, userId, credits } = req.body;
+    const { priceId, uid, credits } = req.body;
 
-    if (!priceId || !userId || !credits) {
+    if (!priceId || !uid || !credits) {
       return res.status(400).json({ error: 'Missing parameters' });
     }
 
@@ -20,20 +20,21 @@ export default async function handler(req, res) {
       mode: 'payment',
       line_items: [
         {
-          price: priceId, // Stripe Price ID
+          price: priceId,
           quantity: 1,
         },
       ],
       success_url: `${req.headers.origin}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.origin}/payment-cancel`,
       metadata: {
-        uid: userId,        // pass user id as uid (to match webhook)
-        credits: credits.toString(), // pass credits as string
+        uid,
+        credits: String(credits), // metadata values must be strings
       },
     });
 
-    res.status(200).json({ sessionId: session.id });
+    res.status(200).json({ url: session.url });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 }
