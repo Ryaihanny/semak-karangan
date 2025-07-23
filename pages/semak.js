@@ -9,17 +9,6 @@ const [creditBalance, setCreditBalance] = useState(null);
   const [pictureDescription, setPictureDescription] = useState('');
   const [pupils, setPupils] = useState([
     {
-      id: 1,import { useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
-import { auth } from '../lib/firebase';  // path as appropriate
-
-export default function Semak() {
-const [creditBalance, setCreditBalance] = useState(null);
-  const [pictureDescription, setPictureDescription] = useState('');
-  const [pupils, setPupils] = useState([
-    {
       id: 1,
       nama: '',
       karangan: '',
