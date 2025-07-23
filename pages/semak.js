@@ -570,4 +570,8 @@ if (includeKarangan) {
       </main>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> Fix syntax error in Authorization header
