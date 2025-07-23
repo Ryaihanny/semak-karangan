@@ -133,7 +133,7 @@ useEffect(() => {
       selected.forEach((p) => {
         if (p.mode === 'ocr' && p.ocrFiles.length > 0) {
           Array.from(p.ocrFiles).forEach((file) => {
-            formData.append(file_${p.id}, file);
+            formData.append(`file_${p.id}`, file);
           });
         }
       });
@@ -144,9 +144,10 @@ const idToken = await user.getIdToken();
 const res = await fetch('/api/semak/bulk', {
   method: 'POST',
   body: formData,
-  headers: {
-    Authorization: Bearer ${idToken},
-  },
+headers: {
+  Authorization: `Bearer ${idToken}`,
+},
+
 });
 
       const json = await res.json();
@@ -220,15 +221,15 @@ await fetchCredit();
       if (i > 0) pdf.addPage();
 
       pdf.setFont(undefined, 'bold');
-      pdf.text(Keputusan Semakan Karangan untuk: ${result.nama}, margin, y);
+      pdf.text(`Keputusan Semakan Karangan untuk: ${result.nama}`, margin, y);
       pdf.setFont(undefined, 'normal');
       y += lineHeight * 2;
 
-      pdf.text(Markah Isi: ${result.markahIsi ?? '-'}, margin, y);
+      pdf.text(`Markah Isi: ${result.markahIsi ?? '-'}`, margin, y);
       y += lineHeight;
-      pdf.text(Markah Bahasa: ${result.markahBahasa ?? '-'}, margin, y);
+      pdf.text(`Markah Bahasa: ${result.markahBahasa ?? '-'}`, margin, y);
       y += lineHeight;
-      pdf.text(Markah Keseluruhan: ${result.markahKeseluruhan ?? '-'}, margin, y);
+      pdf.text(`Markah Keseluruhan: ${result.markahKeseluruhan ?? '-'}`, margin, y);
       y += lineHeight * 2;
 
       pdf.setFont(undefined, 'bold');
@@ -328,7 +329,7 @@ if (includeKarangan) {
         y += lineHeight;
       } else {
         result.gayaBahasa.forEach((g) => {
-          const wrapped = pdf.splitTextToSize(- ${cleanText(g)}, usableWidth);
+          const wrapped = pdf.splitTextToSize(`- ${cleanText(g)}`, usableWidth);
           wrapped.forEach((line) => {
             if (y + lineHeight > pageHeight - margin) {
               pdf.addPage();
@@ -570,8 +571,4 @@ if (includeKarangan) {
       </main>
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> Fix syntax error in Authorization header
