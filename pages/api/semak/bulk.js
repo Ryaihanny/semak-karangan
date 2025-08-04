@@ -87,7 +87,9 @@ export default async function handler(req, res) {
     }
 
     try {
-      const pupils = JSON.parse(fields.pupils || '[]');
+      const allPupils = JSON.parse(fields.pupils || '[]');
+const pupils = allPupils.filter(p => p.checked); // ✅ Only process checked pupils
+
 const idToken = req.headers.authorization?.split('Bearer ')[1];
 if (!idToken) {
   return res.status(401).json({ error: 'Unauthorized: No token provided' });
@@ -112,6 +114,11 @@ try {
       }
 
       // Deduct credits before processing:
+
+console.log('👥 Pupils to process:', pupils.length);
+console.log('📊 Credit balance before deduction:', currentCredits);
+console.log('🧮 Total credits needed:', totalCreditsNeeded);
+
       try {
         await deductCredits(uid, totalCreditsNeeded);
         console.log(`🪙 Deducted ${totalCreditsNeeded} credits from user ${uid}`);
