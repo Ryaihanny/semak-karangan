@@ -130,7 +130,6 @@ if (!userDoc.exists) {
 
 const userData = userDoc.data();
 const currentCredits = userData?.credits ?? 0;
-
 console.log('📊 Credit balance before deduction:', currentCredits);
 
 
