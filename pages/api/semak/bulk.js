@@ -64,11 +64,14 @@ async function deductCredits(userId, deductions) {
     throw new Error('Insufficient credits');
   }
 
-  await userRef.update({
-    credits: currentCredits - deductions,
-  });
+await userRef.update({
+  credits: currentCredits - deductions,
+});
 
-  console.log(`✅ Deducted ${deductions} credits, remaining: ${currentCredits - deductions}`);
+console.log(`✅ Deducted ${deductions} credits, remaining: ${currentCredits - deductions}`);
+
+return currentCredits - deductions;  // Return remaining credits
+
 }
 
 
@@ -116,16 +119,30 @@ try {
       // Deduct credits before processing:
 
 console.log('👥 Pupils to process:', pupils.length);
-console.log('📊 Credit balance before deduction:', currentCredits);
 console.log('🧮 Total credits needed:', totalCreditsNeeded);
 
-      try {
-        await deductCredits(uid, totalCreditsNeeded);
-        console.log(`🪙 Deducted ${totalCreditsNeeded} credits from user ${uid}`);
-      } catch (creditError) {
-        console.error('❌ Credit deduction failed:', creditError.message);
-        return res.status(403).json({ error: 'Kredit tidak mencukupi untuk melakukan semakan ini.' });
-      }
+const userRef = db.collection('users').doc(uid);
+const userDoc = await userRef.get();
+
+if (!userDoc.exists) {
+  return res.status(403).json({ error: 'User not found' });
+}
+
+const userData = userDoc.data();
+const currentCredits = userData?.credits ?? 0;
+
+console.log('📊 Credit balance before deduction:', currentCredits);
+
+
+try {
+  const remainingCredits = await deductCredits(uid, totalCreditsNeeded);
+  console.log(`🪙 Deducted ${totalCreditsNeeded} credits from user ${uid}`);
+  console.log('📊 Credit balance after deduction:', remainingCredits);
+} catch (creditError) {
+  console.error('❌ Credit deduction failed:', creditError.message);
+  return res.status(403).json({ error: 'Kredit tidak mencukupi untuk melakukan semakan ini.' });
+}
+
 
       const results = [];
 
