@@ -50,39 +50,54 @@ uid,  // ✅ Save user's UID
   });
 }
 
-// === NEW: Deduct credits helper ===
 async function deductCredits(userId, deductions) {
-  console.log('🧪 UserID from request:', userId);
-
+  console.log('🧪 Starting credit deduction for userId:', userId);
+  
   const userRef = db.collection('users').doc(userId);
-  const userDoc = await userRef.get();
+  
+  let userDoc;
+  try {
+    userDoc = await userRef.get();
+  } catch (err) {
+    console.error('❌ Firestore get() failed:', err);
+    throw new Error('Failed to fetch user data from Firestore');
+  }
 
   console.log('📄 userDoc.exists?', userDoc.exists);
   if (!userDoc.exists) {
+    console.error('🚫 No user found in Firestore for UID:', userId);
     throw new Error('User not found for credit deduction');
   }
 
   const userData = userDoc.data();
   console.log('📦 userDoc data:', userData);
 
-  const currentCredits = userData?.credits ?? 0;
-  console.log('🔢 currentCredits:', currentCredits);
-  console.log('💸 credits needed:', deductions);
+  const currentCredits = Number(userData?.credits ?? 0);
+  console.log('🔢 currentCredits:', currentCredits, 'deductions needed:', deductions);
+
+  if (isNaN(currentCredits)) {
+    console.error('🚨 Current credits is NaN! Check Firestore data for user:', userId);
+    throw new Error('User credits is not a number');
+  }
 
   if (currentCredits < deductions) {
-    console.log(`🚫 Not enough credits: Have ${currentCredits}, need ${deductions}`);
+    console.error(`🚫 Not enough credits: Have ${currentCredits}, need ${deductions}`);
     throw new Error('Insufficient credits');
   }
 
-await userRef.update({
-  credits: currentCredits - deductions,
-});
+  try {
+    await userRef.update({
+      credits: currentCredits - deductions,
+    });
+  } catch (err) {
+    console.error('❌ Failed to update credits in Firestore:', err);
+    throw new Error('Failed to update user credits');
+  }
 
-console.log(`✅ Deducted ${deductions} credits, remaining: ${currentCredits - deductions}`);
-
-return currentCredits - deductions;  // Return remaining credits
-
+  console.log(`✅ Successfully deducted ${deductions} credits, remaining: ${currentCredits - deductions}`);
+  return currentCredits - deductions;
 }
+
 
 
 // ✅ Main handler
