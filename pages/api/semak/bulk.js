@@ -18,6 +18,11 @@ if (!admin.apps.length) {
   });
 }
 
+console.log('🔑 Private key length:', process.env.GOOGLE_PRIVATE_KEY?.length);
+console.log('📧 Client email:', process.env.GOOGLE_CLIENT_EMAIL);
+console.log('🆔 Project ID:', process.env.GOOGLE_PROJECT_ID);
+
+
 const db = admin.firestore();
 const bulkVisionClient = new BulkVisionClient({
   projectId: process.env.GOOGLE_PROJECT_ID,
@@ -127,16 +132,6 @@ console.log('👥 Pupils to process:', pupils.length);
 console.log('🧮 Total credits needed:', totalCreditsNeeded);
 
 // 🧼 Cleaned-up credit deduction:
-try {
-  const remainingCredits = await deductCredits(uid, totalCreditsNeeded);
-  console.log(`🪙 Deducted ${totalCreditsNeeded} credits from user ${uid}`);
-  console.log('📊 Credit balance after deduction:', remainingCredits);
-} catch (creditError) {
-  console.error('❌ Credit deduction failed:', creditError.message);
-  return res.status(403).json({ error: 'Kredit tidak mencukupi untuk melakukan semakan ini.' });
-}
-
-
 
 try {
   const remainingCredits = await deductCredits(uid, totalCreditsNeeded);
