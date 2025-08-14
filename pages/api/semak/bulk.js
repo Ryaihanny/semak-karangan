@@ -6,7 +6,6 @@ import { analyseKarangan } from '@/lib/analyseKarangan';
 import admin from 'firebase-admin';
 import { generateUlasan } from '@/lib/analyseKarangan'; // ✅ NEW
 
-process.env.GOOGLE_APPLICATION_CREDENTIALS = path.join(process.cwd(), 'google-credentials.json');
 
 // ✅ Inisialisasi Firebase jika belum ada
 if (!admin.apps.length) {
@@ -20,7 +19,13 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-const bulkVisionClient = new BulkVisionClient();
+const bulkVisionClient = new BulkVisionClient({
+  projectId: process.env.GOOGLE_PROJECT_ID,
+  credentials: {
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+  },
+});
 export const config = { api: { bodyParser: false } };
 
 // ✅ Simpan hasil analisis ke Firestore (ID: set_id)
