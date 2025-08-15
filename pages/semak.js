@@ -69,6 +69,7 @@ useEffect(() => {
 
   // Update pupil property by id
   const updatePupil = (id, key, value) => {
+console.log(`Updating pupil ${id}: ${key} = ${value}`);
     setPupils((prev) =>
       prev.map((p) => (p.id === id ? { ...p, [key]: value } : p))
     );
@@ -101,6 +102,7 @@ useEffect(() => {
 
 console.log('All pupils:', pupils);
 console.log('Selected pupils:', selected);
+console.log("Selected pupils for processing:", selected);
 
 
     if (selected.length === 0) {
@@ -144,6 +146,8 @@ console.log('Selected pupils:', selected);
 console.log('Sending userId to backend:', userId);
 
 const idToken = await user.getIdToken();
+
+console.log("Sending pupils data to backend:", JSON.stringify(pupilsData, null, 2));
 
 const res = await fetch('/api/semak/bulk', {
   method: 'POST',
