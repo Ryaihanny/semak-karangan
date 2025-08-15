@@ -168,21 +168,23 @@ try {
           continue;
         }
 
-        if (mode === 'manual') {
-          if (!karangan?.trim()) {
-            results.push({ id, error: 'Karangan kosong untuk mod manual.' });
-            continue;
-          }
+if (mode === 'manual') {
+  const safeKarangan = typeof karangan === 'string' ? karangan : '';
+  if (!safeKarangan.trim()) {
+    results.push({ id, error: 'Karangan kosong untuk mod manual.' });
+    continue;
+  }
 
-          try {
-            console.log('🚀 Memulakan analisis karangan untuk:', nama);
-            const analysis = await analyseKarangan({
-              nama,
-              set,
-              karangan,
-              pictureDescription,
-              pictureUrl,
-            });
+  try {
+    console.log('🚀 Memulakan analisis karangan untuk:', nama);
+    const analysis = await analyseKarangan({
+      nama,
+      set,
+      karangan: safeKarangan,
+      pictureDescription,
+      pictureUrl,
+    });
+
 
             console.log('✅ Analisis selesai untuk', nama, 'Isi:', analysis.markahIsi, 'Bahasa:', analysis.markahBahasa);
 
@@ -227,18 +229,19 @@ const filesArray = Array.isArray(fileItems) ? fileItems.slice(0, 5) : [fileItems
               combinedText += extractedText + '\n\n';
             }
 
-            if (!combinedText.trim()) {
-              results.push({ id, error: 'Tiada teks dijumpai dari fail OCR.' });
-              continue;
-            }
+const safeCombinedText = typeof combinedText === 'string' ? combinedText : '';
+if (!safeCombinedText.trim()) {
+  results.push({ id, error: 'Tiada teks dijumpai dari fail OCR.' });
+  continue;
+}
 
-            const analysis = await analyseKarangan({
-              nama,
-              set,
-              karangan: combinedText,
-              pictureDescription,
-              pictureUrl,
-            });
+const analysis = await analyseKarangan({
+  nama,
+  set,
+  karangan: safeCombinedText,
+  pictureDescription,
+  pictureUrl,
+});
 
             // ✅ Tambah ulasan keseluruhan ringkas
             const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
