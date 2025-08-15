@@ -117,6 +117,11 @@ export default async function handler(req, res) {
     try {
       const allPupils = JSON.parse(fields.pupils || '[]');
 const pupils = allPupils.filter(p => p.checked); // ✅ Only process checked pupils
+
+console.log('allPupils parsed from request:', allPupils);
+console.log('pupils checked for processing:', pupils);
+
+
 if (!pupils.length) {
   return res.status(400).json({ error: 'Tiada murid dipilih untuk semakan.' });
 }
