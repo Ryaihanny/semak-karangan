@@ -117,6 +117,10 @@ export default async function handler(req, res) {
     try {
       const allPupils = JSON.parse(fields.pupils || '[]');
 const pupils = allPupils.filter(p => p.checked); // ✅ Only process checked pupils
+if (!pupils.length) {
+  return res.status(400).json({ error: 'Tiada murid dipilih untuk semakan.' });
+}
+
 
 const idToken = req.headers.authorization?.split('Bearer ')[1];
 if (!idToken) {
