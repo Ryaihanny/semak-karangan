@@ -99,6 +99,10 @@ useEffect(() => {
       singleIds ? singleIds.includes(p.id) : p.checked
     );
 
+console.log('All pupils:', pupils);
+console.log('Selected pupils:', selected);
+
+
     if (selected.length === 0) {
       alert('Sila tandakan pelajar yang mahu disemak.');
       return;
