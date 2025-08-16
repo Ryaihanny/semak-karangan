@@ -265,17 +265,19 @@ if (includeKarangan) {
 
         // Underline ayat salah in this line
 (result.kesalahanBahasa || []).forEach(({ ayatSalah }) => {
+  // Make sure ayatSalah exists and is a string
   const phrase = (ayatSalah || '').trim();
   if (!phrase) return;
 
-if (!line || typeof line !== 'string') return;
+  // Make sure current line is a valid string
+  if (!line || typeof line !== 'string') return;
 
-  const lineText = line || '';
+  const lineText = line;
   const normalizedLine = lineText.toLowerCase();
   const normalizedPhrase = phrase.toLowerCase();
 
   const startIdx = normalizedLine.indexOf(normalizedPhrase);
-  if (startIdx < 0) return; // safety check
+  if (startIdx < 0) return; // phrase not found in line
 
   const textBefore = lineText.substring(0, startIdx);
   const startX = margin + pdf.getTextWidth(textBefore);
