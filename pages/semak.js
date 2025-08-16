@@ -163,7 +163,7 @@ const res = await fetch('/api/semak/bulk', {
 });
 
 const json = await res.json();
-console.log('Bulk semak response:', data);
+console.log('Bulk semak response:', json);
      
       if (!res.ok) throw new Error(json.error || 'Ralat pelayan');
 await fetchCredit();
