@@ -264,12 +264,14 @@ if (includeKarangan) {
         pdf.text(line, margin, y);
 
         // Underline ayat salah in this line
-(result.kesalahanBahasa ?? []).forEach(({ ayatSalah }) => {
-  const phrase = (ayatSalah ?? '').trim();
+(result.kesalahanBahasa || []).forEach(({ ayatSalah }) => {
+  if (!ayatSalah) return; // skip if undefined/null
+  const phrase = String(ayatSalah).trim();
   if (!phrase) return;
+
   if (!line || typeof line !== 'string') return;
 
-  const lineText = line;
+  const lineText = String(line);
   const normalizedLine = lineText.toLowerCase();
   const normalizedPhrase = phrase.toLowerCase();
 
