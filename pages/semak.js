@@ -264,12 +264,9 @@ if (includeKarangan) {
         pdf.text(line, margin, y);
 
         // Underline ayat salah in this line
-(result.kesalahanBahasa || []).forEach(({ ayatSalah }) => {
-  // Make sure ayatSalah exists and is a string
-  const phrase = (ayatSalah || '').trim();
+(result.kesalahanBahasa ?? []).forEach(({ ayatSalah }) => {
+  const phrase = (ayatSalah ?? '').trim();
   if (!phrase) return;
-
-  // Make sure current line is a valid string
   if (!line || typeof line !== 'string') return;
 
   const lineText = line;
@@ -277,7 +274,7 @@ if (includeKarangan) {
   const normalizedPhrase = phrase.toLowerCase();
 
   const startIdx = normalizedLine.indexOf(normalizedPhrase);
-  if (startIdx < 0) return; // phrase not found in line
+  if (startIdx < 0) return;
 
   const textBefore = lineText.substring(0, startIdx);
   const startX = margin + pdf.getTextWidth(textBefore);
@@ -289,7 +286,6 @@ if (includeKarangan) {
   pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
   pdf.setDrawColor(0);
 });
-
 
     y += lineHeight;
   }
@@ -531,13 +527,14 @@ if (includeKarangan) {
                 </td>
                 <td style={{ padding: 10, border: '1px solid #48A6A7', maxWidth: 300, whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
                   {pupil.error && <div style={{ color: 'red' }}>{pupil.error}</div>}
-                  {pupil.result && (
-                    <>
-                      <div><strong>Markah Isi:</strong> {pupil.result.markahIsi ?? '-'}</div>
-                      <div><strong>Markah Bahasa:</strong> {pupil.result.markahBahasa ?? '-'}</div>
-                      <div><strong>Markah Keseluruhan:</strong> {pupil.result.markahKeseluruhan ?? '-'}</div>
-                    </>
-                  )}
+{pupil.result && (
+  <>
+    <div><strong>Markah Isi:</strong> {pupil.result?.markahIsi ?? '-'}</div>
+    <div><strong>Markah Bahasa:</strong> {pupil.result?.markahBahasa ?? '-'}</div>
+    <div><strong>Markah Keseluruhan:</strong> {pupil.result?.markahKeseluruhan ?? '-'}</div>
+  </>
+)}
+
                 </td>
               </tr>
             ))}
