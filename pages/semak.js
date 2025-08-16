@@ -264,9 +264,8 @@ if (includeKarangan) {
         pdf.text(line, margin, y);
 
         // Underline ayat salah in this line
-(result.kesalahanBahasa || []).forEach(({ ayatSalah }) => {
-  if (!ayatSalah) return; // skip if undefined/null
-  const phrase = String(ayatSalah).trim();
+(result.kesalahanBahasa || []).forEach((item) => {
+  const phrase = String(item?.ayatSalah || '').trim();
   if (!phrase) return;
 
   if (!line || typeof line !== 'string') return;
