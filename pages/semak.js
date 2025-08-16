@@ -120,96 +120,73 @@ console.log("Selected pupils for processing:", selected);
       )
     );
 
-    try {
-      const formData = new FormData();
-      formData.append('userId', userId);
+try {
+  const formData = new FormData();
+  formData.append('userId', userId);
 
-const pupilsData = selected.map(p => ({
-  id: p.id,
-  nama: p.nama,
-  karangan: p.karangan,
-  mode: p.mode,
-  set: p.set,
-  checked: p.checked,               // use actual checked value
-  pictureDescription: pictureDescription,  // same description for all selected pupils
-  pictureUrl: p.pictureUrl || '',
-}));
-formData.append('pupils', JSON.stringify(pupilsData));
+  const pupilsData = selected.map(p => ({
+    id: p.id,
+    nama: p.nama,
+    karangan: p.karangan,
+    mode: p.mode,
+    set: p.set,
+    checked: p.checked,
+    pictureDescription: pictureDescription,
+    pictureUrl: p.pictureUrl || '',
+  }));
 
+  // Append pupils data as JSON string
+  formData.append('pupils', JSON.stringify(pupilsData));
 
-      // Append OCR files keyed by "file_<id>" for each pupil in OCR mode
-      selected.forEach((p) => {
-        if (p.mode === 'ocr' && p.ocrFiles.length > 0) {
-          Array.from(p.ocrFiles).forEach((file) => {
-            formData.append(`file_${p.id}`, file);
-          });
-        }
+  // Append OCR files for pupils in OCR mode
+  selected.forEach((p) => {
+    if (p.mode === 'ocr' && p.ocrFiles.length > 0) {
+      Array.from(p.ocrFiles).forEach((file) => {
+        formData.append(`file_${p.id}`, file);
       });
-
-// 1️⃣ Prepare FormData
-const formData = new FormData();
-
-// Append pupils data as JSON string
-formData.append('pupils', JSON.stringify(pupilsData));
-
-// If any pupil is in 'ocr' mode, append their files
-for (const pupil of pupilsData) {
-  if (pupil.mode === 'ocr' && pupil.files) {
-    for (let i = 0; i < pupil.files.length; i++) {
-      formData.append(`file_${pupil.id}`, pupil.files[i]);
     }
-  }
+  });
+
+  console.log("Sending userId to backend:", userId);
+  console.log("Sending pupils data to backend:", JSON.stringify(pupilsData, null, 2));
+
+  const idToken = await user.getIdToken();
+
+  const res = await fetch('/api/semak/bulk', {
+    method: 'POST',
+    body: formData,
+    headers: {
+      Authorization: `Bearer ${idToken}`, // ✅ Let fetch handle multipart headers
+    },
+  });
+
+  const json = await res.json();
+
+  if (!res.ok) throw new Error(json.error || 'Ralat pelayan');
+  await fetchCredit();
+
+  // Update pupils with results/errors
+  setPupils((prev) =>
+    prev.map((p) => {
+      const found = json.results.find((r) => r.id === p.id);
+      if (!found) return p;
+      return {
+        ...p,
+        loading: false,
+        error: found.error || null,
+        result: found.error ? null : found,
+      };
+    })
+  );
+} catch (e) {
+  alert('Ralat semasa semakan: ' + e.message);
+  setPupils((prev) =>
+    prev.map((p) =>
+      selected.find((sel) => sel.id === p.id) ? { ...p, loading: false } : p
+    )
+  );
 }
 
-console.log("Sending userId to backend:", userId);
-
-const idToken = await user.getIdToken();
-
-console.log("Sending pupils data to backend:", JSON.stringify(pupilsData, null, 2));
-
-// 2️⃣ Send the request
-const res = await fetch('/api/semak/bulk', {
-  method: 'POST',
-  body: formData,
-  headers: {
-    Authorization: `Bearer ${idToken}`, // ✅ Keep the token
-  },
-});
-
-const data = await res.json();
-console.log('Bulk semak response:', data);
-
-
-      const json = await res.json();
-
-      if (!res.ok) throw new Error(json.error || 'Ralat pelayan');
-await fetchCredit();
-
-
-      // Update pupils with their respective results or errors
-      setPupils((prev) =>
-        prev.map((p) => {
-          const found = json.results.find((r) => r.id === p.id);
-          if (!found) return p;
-
-          return {
-            ...p,
-            loading: false,
-            error: found.error || null,
-            result: found.error ? null : found,
-          };
-        })
-      );
-    } catch (e) {
-      alert('Ralat semasa semakan: ' + e.message);
-      // Reset loading state on error for all selected pupils
-      setPupils((prev) =>
-        prev.map((p) =>
-          selected.find((sel) => sel.id === p.id) ? { ...p, loading: false } : p
-        )
-      );
-    }
-  }
 
   // Generate and download PDF for selected pupils who have result
   const downloadCombinedPDF = async () => {
