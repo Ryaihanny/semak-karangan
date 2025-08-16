@@ -131,7 +131,7 @@ const pupilsData = selected.map(({ id, nama, karangan, mode, set, checked }) => 
   karangan,
   mode,
   set,
-  checked,                  // ✅ include checked
+  checked: true                  // ✅ include checked
   pictureDescription,
   pictureUrl: '',
 }));
