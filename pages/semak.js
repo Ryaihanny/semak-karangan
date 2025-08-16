@@ -145,20 +145,40 @@ formData.append('pupils', JSON.stringify(pupilsData));
           });
         }
       });
-console.log('Sending userId to backend:', userId);
+
+// 1️⃣ Prepare FormData
+const formData = new FormData();
+
+// Append pupils data as JSON string
+formData.append('pupils', JSON.stringify(pupilsData));
+
+// If any pupil is in 'ocr' mode, append their files
+for (const pupil of pupilsData) {
+  if (pupil.mode === 'ocr' && pupil.files) {
+    for (let i = 0; i < pupil.files.length; i++) {
+      formData.append(`file_${pupil.id}`, pupil.files[i]);
+    }
+  }
+}
+
+console.log("Sending userId to backend:", userId);
 
 const idToken = await user.getIdToken();
 
 console.log("Sending pupils data to backend:", JSON.stringify(pupilsData, null, 2));
 
+// 2️⃣ Send the request
 const res = await fetch('/api/semak/bulk', {
   method: 'POST',
   body: formData,
-headers: {
-  Authorization: `Bearer ${idToken}`,
-},
-
+  headers: {
+    Authorization: `Bearer ${idToken}`, // ✅ Keep the token
+  },
 });
+
+const data = await res.json();
+console.log('Bulk semak response:', data);
+
 
       const json = await res.json();
 
