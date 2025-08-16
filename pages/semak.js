@@ -130,7 +130,7 @@ const pupilsData = selected.map(p => ({
   karangan: p.karangan,
   mode: p.mode,
   set: p.set,
-  checked: p.checked,               // use actual checked value
+  checked: Boolean(p.checked),               // use actual checked value
   pictureDescription: pictureDescription,  // same description for all selected pupils
   pictureUrl: p.pictureUrl || '',
 }));
@@ -145,9 +145,6 @@ formData.append('pupils', JSON.stringify(pupilsData));
           });
         }
       });
-
-// 1️⃣ Prepare FormData
-const formData = new FormData();
 
 // Append pupils data as JSON string
 formData.append('pupils', JSON.stringify(pupilsData));
