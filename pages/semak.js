@@ -68,12 +68,13 @@ useEffect(() => {
   };
 
   // Update pupil property by id
-  const updatePupil = (id, key, value) => {
-console.log(`Updating pupil ${id}: ${key} = ${value}`);
-    setPupils((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [key]: value } : p))
-    );
-  };
+// Updated
+const updatePupil = (index, key, value) => {
+  setPupils((prev) =>
+    prev.map((p, i) => (i === index ? { ...p, [key]: value } : p))
+  );
+};
+
 
   // Toggle check/uncheck all pupils
   const toggleAllChecked = (checked) => {
@@ -443,13 +444,13 @@ if (includeKarangan) {
             </tr>
           </thead>
           <tbody>
-            {pupils.map((pupil) => (
+            {pupils.map((pupil, index) => (
               <tr key={pupil.id}>
                 <td style={{ padding: 10, border: '1px solid #48A6A7', textAlign: 'center' }}>
                   <input
                     type="checkbox"
                     checked={pupil.checked}
-                    onChange={(e) => updatePupil(pupil.id, 'checked', e.target.checked)}
+                    onChange={(e) => updatePupil(index, 'checked', e.target.checked)}
                   />
                 </td>
                 <td style={{ padding: 10, border: '1px solid #48A6A7' }}>
@@ -457,7 +458,7 @@ if (includeKarangan) {
                     type="text"
                     placeholder="Nama Pelajar"
                     value={pupil.nama}
-                    onChange={(e) => updatePupil(pupil.id, 'nama', e.target.value)}
+                    onChange={(e) => updatePupil(index, 'nama', e.target.value)}
                     style={{ width: '100%', border: '1px solid #ccc', padding: 6, borderRadius: 4 }}
                     disabled={pupil.loading}
                   />
@@ -465,7 +466,7 @@ if (includeKarangan) {
                 <td style={{ padding: 10, border: '1px solid #48A6A7', textAlign: 'center' }}>
                   <select
                     value={pupil.mode}
-                    onChange={(e) => updatePupil(pupil.id, 'mode', e.target.value)}
+                    onChange={(e) => updatePupil(index, 'mode', e.target.value)}
                     style={{ padding: 6, borderRadius: 4 }}
                     disabled={pupil.loading}
                   >
@@ -478,7 +479,7 @@ if (includeKarangan) {
                     type="text"
                     placeholder="Set (Batch)"
                     value={pupil.set}
-                    onChange={(e) => updatePupil(pupil.id, 'set', e.target.value)}
+                    onChange={(e) => updatePupil(index, 'set', e.target.value)}
                     style={{ width: '100%', border: '1px solid #ccc', padding: 6, borderRadius: 4 }}
                     disabled={pupil.loading}
                   />
@@ -488,7 +489,7 @@ if (includeKarangan) {
                     <textarea
                       placeholder="Tulis Karangan"
                       value={pupil.karangan}
-                      onChange={(e) => updatePupil(pupil.id, 'karangan', e.target.value)}
+                      onChange={(e) => updatePupil(index, 'karangan', e.target.value)}
                       style={{ width: '100%', border: '1px solid #ccc', padding: 6, borderRadius: 4, resize: 'vertical' }}
                       rows={4}
                       disabled={pupil.loading}
@@ -498,7 +499,7 @@ if (includeKarangan) {
                       type="file"
                       accept="image/*"
                       multiple
-                      onChange={(e) => updatePupil(pupil.id, 'ocrFiles', e.target.files)}
+                      onChange={(e) => updatePupil(index, 'ocrFiles', e.target.files)}
                       disabled={pupil.loading}
                     />
                   )}
