@@ -268,6 +268,8 @@ if (includeKarangan) {
   const phrase = (ayatSalah || '').trim();
   if (!phrase) return;
 
+if (!line || typeof line !== 'string') return;
+
   const lineText = line || '';
   const normalizedLine = lineText.toLowerCase();
   const normalizedPhrase = phrase.toLowerCase();
