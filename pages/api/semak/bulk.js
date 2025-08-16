@@ -116,10 +116,12 @@ export default async function handler(req, res) {
 
     try {
       const allPupils = JSON.parse(fields.pupils || '[]');
-const pupils = allPupils.filter(p => p.checked); // ✅ Only process checked pupils
+const pupils = allPupils.filter(p => p.checked === true || p.checked === 'true');
 
 console.log('allPupils parsed from request:', allPupils);
 console.log('pupils checked for processing:', pupils);
+console.log('Pupils to process:', pupils.map(p => ({ nama: p.nama, checked: p.checked, type: typeof p.checked })));
+
 
 
 if (!pupils.length) {
