@@ -130,7 +130,7 @@ const pupilsData = selected.map(p => ({
   karangan: p.karangan,
   mode: p.mode,
   set: p.set,
-  checked: Boolean(p.checked),               // use actual checked value
+  checked: true,               // use actual checked value
   pictureDescription: pictureDescription,  // same description for all selected pupils
   pictureUrl: p.pictureUrl || '',
 }));
