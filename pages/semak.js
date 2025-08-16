@@ -125,16 +125,18 @@ console.log("Selected pupils for processing:", selected);
       formData.append('userId', userId);
 
       // JSON encode pupils data but without files
-      const pupilsData = selected.map(({ id, nama, karangan, mode, set }) => ({
-        id,
-        nama,
-        karangan,
-        mode,
-        set,
-        pictureDescription,
-        pictureUrl: '',
-      }));
-      formData.append('pupils', JSON.stringify(pupilsData));
+const pupilsData = selected.map(({ id, nama, karangan, mode, set, checked }) => ({
+  id,
+  nama,
+  karangan,
+  mode,
+  set,
+  checked,                  // ✅ include checked
+  pictureDescription,
+  pictureUrl: '',
+}));
+formData.append('pupils', JSON.stringify(pupilsData));
+
 
       // Append OCR files keyed by "file_<id>" for each pupil in OCR mode
       selected.forEach((p) => {
