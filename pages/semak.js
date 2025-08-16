@@ -124,16 +124,15 @@ console.log("Selected pupils for processing:", selected);
       const formData = new FormData();
       formData.append('userId', userId);
 
-      // JSON encode pupils data but without files
-const pupilsData = selected.map(({ id, nama, karangan, mode, set, checked }) => ({
-  id,
-  nama,
-  karangan,
-  mode,
-  set,
-  checked: true,                  // ✅ include checked
-  pictureDescription,
-  pictureUrl: '',
+const pupilsData = selected.map(p => ({
+  id: p.id,
+  nama: p.nama,
+  karangan: p.karangan,
+  mode: p.mode,
+  set: p.set,
+  checked: p.checked,               // use actual checked value
+  pictureDescription: pictureDescription,  // same description for all selected pupils
+  pictureUrl: p.pictureUrl || '',
 }));
 formData.append('pupils', JSON.stringify(pupilsData));
 
