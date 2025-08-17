@@ -280,22 +280,23 @@ const downloadCombinedPDF = async () => {
         pdf.text(line, margin, y);
 
         // Underline ayat salah
-        (result.kesalahanBahasa || []).forEach((item) => {
-          const phrase = (item?.ayatSalah || '').trim();
-          if (!phrase) return;
-          const startIdx = line.toLowerCase().indexOf(phrase.toLowerCase());
-          if (startIdx !== -1) {
-            const textBefore = line.substring(0, startIdx);
-            const startX = margin + pdf.getTextWidth(textBefore);
-            const phraseWidth = pdf.getTextWidth(phrase);
-            const underlineY = y + 1.5;
+(result.kesalahanBahasa || []).forEach((item) => {
+  if (!item || !item.ayatSalah) return; // skip if item or ayatSalah is missing
+  const phrase = item.ayatSalah.trim();
+  const startIdx = line.toLowerCase().indexOf(phrase.toLowerCase());
+  if (startIdx !== -1) {
+    const textBefore = line.substring(0, startIdx);
+    const startX = margin + pdf.getTextWidth(textBefore);
+    const phraseWidth = pdf.getTextWidth(phrase);
+    const underlineY = y + 1.5;
 
-            pdf.setDrawColor(255, 0, 0);
-            pdf.setLineWidth(0.5);
-            pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
-            pdf.setDrawColor(0);
-          }
-        });
+    pdf.setDrawColor(255, 0, 0);
+    pdf.setLineWidth(0.5);
+    pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
+    pdf.setDrawColor(0);
+  }
+});
+
 
         y += lineHeight;
       }
