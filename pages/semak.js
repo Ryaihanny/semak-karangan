@@ -266,7 +266,7 @@ if (includeKarangan) {
         // Underline ayat salah in this line
 (result.kesalahanBahasa || []).forEach((item) => {
   const phrase = String(item?.ayatSalah || '').trim();
-  if (!phrase) return;
+  if (!phrase) return; // skip if empty
 
   if (!line || typeof line !== 'string') return;
 
@@ -274,18 +274,23 @@ if (includeKarangan) {
   const normalizedLine = lineText.toLowerCase();
   const normalizedPhrase = phrase.toLowerCase();
 
-  const startIdx = normalizedLine.indexOf(normalizedPhrase);
-  if (startIdx < 0) return;
+  let startIdx = 0;
+  while (startIdx < normalizedLine.length) {
+    const foundIdx = normalizedLine.indexOf(normalizedPhrase, startIdx);
+    if (foundIdx === -1) break; // no more occurrences
 
-  const textBefore = lineText.substring(0, startIdx);
-  const startX = margin + pdf.getTextWidth(textBefore);
-  const phraseWidth = pdf.getTextWidth(lineText.substr(startIdx, phrase.length));
-  const underlineY = y + 1.5;
+    const textBefore = lineText.substring(0, foundIdx);
+    const startX = margin + pdf.getTextWidth(textBefore);
+    const phraseWidth = pdf.getTextWidth(lineText.substr(foundIdx, phrase.length));
+    const underlineY = y + 1.5;
 
-  pdf.setDrawColor(255, 0, 0);
-  pdf.setLineWidth(0.5);
-  pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
-  pdf.setDrawColor(0);
+    pdf.setDrawColor(255, 0, 0);
+    pdf.setLineWidth(0.5);
+    pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
+    pdf.setDrawColor(0);
+
+    startIdx = foundIdx + phrase.length; // move past this occurrence
+  }
 });
 
     y += lineHeight;
