@@ -172,7 +172,7 @@ await fetchCredit();
       // Update pupils with their respective results or errors
       setPupils((prev) =>
         prev.map((p) => {
-          const found = json.results.find((r) => r.id === p.id);
+          const found = json.results.find((r) => String(r.id) === String(p.id));
           if (!found) return p;
 
           return {
