@@ -266,9 +266,16 @@ if (includeKarangan) {
         // Underline ayat salah in this line
 (result.kesalahanBahasa || []).forEach((item) => {
   const phrase = String(item?.ayatSalah || '').trim();
-  if (!phrase) return; // skip if empty
 
-  if (!line || typeof line !== 'string') return;
+  // Debugging logs
+  console.log('Current line:', line);
+  console.log('Phrase to find:', phrase);
+
+  if (!phrase) return; // skip if empty
+  if (!line || typeof line !== 'string') {
+    console.warn('Skipping this line because it is not a string:', line);
+    return;
+  }
 
   const lineText = String(line);
   const normalizedLine = lineText.toLowerCase();
