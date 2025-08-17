@@ -264,16 +264,15 @@ if (includeKarangan) {
         pdf.text(line, margin, y);
 
         // Underline ayat salah in this line
-(result.kesalahanBahasa || []).forEach((item) => {
-  const phrase = String(item?.ayatSalah || '').trim();
+(result.kesalahanBahasa || []).forEach((item, itemIndex) => {
+  const phrase = (item?.ayatSalah || '').trim();
+  if (!phrase) {
+    console.log(`Skipping empty ayatSalah at index ${itemIndex}`, item);
+    return;
+  }
 
-  // Debugging logs
-  console.log('Current line:', line);
-  console.log('Phrase to find:', phrase);
-
-  if (!phrase) return; // skip if empty
   if (!line || typeof line !== 'string') {
-    console.warn('Skipping this line because it is not a string:', line);
+    console.log(`Skipping invalid line at lineIndex ${lineIndex}`, line);
     return;
   }
 
@@ -281,9 +280,14 @@ if (includeKarangan) {
   const normalizedLine = lineText.toLowerCase();
   const normalizedPhrase = phrase.toLowerCase();
 
+  console.log(`Processing lineIndex ${lineIndex}, ayatSalah: "${phrase}"`);
+  
   let startIdx = 0;
+
   while (startIdx < normalizedLine.length) {
     const foundIdx = normalizedLine.indexOf(normalizedPhrase, startIdx);
+    console.log(`foundIdx for "${phrase}":`, foundIdx);
+
     if (foundIdx === -1) break; // no more occurrences
 
     const textBefore = lineText.substring(0, foundIdx);
@@ -291,7 +295,7 @@ if (includeKarangan) {
     const phraseWidth = pdf.getTextWidth(lineText.substr(foundIdx, phrase.length));
     const underlineY = y + 1.5;
 
-    pdf.setDrawColor(255, 0, 0);
+    pdf.setDrawColor(255, 0, 0); // red underline
     pdf.setLineWidth(0.5);
     pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
     pdf.setDrawColor(0);
