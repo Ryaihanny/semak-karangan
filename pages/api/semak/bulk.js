@@ -98,27 +98,36 @@ async function deductCredits(userId, deductions) {
   return currentCredits - deductions;
 }
 
+// Wrap formidable parse in a promise
+function parseForm(req) {
+  return new Promise((resolve, reject) => {
+    const form = formidable({ multiples: true });
+    form.parse(req, (err, fields, files) => {
+      if (err) reject(err);
+      else resolve({ fields, files });
+    });
+  });
+}
 
-
-// ✅ Main handler
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed, use POST' });
   }
 
-  const form = formidable({ multiples: true });
+  let fields, files;
+  try {
+    ({ fields, files } = await parseForm(req));
+  } catch (err) {
+    console.error('❌ Form parse error:', err);
+    return res.status(500).json({ error: 'Failed to parse form data', detail: err.message });
+  }
 
-  form.parse(req, async (err, fields, files) => {
-    if (err) {
-      console.error('❌ Form parse error:', err);
-      return res.status(500).json({ error: 'Failed to parse form data' });
-    }
+  try {
+    const allPupils = JSON.parse(fields.pupils || '[]');
+    const pupils = allPupils.filter(p => p.checked === true || p.checked === 'true');
 
-    try {
-      const allPupils = JSON.parse(fields.pupils || '[]');
-const pupils = allPupils.filter(p => p.checked === true || p.checked === 'true');
+    console.log('allPupils parsed from request:', allPupils);
 
-console.log('allPupils parsed from request:', allPupils);
 console.log('pupils checked for processing:', pupils);
 
 
@@ -284,5 +293,4 @@ analysis.karanganUnderlined = safeCombinedText;
       console.error('❌ Bulk handler error:', e);
       res.status(500).json({ error: 'Ralat pelayan semasa pemprosesan bulk.', detail: e.message });
     }
-  });
 }
