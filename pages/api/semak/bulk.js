@@ -195,6 +195,8 @@ if (mode === 'manual') {
       pictureUrl,
     });
 
+analysis.karanganUnderlined = safeKarangan; // ✅ Add this line
+
 
             console.log('✅ Analisis selesai untuk', nama, 'Isi:', analysis.markahIsi, 'Bahasa:', analysis.markahBahasa);
 
@@ -252,6 +254,8 @@ const analysis = await analyseKarangan({
   pictureDescription,
   pictureUrl,
 });
+
+analysis.karanganUnderlined = safeCombinedText;
 
             // ✅ Tambah ulasan keseluruhan ringkas
             const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
