@@ -195,206 +195,188 @@ await fetchCredit();
   }
 
   // Generate and download PDF for selected pupils who have result
-  const downloadCombinedPDF = async () => {
-    setPdfLoading(true);
-    const selected = pupils.filter((p) => p.checked && p.result);
+const downloadCombinedPDF = async () => {
+  setPdfLoading(true);
+  const selected = pupils.filter((p) => p.checked && p.result);
 
-    if (selected.length === 0) {
-      alert('Sila tandakan pelajar yang ada keputusan untuk dimuat turun.');
-      setPdfLoading(false);
-      return;
-    }
-
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const margin = 10;
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const usableWidth = pageWidth - margin * 2;
-    const lineHeight = 7;
-    const fontSize = 12;
-
-    pdf.setFont('Times', 'normal');
-    pdf.setFontSize(fontSize);
-
-    const cleanText = (text) =>
-      text
-        ?.replace(/<br\s*\/?>/gi, '\n')
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/<\/?[^>]+(>|$)/g, '') || '-';
-
-    for (let i = 0; i < selected.length; i++) {
-      const p = selected[i];
-      const result = p.result;
-      let y = margin;
-
-      if (i > 0) pdf.addPage();
-
-      pdf.setFont(undefined, 'bold');
-      pdf.text(`Keputusan Semakan Karangan untuk: ${result.nama}`, margin, y);
-      pdf.setFont(undefined, 'normal');
-      y += lineHeight * 2;
-
-      pdf.text(`Markah Isi: ${result.markahIsi ?? '-'}`, margin, y);
-      y += lineHeight;
-      pdf.text(`Markah Bahasa: ${result.markahBahasa ?? '-'}`, margin, y);
-      y += lineHeight;
-      pdf.text(`Markah Keseluruhan: ${result.markahKeseluruhan ?? '-'}`, margin, y);
-      y += lineHeight * 2;
-
-      pdf.setFont(undefined, 'bold');
-      pdf.text('Karangan Asal (Kesalahan digariskan):', margin, y);
-      pdf.setFont(undefined, 'normal');
-      y += lineHeight;
-
-if (includeKarangan) {
-  const karanganClean = cleanText(result.karanganUnderlined);
-  const karanganLines = pdf.splitTextToSize(karanganClean, usableWidth);
-
-  for (let lineIndex = 0; lineIndex < karanganLines.length; lineIndex++) {
-    const line = karanganLines[lineIndex];
-    if (y + lineHeight > pageHeight - margin) {
-      pdf.addPage();
-      y = margin;
-    }
-
-        pdf.text(line, margin, y);
-
-        // Underline ayat salah in this line
-(result.kesalahanBahasa || []).forEach((item, itemIndex) => {
-  const phrase = (item?.ayatSalah || '').trim();
-  if (!phrase) {
-    console.log(`Skipping empty ayatSalah at index ${itemIndex}`, item);
+  if (selected.length === 0) {
+    alert('Sila tandakan pelajar yang ada keputusan untuk dimuat turun.');
+    setPdfLoading(false);
     return;
   }
 
-  if (!line || typeof line !== 'string') {
-    console.log(`Skipping invalid line at lineIndex ${lineIndex}`, line);
-    return;
-  }
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const margin = 10;
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const usableWidth = pageWidth - margin * 2;
+  const lineHeight = 7;
+  const fontSize = 12;
 
-  const lineText = String(line);
-  const normalizedLine = lineText.toLowerCase();
-  const normalizedPhrase = phrase.toLowerCase();
+  pdf.setFont('Times', 'normal');
+  pdf.setFontSize(fontSize);
 
-  console.log(`Processing lineIndex ${lineIndex}, ayatSalah: "${phrase}"`);
-  
-  let startIdx = 0;
+  const cleanText = (text) =>
+    text
+      ?.replace(/<br\s*\/?>/gi, '\n')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<\/?[^>]+(>|$)/g, '') || '-';
 
-  while (startIdx < normalizedLine.length) {
-    const foundIdx = normalizedLine.indexOf(normalizedPhrase, startIdx);
-    console.log(`foundIdx for "${phrase}":`, foundIdx);
+  for (let i = 0; i < selected.length; i++) {
+    const p = selected[i];
+    const result = p.result;
+    let y = margin;
 
-    if (foundIdx === -1) break; // no more occurrences
+    if (i > 0) pdf.addPage();
 
-    const textBefore = lineText.substring(0, foundIdx);
-    const startX = margin + pdf.getTextWidth(textBefore);
-    const phraseWidth = pdf.getTextWidth(lineText.substr(foundIdx, phrase.length));
-    const underlineY = y + 1.5;
+    // Header
+    pdf.setFont(undefined, 'bold');
+    pdf.text(`Keputusan Semakan Karangan untuk: ${result.nama}`, margin, y);
+    pdf.setFont(undefined, 'normal');
+    y += lineHeight * 2;
 
-    pdf.setDrawColor(255, 0, 0); // red underline
-    pdf.setLineWidth(0.5);
-    pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
-    pdf.setDrawColor(0);
-
-    startIdx = foundIdx + phrase.length; // move past this occurrence
-  }
-});
-
+    // Marks
+    pdf.text(`Markah Isi: ${result.markahIsi ?? '-'}`, margin, y);
     y += lineHeight;
-  }
-} else {
-  pdf.text('(Karangan penuh tidak disertakan atas permintaan)', margin, y);
-  y += lineHeight * 2;
-}
+    pdf.text(`Markah Bahasa: ${result.markahBahasa ?? '-'}`, margin, y);
+    y += lineHeight;
+    pdf.text(`Markah Keseluruhan: ${result.markahKeseluruhan ?? '-'}`, margin, y);
+    y += lineHeight;
 
-      pdf.setFont(undefined, 'bold');
-      pdf.text('Analisis Kesalahan Bahasa:', margin, y);
-      pdf.setFont(undefined, 'normal');
-      y += lineHeight;
+    // Ringkasan Ulasan
+    pdf.setFont(undefined, 'bold');
+    pdf.text('Ringkasan Ulasan:', margin, y);
+    pdf.setFont(undefined, 'normal');
+    y += lineHeight;
 
-      if (!result.kesalahanBahasa || result.kesalahanBahasa.length === 0) {
-        pdf.text('Tiada kesalahan bahasa dikesan.', margin, y);
-        y += lineHeight;
-      } else {
-        autoTable(pdf, {
-          startY: y,
-          head: [['Kategori', 'Ayat Salah', 'Pembetulan', 'Penjelasan']],
-          body: result.kesalahanBahasa.map((item) => [
-            cleanText(item.kategori),
-            cleanText(item.ayatSalah),
-            cleanText(item.cadangan),
-            cleanText(item.penjelasan),
-          ]),
-          margin: { left: margin, right: margin },
-          styles: {
-            font: 'times',
-            fontSize: 11,
-            cellPadding: 2,
-            textColor: 0,
-            lineColor: [0, 0, 0],
-            lineWidth: 0.5,
-          },
-          headStyles: {
-            fillColor: [255, 255, 255],
-            textColor: 0,
-            fontStyle: 'bold',
-            lineColor: [0, 0, 0],
-            lineWidth: 0.5,
-          },
-          theme: 'grid',
-          pageBreak: 'auto',
-        });
+    const isiSummary = result.ulasan?.isi ?? 'Tiada ulasan isi.';
+    pdf.text(`Isi: ${isiSummary}`, margin + 5, y);
+    y += lineHeight;
 
-        y = pdf.lastAutoTable.finalY + lineHeight;
-      }
+    const bahasaSummary = result.ulasan?.bahasa ?? 'Tiada ulasan bahasa.';
+    pdf.text(`Bahasa: ${bahasaSummary}`, margin + 5, y);
+    y += lineHeight * 2;
 
-      pdf.setFont(undefined, 'bold');
-      pdf.text('Gaya Bahasa Dikesan:', margin, y);
-      pdf.setFont(undefined, 'normal');
-      y += lineHeight;
+    // Karangan Asal
+    pdf.setFont(undefined, 'bold');
+    pdf.text('Karangan Asal (Kesalahan digariskan):', margin, y);
+    pdf.setFont(undefined, 'normal');
+    y += lineHeight;
 
-      if (!result.gayaBahasa || result.gayaBahasa.length === 0) {
-        pdf.text('Tiada gaya bahasa dikesan.', margin, y);
-        y += lineHeight;
-      } else {
-        result.gayaBahasa.forEach((g) => {
-          const wrapped = pdf.splitTextToSize(`- ${cleanText(g)}`, usableWidth);
-          wrapped.forEach((line) => {
-            if (y + lineHeight > pageHeight - margin) {
-              pdf.addPage();
-              y = margin;
-            }
-            pdf.text(line, margin, y);
-            y += lineHeight;
-          });
-        });
-      }
+    if (includeKarangan) {
+      const karanganClean = cleanText(result.karanganUnderlined);
+      const karanganLines = pdf.splitTextToSize(karanganClean, usableWidth);
 
-      y += lineHeight;
-
-      pdf.setFont(undefined, 'bold');
-      pdf.text('Ulasan Keseluruhan:', margin, y);
-      pdf.setFont(undefined, 'normal');
-      y += lineHeight;
-
-      const ulasanKeseluruhanLines = pdf.splitTextToSize(cleanText(result.ulasan?.keseluruhan), usableWidth);
-      ulasanKeseluruhanLines.forEach((line) => {
+      for (let lineIndex = 0; lineIndex < karanganLines.length; lineIndex++) {
+        const line = karanganLines[lineIndex];
         if (y + lineHeight > pageHeight - margin) {
           pdf.addPage();
           y = margin;
         }
         pdf.text(line, margin, y);
+
+        // Underline ayat salah
+        (result.kesalahanBahasa || []).forEach((item) => {
+          const phrase = (item?.ayatSalah || '').trim();
+          if (!phrase) return;
+          const startIdx = line.toLowerCase().indexOf(phrase.toLowerCase());
+          if (startIdx !== -1) {
+            const textBefore = line.substring(0, startIdx);
+            const startX = margin + pdf.getTextWidth(textBefore);
+            const phraseWidth = pdf.getTextWidth(phrase);
+            const underlineY = y + 1.5;
+
+            pdf.setDrawColor(255, 0, 0);
+            pdf.setLineWidth(0.5);
+            pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
+            pdf.setDrawColor(0);
+          }
+        });
+
         y += lineHeight;
+      }
+    } else {
+      pdf.text('(Karangan penuh tidak disertakan atas permintaan)', margin, y);
+      y += lineHeight * 2;
+    }
+
+    // Analisis Kesalahan Bahasa Table
+    if (!result.kesalahanBahasa || result.kesalahanBahasa.length === 0) {
+      pdf.setFont(undefined, 'bold');
+      pdf.text('Analisis Kesalahan Bahasa:', margin, y);
+      pdf.setFont(undefined, 'normal');
+      y += lineHeight;
+      pdf.text('Tiada kesalahan bahasa dikesan.', margin + 5, y);
+      y += lineHeight;
+    } else {
+      autoTable(pdf, {
+        startY: y,
+        head: [['Kategori', 'Ayat Salah', 'Pembetulan', 'Penjelasan']],
+        body: result.kesalahanBahasa.map((item) => [
+          cleanText(item.kategori),
+          cleanText(item.ayatSalah),
+          cleanText(item.cadangan),
+          cleanText(item.penjelasan),
+        ]),
+        margin: { left: margin, right: margin },
+        styles: { font: 'times', fontSize: 11, cellPadding: 2, textColor: 0, lineColor: [0, 0, 0], lineWidth: 0.5 },
+        headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.5 },
+        theme: 'grid',
+        pageBreak: 'auto',
+      });
+      y = pdf.lastAutoTable.finalY + lineHeight;
+    }
+
+    // Gaya Bahasa
+    pdf.setFont(undefined, 'bold');
+    pdf.text('Gaya Bahasa Dikesan:', margin, y);
+    pdf.setFont(undefined, 'normal');
+    y += lineHeight;
+
+    if (!result.gayaBahasa || result.gayaBahasa.length === 0) {
+      pdf.text('Tiada gaya bahasa dikesan.', margin, y);
+      y += lineHeight;
+    } else {
+      result.gayaBahasa.forEach((g) => {
+        const wrapped = pdf.splitTextToSize(`- ${cleanText(g)}`, usableWidth);
+        wrapped.forEach((line) => {
+          if (y + lineHeight > pageHeight - margin) {
+            pdf.addPage();
+            y = margin;
+          }
+          pdf.text(line, margin, y);
+          y += lineHeight;
+        });
       });
     }
 
-    pdf.save('Laporan_Semakan_Karangan.pdf');
-    setPdfLoading(false);
-  };
+    y += lineHeight;
+
+    // Ulasan Keseluruhan
+    pdf.setFont(undefined, 'bold');
+    pdf.text('Ulasan Keseluruhan:', margin, y);
+    pdf.setFont(undefined, 'normal');
+    y += lineHeight;
+
+    const ulasanKeseluruhanLines = pdf.splitTextToSize(cleanText(result.ulasan?.keseluruhan), usableWidth);
+    ulasanKeseluruhanLines.forEach((line) => {
+      if (y + lineHeight > pageHeight - margin) {
+        pdf.addPage();
+        y = margin;
+      }
+      pdf.text(line, margin, y);
+      y += lineHeight;
+    });
+  }
+
+  pdf.save('Laporan_Semakan_Karangan.pdf');
+  setPdfLoading(false);
+};
+
 
   return (
     <div style={{ display: 'flex' }}>
