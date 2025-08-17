@@ -279,23 +279,26 @@ const downloadCombinedPDF = async () => {
         }
         pdf.text(line, margin, y);
 
-        // Underline ayat salah
+// Underline ayat salah in this line
 (result.kesalahanBahasa || []).forEach((item) => {
-  if (!item || !item.ayatSalah) return; // skip if item or ayatSalah is missing
-  const phrase = item.ayatSalah.trim();
-  const startIdx = line.toLowerCase().indexOf(phrase.toLowerCase());
-  if (startIdx !== -1) {
-    const textBefore = line.substring(0, startIdx);
-    const startX = margin + pdf.getTextWidth(textBefore);
+  const lineText = String(line || '');
+  const phrase = (item?.ayatSalah || '').trim();
+  if (!phrase) return; // skip empty phrases
+
+  const regex = new RegExp(phrase, 'gi'); // global, case-insensitive
+  let match;
+  while ((match = regex.exec(lineText)) !== null) {
+    const startX = margin + pdf.getTextWidth(lineText.substring(0, match.index));
     const phraseWidth = pdf.getTextWidth(phrase);
     const underlineY = y + 1.5;
 
-    pdf.setDrawColor(255, 0, 0);
+    pdf.setDrawColor(255, 0, 0); // red underline
     pdf.setLineWidth(0.5);
     pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
     pdf.setDrawColor(0);
   }
 });
+
 
 
         y += lineHeight;
