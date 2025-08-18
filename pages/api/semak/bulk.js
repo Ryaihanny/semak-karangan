@@ -232,8 +232,12 @@ await saveResultToFirestore(set, id, {
 
         const fileBuffer = fs.readFileSync(filepath);
 
-// ✅ Convert image to standard RGB JPEG using sharp
-const buffer = await sharp(fileBuffer).jpeg().toBuffer();
+// ✅ Convert image to standard RGB JPEG and flatten alpha using sharp
+const buffer = await sharp(fileBuffer)
+  .flatten({ background: { r: 255, g: 255, b: 255 } }) // remove alpha
+  .jpeg({ quality: 90 }) // set JPEG quality
+  .toBuffer();
+
 
 const [visionResult] = await bulkVisionClient.textDetection({
   image: { content: buffer },
