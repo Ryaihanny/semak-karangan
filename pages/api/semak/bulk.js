@@ -196,18 +196,26 @@ if (mode === 'manual') {
 
   try {
     console.log('🚀 Memulakan analisis karangan untuk:', nama);
-    const analysis = await analyseKarangan({
-      nama,
-      set,
-      karangan: safeKarangan,
-      pictureDescription,
-      pictureUrl,
-    });
+
+
+
+const safePictureDescription = typeof pictureDescription === 'string' ? pictureDescription : '';
+const safePictureUrl = typeof pictureUrl === 'string' ? pictureUrl : '';
+
+const analysis = await analyseKarangan({
+  nama,
+  set,
+  karangan: safeKarangan,
+  pictureDescription: safePictureDescription,
+  pictureUrl: safePictureUrl,
+});
+
 
 analysis.karanganUnderlined = safeKarangan; // ✅ Add this line
+const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
+analysis.ulasan.keseluruhan = ulasanKeseluruhan;
 
-
-            console.log('✅ Analisis selesai untuk', nama, 'Isi:', analysis.markahIsi, 'Bahasa:', analysis.markahBahasa);
+console.log('✅ Analisis selesai untuk', nama, 'Isi:', analysis.markahIsi, 'Bahasa:', analysis.markahBahasa);
 
 await saveResultToFirestore(set, id, {
   nama,
@@ -224,66 +232,76 @@ await saveResultToFirestore(set, id, {
             results.push({ id, error: 'Ralat semasa analisis manual.' });
           }
         } else if (mode === 'ocr') {
-         const fileItems = files[`file_${id}`];
+  const fileItems = files[`file_${id}`];
 
-if (!fileItems) {
-  results.push({ id, error: 'Fail OCR tidak dijumpai.' });
-  continue;
+  if (!fileItems) {
+    results.push({ id, error: 'Fail OCR tidak dijumpai.' });
+    continue;
+  }
+
+  const filesArray = Array.isArray(fileItems) ? fileItems.slice(0, 5) : [fileItems];
+
+  try {
+    let combinedText = '';
+
+    for (const file of filesArray) {
+      try {
+        const filepath = file.filepath || file.path;
+        if (!filepath) continue;
+
+        const fileBuffer = fs.readFileSync(filepath);
+        const [visionResult] = await bulkVisionClient.textDetection({
+          image: { content: fileBuffer },
+        });
+
+        const extractedText = visionResult?.textAnnotations?.[0]?.description || '';
+        combinedText += extractedText + '\n\n';
+      } catch (ocrErr) {
+        console.error(`❌ OCR failed for file ${file.originalFilename || file.newFilename}:`, ocrErr);
+        continue; // skip this file but continue processing others
+      }
+    }
+
+    const safeKarangan = typeof combinedText === 'string' ? combinedText : '';
+    const safePictureDescription = typeof pictureDescription === 'string' ? pictureDescription : '';
+    const safePictureUrl = typeof pictureUrl === 'string' ? pictureUrl : '';
+
+    if (!safeKarangan.trim()) {
+      results.push({ id, error: 'Tiada teks dijumpai dari fail OCR.' });
+      continue;
+    }
+
+    const analysis = await analyseKarangan({
+      nama,
+      set,
+      karangan: safeKarangan,
+      pictureDescription: safePictureDescription,
+      pictureUrl: safePictureUrl,
+    });
+
+    analysis.karanganUnderlined = safeKarangan;
+
+    const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
+    analysis.ulasan.keseluruhan = ulasanKeseluruhan;
+
+    await saveResultToFirestore(set, id, {
+      nama,
+      set,
+      karangan: safeKarangan,
+      ...analysis,
+    }, uid);
+
+    results.push({ id, ...analysis });
+  } catch (e) {
+    console.error(`❌ OCR analysis error for pupil ${nama} (${id}):`, e);
+    results.push({ id, error: 'Ralat semasa analisis OCR.', detail: e.message });
+  }
 }
 
-const filesArray = Array.isArray(fileItems) ? fileItems.slice(0, 5) : [fileItems];
 
-
-          try {
-            let combinedText = '';
-
-            for (const file of filesArray) {
-              const filepath = file.filepath || file.path;
-              if (!filepath) continue;
-
-              const fileBuffer = fs.readFileSync(filepath);
-              const [visionResult] = await bulkVisionClient.textDetection({
-                image: { content: fileBuffer },
-              });
-
-              const extractedText = visionResult?.textAnnotations?.[0]?.description || '';
-              combinedText += extractedText + '\n\n';
-            }
-
-const safeCombinedText = typeof combinedText === 'string' ? combinedText : '';
-if (!safeCombinedText.trim()) {
-  results.push({ id, error: 'Tiada teks dijumpai dari fail OCR.' });
-  continue;
-}
-
-const analysis = await analyseKarangan({
-  nama,
-  set,
-  karangan: safeCombinedText,
-  pictureDescription,
-  pictureUrl,
-});
-
-analysis.karanganUnderlined = safeCombinedText;
-
-            // ✅ Tambah ulasan keseluruhan ringkas
-            const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
-            analysis.ulasan.keseluruhan = ulasanKeseluruhan;
-
-            await saveResultToFirestore(set, id, {
-              nama,
-              set,
-              karangan: safeCombinedText,
-              ...analysis,
-}, uid);
-        
-
-            results.push({ id, ...analysis });
-          } catch (e) {
-            console.error(`❌ OCR analysis error for pupil ${nama} (${id}):`, e);
-            results.push({ id, error: 'Ralat semasa analisis OCR.', detail: e.message });
-          }
         } else {
+
+        
           results.push({ id, error: 'Mod tidak sah.' });
         }
       }
