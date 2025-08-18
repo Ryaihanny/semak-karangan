@@ -5,7 +5,7 @@ import { ImageAnnotatorClient as BulkVisionClient } from '@google-cloud/vision';
 import { analyseKarangan } from '@/lib/analyseKarangan';
 import admin from 'firebase-admin';
 import { generateUlasan } from '@/lib/analyseKarangan'; // ✅ NEW
-
+import sharp from 'sharp'; // <-- add this at the top
 
 // ✅ Inisialisasi Firebase jika belum ada
 if (!admin.apps.length) {
@@ -21,7 +21,6 @@ if (!admin.apps.length) {
 console.log('🔑 Private key length:', process.env.GOOGLE_PRIVATE_KEY?.length);
 console.log('📧 Client email:', process.env.GOOGLE_CLIENT_EMAIL);
 console.log('🆔 Project ID:', process.env.GOOGLE_PROJECT_ID);
-
 
 const db = admin.firestore();
 const bulkVisionClient = new BulkVisionClient({
@@ -127,15 +126,11 @@ export default async function handler(req, res) {
     const pupils = allPupils.filter(p => p.checked === true || p.checked === 'true');
 
     console.log('allPupils parsed from request:', allPupils);
-
 console.log('pupils checked for processing:', pupils);
-
-
 
 if (!pupils.length) {
   return res.status(400).json({ error: 'Tiada murid dipilih untuk semakan.' });
 }
-
 
 const idToken = req.headers.authorization?.split('Bearer ')[1];
 if (!idToken) {
@@ -150,7 +145,6 @@ try {
   console.error('❌ Token verification failed:', tokenError.message);
   return res.status(401).json({ error: 'Invalid or expired token' });
 }
-
       console.log('📥 Pupils received:', pupils);
 
       // Calculate total credits needed:
@@ -161,12 +155,10 @@ try {
       }
 
       // Deduct credits before processing:
-
 console.log('👥 Pupils to process:', pupils.length);
 console.log('🧮 Total credits needed:', totalCreditsNeeded);
 
 // 🧼 Cleaned-up credit deduction:
-
 try {
   const remainingCredits = await deductCredits(uid, totalCreditsNeeded);
   console.log(`🪙 Deducted ${totalCreditsNeeded} credits from user ${uid}`);
@@ -175,13 +167,9 @@ try {
   console.error('❌ Credit deduction failed:', creditError.message);
   return res.status(403).json({ error: 'Kredit tidak mencukupi untuk melakukan semakan ini.' });
 }
-
-
       const results = [];
-
       for (const pupil of pupils) {
         const { id, nama, set, karangan, mode, pictureDescription, pictureUrl } = pupil;
-
         if (!nama) {
           results.push({ id, error: 'Nama pelajar diperlukan.' });
           continue;
@@ -196,12 +184,8 @@ if (mode === 'manual') {
 
   try {
     console.log('🚀 Memulakan analisis karangan untuk:', nama);
-
-
-
 const safePictureDescription = typeof pictureDescription === 'string' ? pictureDescription : '';
 const safePictureUrl = typeof pictureUrl === 'string' ? pictureUrl : '';
-
 const analysis = await analyseKarangan({
   nama,
   set,
@@ -209,7 +193,6 @@ const analysis = await analyseKarangan({
   pictureDescription: safePictureDescription,
   pictureUrl: safePictureUrl,
 });
-
 
 analysis.karanganUnderlined = safeKarangan; // ✅ Add this line
 const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
@@ -223,8 +206,6 @@ await saveResultToFirestore(set, id, {
   karangan: safeKarangan,
   ...analysis,
 }, uid); // ✅ uid is passed as a separate 4th argument
-
-
 
             results.push({ id, ...analysis });
           } catch (e) {
@@ -257,8 +238,6 @@ const buffer = await sharp(fileBuffer).jpeg().toBuffer();
 const [visionResult] = await bulkVisionClient.textDetection({
   image: { content: buffer },
 });
-
-
         const extractedText = visionResult?.textAnnotations?.[0]?.description || '';
         combinedText += extractedText + '\n\n';
       } catch (ocrErr) {
