@@ -296,9 +296,7 @@ await saveResultToFirestore(set, id, {
     console.error(`❌ OCR analysis error for pupil ${nama} (${id}):`, e);
     results.push({ id, error: 'Ralat semasa analisis OCR.', detail: e.message });
   }
-
         } else {
-
           results.push({ id, error: 'Mod tidak sah.' });
         }
       }
