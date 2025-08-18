@@ -250,9 +250,14 @@ await saveResultToFirestore(set, id, {
         if (!filepath) continue;
 
         const fileBuffer = fs.readFileSync(filepath);
-        const [visionResult] = await bulkVisionClient.textDetection({
-          image: { content: fileBuffer },
-        });
+
+// ✅ Convert image to standard RGB JPEG using sharp
+const buffer = await sharp(fileBuffer).jpeg().toBuffer();
+
+const [visionResult] = await bulkVisionClient.textDetection({
+  image: { content: buffer },
+});
+
 
         const extractedText = visionResult?.textAnnotations?.[0]?.description || '';
         combinedText += extractedText + '\n\n';
