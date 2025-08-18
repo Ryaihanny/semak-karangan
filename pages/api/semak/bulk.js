@@ -212,7 +212,7 @@ analysis.karanganUnderlined = safeKarangan; // ✅ Add this line
 await saveResultToFirestore(set, id, {
   nama,
   set,
-  karangan,
+  karangan: safeKarangan,
   ...analysis,
 }, uid); // ✅ uid is passed as a separate 4th argument
 
@@ -273,7 +273,7 @@ analysis.karanganUnderlined = safeCombinedText;
             await saveResultToFirestore(set, id, {
               nama,
               set,
-              karangan: combinedText,
+              karangan: safeCombinedText,
               ...analysis,
 }, uid);
         
