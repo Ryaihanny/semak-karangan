@@ -216,22 +216,19 @@ const downloadCombinedPDF = async () => {
   pdf.setFont('Times', 'normal');
   pdf.setFontSize(fontSize);
 
-  const cleanText = (text) =>
-    text
-      ?.replace(/<br\s*\/?>/gi, '\n')
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/<\/?[^>]+(>|$)/g, '') || '-';
-
-  for (let i = 0; i < selected.length; i++) {
-    const p = selected[i];
-    const result = p.result;
-    let y = margin;
-
-    if (i > 0) pdf.addPage();
+const cleanText = (text) => {
+  if (typeof text !== "string") {
+    return text ? String(text) : "-";
+  }
+  return text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/<\/?[^>]+(>|$)/g, '') || '-';
+};
 
     // Header
     pdf.setFont(undefined, 'bold');
