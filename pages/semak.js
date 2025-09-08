@@ -234,6 +234,18 @@ const downloadCombinedPDF = async () => {
   for (let i = 0; i < selected.length; i++) {
     const p = selected[i];
     const result = p.result || {};
+
+    // ✅ Add the console.log here
+    console.log("📄 Generating PDF for:", {
+      nama: p.nama,
+      markahIsi: result.markahIsi,
+      markahBahasa: result.markahBahasa,
+      markahKeseluruhan: result.markahKeseluruhan,
+      ulasan: result.ulasan,
+      kesalahanBahasa: result.kesalahanBahasa?.length || 0,
+      gayaBahasa: result.gayaBahasa?.length || 0,
+    });
+
     let y = margin;
 
     if (i > 0) pdf.addPage();
