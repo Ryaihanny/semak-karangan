@@ -216,23 +216,31 @@ const downloadCombinedPDF = async () => {
   pdf.setFont('Times', 'normal');
   pdf.setFontSize(fontSize);
 
-const cleanText = (text) => {
-  if (typeof text !== "string") {
-    return text ? String(text) : "-";
-  }
-  return text
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/<\/?[^>]+(>|$)/g, '') || '-';
-};
+  const cleanText = (text) => {
+    if (typeof text !== "string") {
+      return text ? String(text) : "-";
+    }
+    return text
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<\/?[^>]+(>|$)/g, '') || '-';
+  };
+
+  // 🔑 Loop through each selected pupil
+  for (let i = 0; i < selected.length; i++) {
+    const p = selected[i];
+    const result = p.result || {};
+    let y = margin;
+
+    if (i > 0) pdf.addPage();
 
     // Header
     pdf.setFont(undefined, 'bold');
-    pdf.text(`Keputusan Semakan Karangan untuk: ${result.nama}`, margin, y);
+    pdf.text(`Keputusan Semakan Karangan untuk: ${cleanText(p.nama)}`, margin, y);
     pdf.setFont(undefined, 'normal');
     y += lineHeight * 2;
 
@@ -251,11 +259,11 @@ const cleanText = (text) => {
     y += lineHeight;
 
     const isiSummary = result.ulasan?.isi ?? 'Tiada ulasan isi.';
-    pdf.text(`Isi: ${isiSummary}`, margin + 5, y);
+    pdf.text(`Isi: ${cleanText(isiSummary)}`, margin + 5, y);
     y += lineHeight;
 
     const bahasaSummary = result.ulasan?.bahasa ?? 'Tiada ulasan bahasa.';
-    pdf.text(`Bahasa: ${bahasaSummary}`, margin + 5, y);
+    pdf.text(`Bahasa: ${cleanText(bahasaSummary)}`, margin + 5, y);
     y += lineHeight * 2;
 
     // Karangan Asal
@@ -268,35 +276,32 @@ const cleanText = (text) => {
       const karanganClean = cleanText(result.karanganUnderlined);
       const karanganLines = pdf.splitTextToSize(karanganClean, usableWidth);
 
-      for (let lineIndex = 0; lineIndex < karanganLines.length; lineIndex++) {
-        const line = karanganLines[lineIndex];
+      for (let line of karanganLines) {
         if (y + lineHeight > pageHeight - margin) {
           pdf.addPage();
           y = margin;
         }
         pdf.text(line, margin, y);
 
-// Underline ayat salah in this line
-(result.kesalahanBahasa || []).forEach((item) => {
-  const lineText = String(line || '');
-  const phrase = (item?.ayatSalah || '').trim();
-  if (!phrase) return; // skip empty phrases
+        // Underline errors
+        (result.kesalahanBahasa || []).forEach((item) => {
+          const lineText = String(line || '');
+          const phrase = cleanText(item?.ayatSalah || '').trim();
+          if (!phrase) return;
 
-  const regex = new RegExp(phrase, 'gi'); // global, case-insensitive
-  let match;
-  while ((match = regex.exec(lineText)) !== null) {
-    const startX = margin + pdf.getTextWidth(lineText.substring(0, match.index));
-    const phraseWidth = pdf.getTextWidth(phrase);
-    const underlineY = y + 1.5;
+          const regex = new RegExp(phrase, 'gi');
+          let match;
+          while ((match = regex.exec(lineText)) !== null) {
+            const startX = margin + pdf.getTextWidth(lineText.substring(0, match.index));
+            const phraseWidth = pdf.getTextWidth(phrase);
+            const underlineY = y + 1.5;
 
-    pdf.setDrawColor(255, 0, 0); // red underline
-    pdf.setLineWidth(0.5);
-    pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
-    pdf.setDrawColor(0);
-  }
-});
-
-
+            pdf.setDrawColor(255, 0, 0);
+            pdf.setLineWidth(0.5);
+            pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
+            pdf.setDrawColor(0);
+          }
+        });
 
         y += lineHeight;
       }
@@ -324,8 +329,8 @@ const cleanText = (text) => {
           cleanText(item.penjelasan),
         ]),
         margin: { left: margin, right: margin },
-        styles: { font: 'times', fontSize: 11, cellPadding: 2, textColor: 0, lineColor: [0, 0, 0], lineWidth: 0.5 },
-        headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.5 },
+        styles: { font: 'times', fontSize: 11, cellPadding: 2 },
+        headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold' },
         theme: 'grid',
         pageBreak: 'auto',
       });
@@ -363,7 +368,10 @@ const cleanText = (text) => {
     pdf.setFont(undefined, 'normal');
     y += lineHeight;
 
-    const ulasanKeseluruhanLines = pdf.splitTextToSize(cleanText(result.ulasan?.keseluruhan), usableWidth);
+    const ulasanKeseluruhanLines = pdf.splitTextToSize(
+      cleanText(result.ulasan?.keseluruhan ?? 'Tiada ulasan keseluruhan.'),
+      usableWidth
+    );
     ulasanKeseluruhanLines.forEach((line) => {
       if (y + lineHeight > pageHeight - margin) {
         pdf.addPage();
