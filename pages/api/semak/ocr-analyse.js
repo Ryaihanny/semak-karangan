@@ -1,79 +1,63 @@
 import formidable from 'formidable';
 import fs from 'fs';
-import path from 'path';
 import { ImageAnnotatorClient as VisionClient } from '@google-cloud/vision';
-import { generateUlasan } from '@/lib/analyseKarangan'; // ✅ NEW
+import { analyseKarangan, generateUlasan } from '@/lib/analyseKarangan';
 
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+export const config = { api: { bodyParser: false } };
 
 const visionClient = new VisionClient({
   projectId: process.env.GOOGLE_PROJECT_ID,
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
   },
 });
 
-
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed, use POST' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed, use POST' });
 
   const form = formidable({ multiples: true });
 
   form.parse(req, async (err, fields, files) => {
-    if (err) {
-      console.error('Form parse error:', err);
-      return res.status(500).json({ error: 'Failed to parse form data' });
-    }
+    if (err) return res.status(500).json({ error: 'Failed to parse form data', detail: err.message });
 
     try {
-      console.log('📥 OCR fields received:', fields);
-
       const fileItems = files.file;
+      if (!fileItems) return res.status(400).json({ error: 'No file uploaded' });
+
       const filesArray = Array.isArray(fileItems) ? fileItems.slice(0, 5) : [fileItems];
 
       let combinedText = '';
-
       for (const file of filesArray) {
         const filepath = file.filepath || file.path;
         if (!filepath) continue;
 
         const fileBuffer = fs.readFileSync(filepath);
         const [result] = await visionClient.textDetection({ image: { content: fileBuffer } });
-        const extractedText = result.textAnnotations?.[0]?.description || '';
-        combinedText += extractedText + '\n\n';
-
-        console.log('📄 Extracted OCR text chunk:', extractedText.substring(0, 100), '...');
+        combinedText += result.textAnnotations?.[0]?.description || '';
       }
 
-      if (!combinedText.trim()) {
-        return res.status(400).json({ error: 'No text extracted from uploaded images.' });
-      }
+      const safeKarangan = combinedText || '';
+      const safeNama = fields.nama || '';
+      const safePictureDescription = fields.pictureDescription || '';
+      const safePictureUrl = fields.pictureUrl || '';
 
-      const { analyseKarangan } = await import('../../../lib/analyseKarangan.js');
+      if (!safeKarangan.trim()) return res.status(400).json({ error: 'No text extracted from uploaded images.' });
+
       const analysis = await analyseKarangan({
-        nama: fields.nama || '',
-        karangan: combinedText,
-        pictureDescription: fields.pictureDescription ? String(fields.pictureDescription) : '',
-        pictureUrl: fields.pictureUrl ? String(fields.pictureUrl) : '',
+        nama: safeNama,
+        karangan: safeKarangan,
+        pictureDescription: safePictureDescription,
+        pictureUrl: safePictureUrl,
       });
 
-// ✅ Tambah ulasan keseluruhan ringkas
-const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
-analysis.ulasan.keseluruhan = ulasanKeseluruhan;
-
+      analysis.karanganUnderlined = safeKarangan;
+      analysis.ulasan.keseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
 
       res.status(200).json(analysis);
     } catch (error) {
-      console.error('Google Vision error:', error);
-      res.status(500).json({ error: 'Google Vision OCR failed', detail: error.message });
+      console.error('❌ OCR + analyse error:', error);
+      res.status(500).json({ error: 'OCR analysis failed', detail: error.message });
     }
   });
 }

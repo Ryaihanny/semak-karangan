@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { auth, db } from '../lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import AdminLayout from '@/components/AdminLayout'; // Ensure this path is correct
 
 export default function Profile() {
   const router = useRouter();
@@ -15,7 +16,6 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Load user profile data from Firestore
   const loadUserData = async (uid) => {
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
@@ -27,33 +27,10 @@ export default function Profile() {
     }
   };
 
-  // Save profile data
-  const saveUserData = async () => {
-    if (!user) return;
-    setSaving(true);
-    setMessage('');
-    try {
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(
-        userRef,
-        {
-          nama,
-          sekolah,
-          credits, // plural here
-        },
-        { merge: true }
-      );
-      setMessage('Maklumat berjaya disimpan.');
-    } catch (error) {
-      setMessage('Ralat menyimpan maklumat. Sila cuba lagi.');
-    }
-    setSaving(false);
-  };
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
-        router.replace('/');
+        router.replace('/login');
       } else {
         setUser(currentUser);
         await loadUserData(currentUser.uid);
@@ -63,207 +40,121 @@ export default function Profile() {
     return () => unsubscribe();
   }, [router]);
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace('/');
+  const saveUserData = async () => {
+    if (!user) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await setDoc(userRef, { nama, sekolah }, { merge: true });
+      setMessage('✅ Maklumat berjaya dikemaskini.');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      setMessage('❌ Ralat menyimpan maklumat.');
+    }
+    setSaving(false);
   };
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <div className="loader-box">Memuatkan Profil...</div>;
 
   return (
-    <div className="page">
-      <header className="nav">
-        <ul>
-          <li>
-            <a href="/dashboard">Dashboard</a>
-          </li>
-          <li>
-            <a href="/semak">Semak Karangan</a>
-          </li>
-          <li>
-            <a href="/profile">Profil</a>
-          </li>
-          <li>
-            <a onClick={handleLogout} style={{ cursor: 'pointer' }}>
-              Log Keluar
-            </a>
-          </li>
-        </ul>
+    <AdminLayout activePage="profile">
+      <header className="topbar">
+        <div className="header-title">
+          <h1>Tetapan Profil</h1>
+          <p>Uruskan maklumat peribadi dan akaun anda sebagai Pentadbir/Guru.</p>
+        </div>
+        <div className="credit-pill">
+          Baki Kredit: <span>{credits}</span>
+        </div>
       </header>
 
-      <main className="container">
-        <section className="left">
-          <h1 className="title">
-            <span>Profil</span>
-            <span>Pengguna</span>
-            <span className="dot">.ai</span>
-          </h1>
-          <blockquote className="quote-box">
-            <p>Kemaskini maklumat akaun anda dan lihat status kredit anda di sini.</p>
-          </blockquote>
-        </section>
+      <section className="profile-container">
+        <div className="profile-card">
+          <div className="card-header">
+            <div className="avatar-large">
+              {nama ? nama.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+            </div>
+            <h3>{nama || 'Pengguna Pintar'}</h3>
+            <p>{user.email}</p>
+          </div>
 
-        <section className="right">
-          <h2>Maklumat Akaun</h2>
-          <form onSubmit={(e) => e.preventDefault()}>
-            <label>Emel</label>
-            <input type="text" value={user.email} disabled />
+          <form className="profile-form" onSubmit={(e) => e.preventDefault()}>
+            <div className="input-group">
+              <label>Nama Penuh</label>
+              <input type="text" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Masukkan nama anda" />
+            </div>
 
-            <label>Nama</label>
-            <input type="text" value={nama} onChange={(e) => setNama(e.target.value)} />
+            <div className="input-group">
+              <label>Nama Sekolah / Institusi</label>
+              <input type="text" value={sekolah} onChange={(e) => setSekolah(e.target.value)} placeholder="Contoh: SK Taman Melati" />
+            </div>
 
-            <label>Sekolah</label>
-            <input type="text" value={sekolah} onChange={(e) => setSekolah(e.target.value)} />
+            <div className="input-group">
+              <label>ID Akaun (Read Only)</label>
+              <input type="text" value={user.uid} disabled className="disabled-input" />
+            </div>
 
-            <label>Kredit Tersedia</label>
-            <input type="text" value={credits} disabled />
-
-            <button type="button" onClick={saveUserData} disabled={saving}>
+            <button className="btn-save" onClick={saveUserData} disabled={saving}>
               {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
             </button>
-            {message && <p className="message">{message}</p>}
+            
+            {message && <p className="status-message">{message}</p>}
           </form>
-        </section>
-      </main>
+        </div>
+
+        <div className="info-side">
+          <div className="info-card">
+            <h4>Akses Pentadbir</h4>
+            <p>Anda log masuk dengan peranan <b>Admin</b>. Anda mempunyai akses penuh untuk mengurus pengguna dan sistem.</p>
+          </div>
+          <div className="info-card teal">
+            <h4>Baki Kredit</h4>
+            <p>Kredit digunakan untuk proses semakan AI. Baki anda sekarang adalah {credits}.</p>
+            <button className="btn-white" onClick={() => router.push('/beli-kredit')}>Tambah Kredit</button>
+          </div>
+        </div>
+      </section>
 
       <style jsx>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
+        .header-title h1 { margin: 0; font-size: 1.8rem; color: #003D40; }
+        .header-title p { color: #666; margin: 5px 0 0; }
+        
+        .credit-pill { background: white; padding: 10px 20px; border-radius: 50px; border: 1px solid #E2E8F0; font-size: 0.9rem; font-weight: 600; }
+        .credit-pill span { color: #48A6A7; font-weight: 800; }
 
-        * {
-          box-sizing: border-box;
-        }
-        body,
-        html,
-        .page {
-          margin: 0;
-          padding: 0;
-          height: 100vh;
-          font-family: 'Poppins', sans-serif;
-          background: #f2efe7;
-          color: #006a71;
-          overflow: hidden;
-        }
+        .profile-container { display: grid; grid-template-columns: 1.5fr 1fr; gap: 2rem; }
+        
+        .profile-card { background: white; border-radius: 20px; padding: 2.5rem; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .card-header { text-align: center; margin-bottom: 2rem; }
+        .avatar-large { width: 80px; height: 80px; background: #48A6A7; color: white; font-size: 2rem; font-weight: 800; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+        .card-header h3 { margin: 0; color: #003D40; font-size: 1.4rem; }
+        .card-header p { color: #94A3B8; margin: 5px 0 0; font-size: 0.9rem; }
 
-        .nav {
-          position: fixed;
-          top: 24px;
-          right: 40px;
-        }
-        .nav ul {
-          display: flex;
-          gap: 24px;
-          list-style: none;
-          margin: 0;
-          padding: 0;
-        }
-        .nav ul li a {
-          text-decoration: none;
-          font-weight: 600;
-          color: #006a71;
-        }
+        .profile-form { display: flex; flex-direction: column; gap: 1.2rem; }
+        .input-group label { display: block; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 6px; }
+        .input-group input { width: 100%; padding: 12px 16px; border: 1px solid #E2E8F0; border-radius: 12px; background: #F8FAFC; font-size: 1rem; color: #333; transition: 0.2s; }
+        .input-group input:focus { border-color: #48A6A7; outline: none; background: white; }
+        .disabled-input { color: #94A3B8 !important; cursor: not-allowed; }
 
-        .container {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          height: 100%;
-          padding: 6rem 8rem;
-        }
+        .btn-save { background: #003D40; color: white; padding: 14px; border-radius: 12px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; transition: 0.2s; margin-top: 1rem; }
+        .btn-save:hover { background: #002D30; transform: translateY(-1px); }
+        .btn-save:disabled { background: #CBD5E1; transform: none; }
 
-        .left {
-          flex: 1;
-        }
-        .title {
-          font-size: 5rem;
-          font-weight: 800;
-          line-height: 1;
-        }
-        .title span {
-          display: block;
-        }
-        .dot {
-          color: #48a6a7;
-        }
-        .quote-box {
-          margin-top: 2rem;
-          font-size: 1.2rem;
-          color: #444;
-          border-left: 5px solid #48a6a7;
-          padding-left: 1rem;
-          max-width: 500px;
-        }
+        .status-message { text-align: center; font-size: 0.9rem; font-weight: 600; color: #48A6A7; margin-top: 10px; }
 
-        .right {
-          background: #ffffffcc;
-          padding: 2.5rem;
-          border-radius: 20px;
-          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-          width: 360px;
-        }
+        .info-side { display: flex; flex-direction: column; gap: 1.5rem; }
+        .info-card { background: white; padding: 1.8rem; border-radius: 20px; border: 1px solid #E2E8F0; }
+        .info-card h4 { margin-top: 0; color: #003D40; font-size: 1.1rem; }
+        .info-card p { font-size: 0.9rem; color: #64748B; line-height: 1.6; }
+        .info-card.teal { background: #003D40; color: white; border: none; }
+        .info-card.teal h4, .info-card.teal p { color: white; }
+        
+        .btn-white { width: 100%; padding: 10px; border: none; background: #FFD700; color: #003D40; border-radius: 10px; cursor: pointer; font-weight: 700; margin-top: 1rem; }
 
-        .right h2 {
-          margin-bottom: 1.5rem;
-          font-size: 2rem;
-          color: #006a71;
-          text-align: center;
-        }
-
-        form {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        label {
-          font-weight: 600;
-          color: #006a71;
-        }
-
-        input {
-          padding: 1rem;
-          border-radius: 12px;
-          border: 1px solid #ccc;
-          font-size: 1rem;
-        }
-
-        button {
-          background: #48a6a7;
-          color: white;
-          font-weight: 600;
-          padding: 1rem;
-          border: none;
-          border-radius: 12px;
-          font-size: 1.2rem;
-          cursor: pointer;
-        }
-
-        button:disabled {
-          background: #9acbd0;
-          cursor: not-allowed;
-        }
-
-        .message {
-          margin-top: 1rem;
-          font-weight: 600;
-          color: #006a71;
-          text-align: center;
-        }
-
-        @media (max-width: 768px) {
-          .container {
-            flex-direction: column;
-            padding: 2rem;
-          }
-          .left,
-          .right {
-            width: 100%;
-            text-align: center;
-          }
-          .right {
-            margin-top: 2rem;
-          }
-        }
+        .loader-box { height: 100vh; display: grid; place-items: center; font-weight: bold; color: #003D40; background: #F2F6F6; }
       `}</style>
-    </div>
+    </AdminLayout>
   );
 }

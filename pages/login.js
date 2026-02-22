@@ -1,159 +1,98 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import Link from 'next/link';
 
 export default function Login() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [loginType, setLoginType] = useState('username');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
-    } catch (err) {
-      setError('Log masuk gagal. Sila semak emel dan kata laluan.');
-    }
-    setLoading(false);
-  };
-
-  const handleSubmit = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    handleLogin();
+    setLoading(true);
+    try {
+      const cleanId = identifier.trim().toLowerCase();
+      if (loginType === 'username') {
+        const studentDocRef = doc(db, 'students', cleanId);
+        const studentSnap = await getDoc(studentDocRef);
+
+        if (studentSnap.exists() && studentSnap.data().password === password) {
+          localStorage.setItem("studentUser", JSON.stringify({
+            id: studentSnap.id,
+            ...studentSnap.data()
+          }));
+          router.push('/student-dashboard');
+          return;
+        } else {
+          alert("ID atau Kata Laluan salah! ❌ Sila cuba lagi.");
+        }
+      } else {
+        const userCredential = await signInWithEmailAndPassword(auth, cleanId, password);
+        const userDocRef = doc(db, 'users', userCredential.user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        
+        if (userDocSnap.exists()) {
+          const role = userDocSnap.data().role?.toLowerCase();
+          if (role === 'admin') router.push('/admin/dashboard');
+          else router.push('/dashboard');
+        }
+      }
+    } catch (err) {
+      alert("Oops! Maklumat tidak tepat atau ada masalah teknikal.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="page">
-      <main className="container">
-        <section className="form-container">
-          <h2>Log Masuk</h2>
-          <form onSubmit={handleSubmit}>
-            <input
-              type="email"
-              placeholder="Emel"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-            <input
-              type="password"
-              placeholder="Kata Laluan"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? 'Sedang Log Masuk...' : '→'}
-            </button>
-          </form>
-          {error && <p className="error">{error}</p>}
+    <div className="login-page">
+      <div className="login-card">
+        <h1>🚀 Si-Pintar</h1>
+        <p>Log masuk untuk mulakan misi penulisan anda!</p>
+        
+        <div className="toggle-slider">
+          <button type="button" className={loginType === 'username' ? 'active' : ''} onClick={() => setLoginType('username')}>ID Murid</button>
+          <button type="button" className={loginType === 'email' ? 'active' : ''} onClick={() => setLoginType('email')}>Emel Guru</button>
+        </div>
 
-          <div className="links">
-            <a href="/signup">Daftar Akaun</a> | <a href="/forgot-password">Lupa Kata Laluan?</a>
+        <form onSubmit={handleLogin}>
+          <div className="input-field">
+            <label>{loginType === 'username' ? 'ID Murid' : 'Emel Guru'}</label>
+            <input type={loginType === 'username' ? "text" : "email"} placeholder={loginType === 'username' ? "Masukkan ID anda" : "guru@sekolah.edu"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
           </div>
-        </section>
-      </main>
+          <div className="input-field">
+            <label>Kata Laluan</label>
+            <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          <button type="submit" className="login-btn" disabled={loading}>{loading ? "Membuka Portal..." : "Mula Belajar!"}</button>
+        </form>
+
+        <div className="login-footer">
+          Cikgu belum ada akaun? <Link href="/signup">Daftar di sini</Link>
+        </div>
+      </div>
 
       <style jsx>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
-
-        * {
-          box-sizing: border-box;
-        }
-        body,
-        html,
-        .page {
-          margin: 0;
-          padding: 0;
-          height: 100vh;
-          font-family: 'Poppins', sans-serif;
-          background: #F2EFE7;
-          color: #006A71;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          overflow: hidden;
-        }
-
-        .container {
-          background: #ffffffcc;
-          padding: 2.5rem;
-          border-radius: 20px;
-          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-          width: 360px;
-        }
-
-        .form-container h2 {
-          margin-bottom: 1.5rem;
-          font-size: 2rem;
-          color: #006A71;
-          text-align: center;
-        }
-
-        form {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        input {
-          padding: 1rem;
-          border-radius: 12px;
-          border: 1px solid #ccc;
-          font-size: 1rem;
-          color: #006A71;
-        }
-
-        input:disabled {
-          background-color: #f5f5f5;
-          cursor: not-allowed;
-        }
-
-        button {
-          background: #48A6A7;
-          color: white;
-          font-weight: 600;
-          padding: 1rem;
-          border: none;
-          border-radius: 12px;
-          font-size: 1.2rem;
-          cursor: pointer;
-          transition: background-color 0.3s ease;
-        }
-
-        button:hover:enabled {
-          background: #3a8d8e;
-        }
-
-        button:disabled {
-          background: #9ACBD0;
-          cursor: not-allowed;
-        }
-
-        .error {
-          color: red;
-          font-size: 0.9rem;
-          margin-top: 1rem;
-          text-align: center;
-        }
-
-        .links {
-          text-align: center;
-          margin-top: 1rem;
-          font-size: 0.9rem;
-        }
-
-        .links a {
-          color: #006A71;
-          text-decoration: underline;
-        }
+        .login-page { min-height: 100vh; background: #6C63FF; display: flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .login-card { background: white; padding: 50px; border-radius: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); width: 100%; max-width: 400px; text-align: center; }
+        h1 { font-size: 2.5rem; color: #6C63FF; margin-bottom: 10px; font-weight: 800; }
+        p { color: #636E72; margin-bottom: 30px; }
+        .toggle-slider { display: flex; background: #F0F0FF; padding: 5px; border-radius: 15px; margin-bottom: 25px; }
+        .toggle-slider button { flex: 1; border: none; background: none; padding: 10px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: 0.3s; color: #636E72; }
+        .toggle-slider button.active { background: white; color: #6C63FF; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .input-field { text-align: left; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 700; color: #2D3436; }
+        input { width: 100%; padding: 15px; border-radius: 15px; border: 2px solid #F0F0F0; font-size: 1rem; outline: none; transition: 0.3s; box-sizing: border-box; }
+        input:focus { border-color: #6C63FF; }
+        .login-btn { width: 100%; background: #6C63FF; color: white; border: none; padding: 18px; border-radius: 20px; font-size: 1.1rem; font-weight: 800; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        .login-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(108, 99, 255, 0.3); }
+        .login-footer { margin-top: 25px; font-size: 0.9rem; color: #636E72; }
+        .login-footer :global(a) { color: #6C63FF; font-weight: 700; text-decoration: none; }
       `}</style>
     </div>
   );

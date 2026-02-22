@@ -42,15 +42,21 @@ export default async function handler(req, res) {
       .orderBy('timestamp', 'asc')
       .get();
 
-    const results = snapshot.docs.map((doc) => {
+const results = snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
         nama: data.nama,
+        kelas: data.kelas || '', // 👈 Added this
         set: data.set,
         markahIsi: data.markahIsi,
         markahBahasa: data.markahBahasa,
         markahKeseluruhan: data.markahKeseluruhan,
+        // Optional but recommended: include these so PDF generation works from any view
+        ulasan: data.ulasan || {},
+        karangan: data.karangan || '',
+        karanganUnderlined: data.karanganUnderlined || '',
+        kesalahanBahasa: data.kesalahanBahasa || [],
         timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : data.timestamp,
       };
     });

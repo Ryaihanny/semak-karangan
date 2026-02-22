@@ -1,733 +1,412 @@
-// pages/dashboard.js
-
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { getIdToken } from 'firebase/auth';
-
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
+import { 
+  doc, getDoc, updateDoc, writeBatch, collection, 
+  query, where, getDocs, orderBy 
+} from 'firebase/firestore'; 
+import Papa from 'papaparse';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function Dashboard() {
   const router = useRouter();
-
-  // --- State Variables ---
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const [availableSets, setAvailableSets] = useState([]);
-  const [selectedSet, setSelectedSet] = useState('');
-
-  const [viewMode, setViewMode] = useState('class'); // 'class' or 'individual'
-
-  // Class view
+  const [isUploading, setIsUploading] = useState(false);
   const [results, setResults] = useState([]);
-  const [resultsLoading, setResultsLoading] = useState(false);
-  const [resultsError, setResultsError] = useState('');
-
-  // Individual view
-  const [allStudents, setAllStudents] = useState([]);
-  const [selectedStudent, setSelectedStudent] = useState('');
-  const [studentProgress, setStudentProgress] = useState([]);
-  const [progressLoading, setProgressLoading] = useState(false);
-  const [progressError, setProgressError] = useState('');
-
-  // Checkbox selected students for bulk delete
+  const [viewMode, setViewMode] = useState('all'); 
+  const [layoutStyle, setLayoutStyle] = useState('list');
+  
+  // --- Filters ---
+  const [selectedKelas, setSelectedKelas] = useState('Semua');
+  const [selectedTahap, setSelectedTahap] = useState('Semua');
+  const [selectedSet, setSelectedSet] = useState('Semua');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Save last valid student progress to avoid flicker on empty fetch
-  const lastValidProgress = useRef([]);
+  // --- Derived Data & Sorting ---
+  const uniqueClasses = useMemo(() => ['Semua', ...new Set(results.map(r => r.kelas).filter(Boolean))], [results]);
+  const uniqueTahap = useMemo(() => ['Semua', ...new Set(results.map(r => r.level))], [results]);
+  const uniqueSets = useMemo(() => ['Semua', ...new Set(results.map(r => r.set).filter(Boolean).sort((a,b)=>a-b))], [results]);
 
-  // --- Auth and user info loading ---
+  const sortedAndFilteredData = useMemo(() => {
+    return results
+      .filter(item => {
+        const matchSearch = item.nama?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchKelas = selectedKelas === 'Semua' || item.kelas === selectedKelas;
+        const matchTahap = selectedTahap === 'Semua' || item.level === selectedTahap;
+        const matchSet = selectedSet === 'Semua' || String(item.set) === String(selectedSet);
+        return matchSearch && matchKelas && matchTahap && matchSet;
+      })
+      .sort((a, b) => {
+        if (a.level !== b.level) return a.level.localeCompare(b.level);
+        if ((a.kelas || "") !== (b.kelas || "")) return (a.kelas || "").localeCompare(b.kelas || "");
+        if ((a.set || 0) !== (b.set || 0)) return (a.set || 0) - (b.set || 0);
+        return a.nama.localeCompare(b.nama);
+      });
+  }, [results, searchQuery, selectedKelas, selectedTahap, selectedSet]);
+
+  // --- Core Lifecycle ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        router.replace('/');
-        return;
-      }
-
-      try {
-        const userDocRef = doc(db, 'users', currentUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          setUser({
-            ...currentUser,
-            role: userData.role || 'user',
-            credits: userData.credits ?? 0,
-            email: currentUser.email,
-          });
-        } else {
-          setUser({
-            ...currentUser,
-            role: 'user',
-            credits: 0,
-            email: currentUser.email,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to get user data:', error);
-        setUser({
-          ...currentUser,
-          role: 'user',
-          credits: 0,
-          email: currentUser.email,
-        });
-      }
+      if (!currentUser) { router.replace('/login'); return; }
+      const userDocSnap = await getDoc(doc(db, 'users', currentUser.uid));
+      setUser({ uid: currentUser.uid, ...userDocSnap?.data() });
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, [router]);
 
-  // --- Fetch available sets ---
-  useEffect(() => {
-    async function fetchSets() {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        const token = await getIdToken(user, true);
-        const res = await fetch('/api/sets', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-
-        setAvailableSets(data.sets || []);
-        if (data.sets?.length > 0) {
-          setSelectedSet(String(data.sets[0]));
-        }
-      } catch (err) {
-        console.error('Gagal mendapatkan senarai set:', err);
-      }
-    }
-
-    if (auth.currentUser) {
-      fetchSets();
-    } else {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) fetchSets();
-      });
-      return () => unsubscribe();
-    }
-  }, []);
-
-  // --- Fetch all distinct students for individual view ---
-  useEffect(() => {
-    async function fetchAllStudents() {
-      try {
-        const token = await getIdToken(auth.currentUser, true);
-        const res = await fetch('/api/allstudents', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setAllStudents(data.students || []);
-        if (data.students?.length > 0 && !selectedStudent) {
-          setSelectedStudent(data.students[0]);
-        }
-      } catch (err) {
-        console.error('Gagal mendapatkan senarai semua pelajar:', err);
-      }
-    }
-
-    if (auth.currentUser) {
-      fetchAllStudents();
-    } else {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) fetchAllStudents();
-      });
-      return () => unsubscribe();
-    }
-  }, [selectedStudent]);
-
-  // --- Fetch results and students for selected set when in class view ---
-  useEffect(() => {
-    if (!selectedSet || viewMode !== 'class') return;
-
-    async function fetchResults() {
-      setResultsLoading(true);
-      setResultsError('');
-      try {
-        const user = auth.currentUser;
-        if (!user) {
-          setResultsError('Pengguna tidak ditemui.');
-          setResultsLoading(false);
-          return;
-        }
-
-        const token = await getIdToken(user, true);
-        const res = await fetch(
-  `/api/results/class?set=${encodeURIComponent(selectedSet)}`,
-  { headers: { Authorization: `Bearer ${token}` } }
-);
-
-
-        if (!res.ok) throw new Error('Gagal memuatkan data pelajar');
-
-        const data = await res.json();
-
-        // Filter results by selected set
-        const filtered = data.results.filter(r => String(r.set) === String(selectedSet));
-        setResults(filtered || []);
-      } catch (err) {
-        setResultsError(err.message || 'Ralat tidak diketahui');
-        setResults([]);
-      } finally {
-        setResultsLoading(false);
-      }
-    }
-
-    if (auth.currentUser) {
-      fetchResults();
-    } else {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) fetchResults();
-      });
-      return () => unsubscribe();
-    }
-  }, [selectedSet, viewMode]);
-
-  // --- Fetch individual student progress when in individual view ---
-  useEffect(() => {
-    if (!selectedStudent || viewMode !== 'individual') return;
-
-    async function fetchStudentProgress() {
-      setProgressLoading(true);
-      setProgressError('');
-      try {
-        const token = await getIdToken(auth.currentUser, true);
-        const res = await fetch(
-          `/api/results/student?nama=${encodeURIComponent(selectedStudent)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        if (!res.ok) throw new Error('Gagal memuatkan data kemajuan pelajar');
-
-        const data = await res.json();
-
-        if (data.results && data.results.length > 0) {
-          lastValidProgress.current = data.results;
-          setStudentProgress(data.results);
-        } else {
-          setStudentProgress(lastValidProgress.current);
-        }
-      } catch (err) {
-        setProgressError(err.message || 'Ralat tidak diketahui');
-        setStudentProgress([]);
-      } finally {
-        setProgressLoading(false);
-      }
-    }
-
-    fetchStudentProgress();
-  }, [selectedStudent, viewMode]);
-
-  // --- Logout handler ---
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace('/');
-  };
-
-  // --- Delete single student result ---
-  async function handleDelete(nama) {
-    if (!confirm(`Padam data pelajar ${nama}? Tindakan ini tidak boleh dibatalkan.`)) return;
-
+  const refreshData = async () => {
+    if (!auth.currentUser) return;
     try {
-      const res = await fetch('/api/semak/delete', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nama }),
+      const q = query(collection(db, 'karanganResults'), where('userId', '==', auth.currentUser.uid), orderBy('timestamp', 'desc'));
+      const snapshot = await getDocs(q);
+      setResults(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    } catch (err) { 
+      console.error("Error refreshing data:", err); 
+    }
+  };
+
+  useEffect(() => { if (user?.uid) refreshData(); }, [user]);
+
+  // --- Logic Handlers ---
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length) return;
+    if (confirm(`Padam ${selectedIds.length} rekod?`)) {
+      const batch = writeBatch(db);
+      selectedIds.forEach(id => batch.delete(doc(db, 'karanganResults', id)));
+      await batch.commit();
+      setSelectedIds([]);
+      refreshData();
+    }
+  };
+
+  const generatePDF = (items) => {
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const margin = 10;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const usableWidth = pageWidth - margin * 2;
+
+    const cleanText = (text) => {
+      if (!text) return '-';
+      return String(text)
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/<\/?[^>]+(>|$)/g, '');
+    };
+
+    items.forEach((item, index) => {
+      if (index > 0) doc.addPage();
+      doc.setFillColor(0, 61, 64);
+      doc.rect(0, 0, 210, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("times", "bold");
+      doc.setFontSize(20);
+      doc.text("LAPORAN SEMAKAN SI-PINTAR", 105, 18, { align: "center" });
+      doc.setFontSize(10);
+      doc.setFont("times", "normal");
+      doc.text("Standard Penilaian Karangan MOE Singapura", 105, 26, { align: "center" });
+
+      let y = 50;
+      doc.setTextColor(0, 61, 64);
+      doc.setFontSize(12);
+      doc.setFont("times", "bold");
+      doc.text(`NAMA: ${cleanText(item.nama).toUpperCase()}`, margin, y);
+      
+      doc.setFontSize(10);
+      doc.setFont("times", "normal");
+      doc.setTextColor(80, 80, 80);
+      y += 7;
+      doc.text(`Peringkat: ${item.level}`, margin, y);
+      doc.text(`Kelas: ${item.kelas || '-'}`, 60, y);
+      doc.text(`Set: ${item.set || '-'}`, 110, y);
+      doc.text(`Tarikh: ${new Date().toLocaleDateString('ms-MY')}`, 160, y);
+
+      y += 8;
+      const isJunior = (item.level === 'P3' || item.level === 'P4');
+      const maxIsi = isJunior ? 7 : 20;
+      const maxBhs = isJunior ? 8 : 20;
+      const totalMax = isJunior ? 15 : 40;
+
+      autoTable(doc, {
+        startY: y,
+        head: [['KRITERIA', 'MARKAH']],
+        body: [
+          ['Isi & Huraian', `${item.markahIsi} / ${maxIsi}`],
+          ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${maxBhs}`],
+          ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${totalMax}`],
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [0, 61, 64], textColor: [255, 255, 255] },
+        styles: { font: 'times', fontSize: 10 },
+        columnStyles: { 1: { halign: 'center', fontStyle: 'bold' } }
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ralat memadam data');
+      y = doc.lastAutoTable.finalY + 12;
 
-      setResults((prev) => prev.filter((r) => r.nama !== nama));
-      setSelectedIds((prev) => prev.filter((id) => id !== nama));
-      alert(data.message);
-    } catch (err) {
-      alert(`Gagal memadam data: ${err.message}`);
-    }
-  }
+      doc.setTextColor(0, 61, 64);
+      doc.setFont("times", "bold");
+      doc.text("TEKS KARANGAN:", margin, y);
+      y += 7;
+      doc.setFont("times", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(11);
 
-  // --- Bulk delete handler ---
-  async function handleBulkDelete() {
-    if (!confirm('Padam semua pelajar terpilih? Tindakan ini tidak boleh dibatalkan.')) return;
-
-    try {
-      const res = await fetch('/api/semak/delete', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nama: selectedIds }),
+      const rawKarangan = cleanText(item.karangan);
+      const lines = doc.splitTextToSize(rawKarangan, usableWidth);
+      
+      lines.forEach((line) => {
+        if (y > 275) { doc.addPage(); y = 20; }
+        doc.text(line, margin, y);
+        if (item.kesalahanBahasa) {
+          item.kesalahanBahasa.forEach((error) => {
+            const phrase = error.ayatSalah;
+            if (phrase && line.includes(phrase)) {
+              const startX = margin + doc.getTextWidth(line.substring(0, line.indexOf(phrase)));
+              const phraseWidth = doc.getTextWidth(phrase);
+              doc.setDrawColor(200, 0, 0);
+              doc.setLineWidth(error.severity === 'Major' ? 0.5 : 0.2);
+              doc.line(startX, y + 1, startX + phraseWidth, y + 1);
+            }
+          });
+        }
+        y += 7;
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Ralat memadam data');
+      if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
+        y += 5;
+        if (y > 230) { doc.addPage(); y = 20; }
+        doc.setTextColor(200, 0, 0);
+        doc.setFont("times", "bold");
+        doc.text("ANALISIS KESALAHAN:", margin, y);
+        autoTable(doc, {
+          startY: y + 2,
+          head: [['Kesalahan', 'Pembetulan', 'Penjelasan']],
+          body: item.kesalahanBahasa.map(k => [k.ayatSalah, k.cadangan, k.penjelasan]),
+          theme: 'striped',
+          styles: { font: 'times', fontSize: 9 },
+          headStyles: { fillColor: [200, 0, 0] }
+        });
+        y = doc.lastAutoTable.finalY + 10;
+      }
 
-      setResults((prev) => prev.filter((r) => !selectedIds.includes(r.nama)));
-      setSelectedIds([]);
-      alert('Karangan berjaya dipadam.');
-    } catch (err) {
-      alert(`Gagal memadam data: ${err.message}`);
+      if (y > 240) { doc.addPage(); y = 20; }
+      doc.setFillColor(245, 250, 250);
+      doc.rect(margin, y, usableWidth, 25, 'F');
+      doc.setTextColor(0, 61, 64);
+      doc.setFont("times", "bold");
+      doc.text("ULASAN KESELURUHAN:", margin + 3, y + 8);
+      doc.setFont("times", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      const ulasanSummary = cleanText(item.ulasan?.keseluruhan || "");
+      const wrappedUlasan = doc.splitTextToSize(ulasanSummary, usableWidth - 6);
+      doc.text(wrappedUlasan, margin + 3, y + 15);
+
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text("Keputusan ini dijana secara digital berasaskan sistem SI-PINTAR.", 105, 290, { align: "center" });
+    });
+
+    const filename = items.length === 1 ? `Laporan_${items[0].nama}.pdf` : `Laporan_Pukal.pdf`;
+    doc.save(filename);
+  };
+
+  const handleQuickEditSet = async (id, currentSet) => {
+    const newSet = prompt("Masukkan No. Set Baru:", currentSet);
+    if (newSet !== null && newSet !== "") {
+      await updateDoc(doc(db, 'karanganResults', id), { set: parseInt(newSet) });
+      refreshData();
     }
-  }
-
-  // --- Select All handler ---
-  const handleSelectAll = (e) => {
-    if (e.target.checked) {
-      const allNames = results.map((r) => r.nama);
-      setSelectedIds(allNames);
-    } else {
-      setSelectedIds([]);
-    }
   };
 
-  // --- Prepare Chart Data and Options ---
-  const chartData = {
-    labels:
-      studentProgress?.map((r) =>
-        r.timestamp
-          ? new Date(r.timestamp).toLocaleDateString('ms-MY', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-            })
-          : '-'
-      ) || [],
-    datasets: [
-      {
-        label: 'Markah Isi',
-        data: studentProgress?.map((r) => r.markahIsi ?? 0) || [],
-        borderColor: '#006A71',
-        backgroundColor: '#006A71aa',
-        tension: 0.3,
-        fill: true,
-      },
-      {
-        label: 'Markah Bahasa',
-        data: studentProgress?.map((r) => r.markahBahasa ?? 0) || [],
-        borderColor: '#48A6A7',
-        backgroundColor: '#48A6A7aa',
-        tension: 0.3,
-        fill: true,
-      },
-      {
-        label: 'Jumlah Markah',
-        data: studentProgress?.map((r) => r.markahKeseluruhan ?? 0) || [],
-        borderColor: '#9ACBD0',
-        backgroundColor: '#9ACBD0aa',
-        tension: 0.3,
-        fill: true,
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: { position: 'top' },
-      title: {
-        display: true,
-        text: selectedStudent ? `Kemajuan ${selectedStudent}` : 'Kemajuan Pelajar',
-        font: { size: 18 },
-      },
-      tooltip: { mode: 'index', intersect: false },
-    },
-    interaction: { mode: 'nearest', axis: 'x', intersect: false },
-    scales: {
-      y: {
-        min: 0,
-        max: 40,
-        ticks: { stepSize: 4 },
-        title: {
-          display: true,
-          text: 'Markah',
-        },
-      },
-      x: {
-        title: {
-          display: true,
-          text: 'Tarikh',
-        },
-      },
-    },
-  };
-
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <div className="loader-box"><div className="spinner"></div></div>;
 
   return (
-    <div className="dashboard">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <h2>Menu</h2>
-        <nav>
-          <ul>
-            <li>
-              <a href="/dashboard">Dashboard</a>
-            </li>
-            <li>
-              <a href="/semak">Semak Karangan</a>
-            </li>
-            <li>
-              <a href="/profile">Profil</a>
-            </li>
-            <li>
-              <a href="/beli-kredit">Beli Kredit</a>
-            </li>
-            {user?.role === 'admin' && (
-              <li>
-                <a href="/admin/dashboard">Admin Dashboard</a>
-              </li>
-            )}
-          </ul>
+    <div className="dashboard-wrapper">
+      <aside className="main-sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-icon">SI</div>
+          <div className="logo-text"><h3>SI-PINTAR</h3><span>VERSI GURU</span></div>
+        </div>
+
+        <nav className="sidebar-nav">
+          <div className="nav-header">UTAMA</div>
+          <div className={`nav-link ${viewMode === 'all' ? 'active' : ''}`} onClick={() => setViewMode('all')}>📊 Rekod Murid</div>
+          <div className="nav-link" onClick={() => router.push('/trend')}>📈 Analisis Murid</div>
+          
+          <div className="nav-divider"></div>
+
+          <div className="nav-header">PENGURUSAN</div>
+          <div className="nav-link" onClick={() => router.push('/urus-kelas')}>🏫 Urus Kelas</div>
+           <div className="nav-link" onClick={() => router.push('/beli-kredit')}>💰 Beli Kredit</div>
+          <div className="nav-link" onClick={() => router.push('/profile')}>👤 Profil Guru</div>
+          <div className="nav-divider"></div>
+
+          <div className="nav-action-zone">
+            <div className="nav-link highlight" onClick={() => router.push('/semak')}>✍️ Mulakan Semakan</div>
+          </div>
         </nav>
+
+        <button className="btn-logout-sidebar" onClick={() => signOut(auth)}>Keluar Sistem</button>
       </aside>
 
-      {/* Main content */}
-      <main className="main">
-        {/* Topbar */}
-        <header className="topbar">
-          <h1>Dashboard</h1>
-          <div className="user-info">
-            <span>{user.email}</span>
-            <span style={{ marginLeft: '1rem', fontWeight: '600', color: '#006A71' }}>
-              Kredit: {user.credits ?? 0}
-            </span>
-            <button onClick={handleLogout}>Log Keluar</button>
-          </div>
+      <main className="main-viewport">
+        <header className="viewport-header">
+          <h1>Keputusan Karangan</h1>
+          <div className="credit-badge">Baki Kredit: <b>{user?.credits}</b></div>
         </header>
 
-        <section className="content">
-          <p>
-            Selamat datang ke papan pemuka anda! Di sini anda boleh semak karangan dan lihat kemajuan
-            anda.
-          </p>
-
-          {/* View mode selector */}
-          <div className="mb-4">
-            <label htmlFor="viewMode" className="block mb-1 font-semibold text-[#006A71]">
-              Lihat Mengikut:
-            </label>
-            <select
-              id="viewMode"
-              className="p-2 border rounded bg-white text-[#006A71]"
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value)}
-            >
-              <option value="class">Kemajuan Kelas Berdasarkan Set</option>
-              <option value="individual">Kemajuan Individu Semua Set</option>
-            </select>
-          </div>
-
-          {/* Class view */}
-          {viewMode === 'class' && (
-            <>
-              <div className="mb-4">
-                <label htmlFor="setSelect" className="block mb-1 font-semibold text-[#006A71]">
-                  Pilih Set:
-                </label>
-                <select
-                  id="setSelect"
-                  className="p-2 border rounded bg-white text-[#006A71]"
-                  value={selectedSet}
-                  onChange={(e) => setSelectedSet(e.target.value)}
-                >
-                  {availableSets.map((s) => (
-                    <option key={s} value={String(s)}>
-                      Set {s}
-                    </option>
-                  ))}
-                </select>
+        {/* --- MAIN DASHBOARD --- */}
+        {viewMode === 'all' && (
+          <div className="fade-in">
+            <div className="pro-card toolbar-filters">
+              <div className="t-group"><label>Cari Nama</label><input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div>
+              <div className="t-group"><label>Tahap</label><select value={selectedTahap} onChange={(e) => setSelectedTahap(e.target.value)}>{uniqueTahap.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+              <div className="t-group"><label>Kelas</label><select value={selectedKelas} onChange={(e) => setSelectedKelas(e.target.value)}>{uniqueClasses.map(k => <option key={k} value={k}>{k}</option>)}</select></div>
+              <div className="t-group"><label>Set</label><select value={selectedSet} onChange={(e) => setSelectedSet(e.target.value)}>{uniqueSets.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+              <div className="layout-slider">
+                <button className={layoutStyle === 'list' ? 'active' : ''} onClick={() => setLayoutStyle('list')}>Senarai</button>
+                <button className={layoutStyle === 'grid' ? 'active' : ''} onClick={() => setLayoutStyle('grid')}>Grid</button>
               </div>
+            </div>
 
-              <h2 className="results-title">Prestasi Karangan Pelajar</h2>
-
-              <div className="select-all-container">
-                <label>
-                  <input
-                    type="checkbox"
-                    onChange={handleSelectAll}
-                    checked={selectedIds.length === results.length && results.length > 0}
-                  />{' '}
-                  Pilih Semua
-                </label>
-
-                <button
-                  onClick={handleBulkDelete}
-                  disabled={selectedIds.length === 0}
-                  className="delete-btn"
-                >
-                  🗑️ Padam Pilihan
-                </button>
+            {layoutStyle === 'list' ? (
+              <div className="pro-card no-padding">
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th style={{width:'40px'}}><input type="checkbox" onChange={(e) => setSelectedIds(e.target.checked ? sortedAndFilteredData.map(r => r.id) : [])} /></th>
+                      <th>Nama Pelajar</th>
+                      <th>Set</th>
+                      <th>Tahap</th>
+                      <th>Kelas</th>
+                      <th>Markah</th>
+                      <th style={{textAlign:'right'}}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedAndFilteredData.map(item => (
+                      <tr key={item.id} className={selectedIds.includes(item.id) ? 'active-row' : ''}>
+                        <td><input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => setSelectedIds(prev => prev.includes(item.id) ? prev.filter(i => i !== item.id) : [...prev, item.id])} /></td>
+                        <td className="st-name" onClick={() => router.push(`/pelajar/${item.nama}`)}>{item.nama}</td>
+                        <td><span className="set-editable" onClick={() => handleQuickEditSet(item.id, item.set)}>{item.set || '-'}</span></td>
+                        <td>{item.level}</td>
+                        <td>{item.kelas || 'Umum'}</td>
+                        <td className="st-score">{item.markahKeseluruhan}</td>
+                        <td style={{textAlign:'right'}}><button className="btn-action" onClick={() => generatePDF([item])}>PDF</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              {resultsLoading && <p>Memuatkan keputusan pelajar...</p>}
-              {resultsError && <p className="error">{resultsError}</p>}
-              {!resultsLoading && results.length === 0 && (
-                <p>Tiada data pelajar untuk dipaparkan.</p>
-              )}
-
-              <div className="results-list stacked-list">
-                {results.map(({ nama, set, markahIsi, markahBahasa, markahKeseluruhan, id }) => (
-                  <div key={id ?? `${nama}-${set}`} className="result-card">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(nama)}
-                      onChange={(e) => {
-                        if (e.target.checked) setSelectedIds((prev) => [...prev, nama]);
-                        else setSelectedIds((prev) => prev.filter((n) => n !== nama));
-                      }}
-                    />
-                    <h3>{nama}</h3>
-                    <p>
-                      <strong>Set:</strong> {set || '-'}
-                    </p>
-                    <p>
-                      <strong>Markah Isi:</strong> {markahIsi ?? '-'}
-                    </p>
-                    <p>
-                      <strong>Markah Bahasa:</strong> {markahBahasa ?? '-'}
-                    </p>
-                    <p>
-                      <strong>Jumlah Markah:</strong> {markahKeseluruhan ?? '-'}
-                    </p>
-                    <button className="delete-btn" onClick={() => handleDelete(nama)}>
-                      Padam
-                    </button>
+            ) : (
+              <div className="original-grid-system">
+                {sortedAndFilteredData.map(item => (
+                  <div key={item.id} className={`og-card ${selectedIds.includes(item.id) ? 'og-selected' : ''}`}>
+                    <div className="og-header">
+                      <span className="og-set" onClick={() => handleQuickEditSet(item.id, item.set)}>SET {item.set || '?'}</span>
+                      <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => setSelectedIds(prev => prev.includes(item.id) ? prev.filter(i => i !== item.id) : [...prev, item.id])} />
+                    </div>
+                    <h3 onClick={() => router.push(`/pelajar/${item.nama}`)}>{item.nama}</h3>
+                    <p className="og-meta">{item.level} • {item.kelas || 'Umum'}</p>
+                    <div className="og-score-box">
+                      <div className="sc-item"><span>Isi</span><b>{item.markahIsi}</b></div>
+                      <div className="sc-item"><span>Bhs</span><b>{item.markahBahasa}</b></div>
+                      <div className="sc-item total"><span>Jumlah</span><b>{item.markahKeseluruhan}</b></div>
+                    </div>
+                    <button className="btn-og-print" onClick={() => generatePDF([item])}>Cetak Laporan</button>
                   </div>
                 ))}
               </div>
-            </>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* Individual view */}
-          {viewMode === 'individual' && (
-            <>
-              <div className="mb-4">
-                <label htmlFor="studentSelect" className="block mb-1 font-semibold text-[#006A71]">
-                  Pilih Pelajar:
-                </label>
-                <select
-                  id="studentSelect"
-                  className="p-2 border rounded bg-white text-[#006A71]"
-                  value={selectedStudent}
-                  onChange={(e) => setSelectedStudent(e.target.value)}
-                >
-                  <option value="">-- Pilih Pelajar --</option>
-                  {allStudents.map((student) => (
-                    <option key={student} value={student}>
-                      {student}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {progressLoading && <p>Memuatkan kemajuan pelajar...</p>}
-              {progressError && <p className="error">{progressError}</p>}
-
-              {selectedStudent && studentProgress && studentProgress.length > 0 && (
-                <div style={{ maxWidth: '700px', marginBottom: '2rem' }}>
-                  <Line options={chartOptions} data={chartData} />
-                </div>
-              )}
-
-              {!progressLoading &&
-                (!studentProgress || studentProgress.length === 0) && (
-                  <p>Tiada data kemajuan untuk pelajar ini.</p>
-                )}
-            </>
-          )}
-        </section>
+        {/* --- ACTION BAR --- */}
+        <div className={`bulk-control-bar ${selectedIds.length > 0 ? 'visible' : ''}`}>
+          <span><b>{selectedIds.length}</b> rekod dipilih</span>
+          <div className="bc-actions">
+            <button className="bc-btn print" onClick={() => generatePDF(results.filter(r => selectedIds.includes(r.id)))}>Cetak PDF</button>
+            <button className="bc-btn delete" onClick={handleBulkDelete}>Padam</button>
+            <button className="bc-close" onClick={() => setSelectedIds([])}>✕</button>
+          </div>
+        </div>
       </main>
 
-      {/* Styles */}
       <style jsx>{`
-        .dashboard {
-          display: flex;
-          height: 100vh;
-          font-family: 'Poppins', sans-serif;
-        }
+        .dashboard-wrapper { display: flex; min-height: 100vh; background: #F2F6F6; font-family: 'Inter', sans-serif; color: #003D40; }
+        .main-sidebar { width: 280px; background: #003D40; color: white; display: flex; flex-direction: column; padding: 2rem 1.5rem; position: sticky; top: 0; height: 100vh; }
+        .sidebar-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 3rem; }
+        .logo-icon { background: #FFD700; color: #003D40; font-weight: 900; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .logo-text h3 { margin: 0; font-size: 1.1rem; letter-spacing: 1px; }
+        .logo-text span { font-size: 0.6rem; opacity: 0.5; font-weight: 700; }
+        
+        .sidebar-nav { flex: 1; }
+        .nav-header { font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.4); letter-spacing: 1.5px; margin: 1.5rem 0 0.8rem 15px; }
+        .nav-link { padding: 12px 15px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; transition: 0.2s; color: rgba(255,255,255,0.7); font-size: 0.9rem; }
+        .nav-link:hover { background: rgba(255,255,255,0.05); color: white; }
+        .nav-link.active { background: #48A6A7; color: white; font-weight: 600; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .nav-link.highlight { background: #FFD700; color: #003D40; font-weight: 700; margin-top: 10px; }
+        .nav-link.highlight:hover { background: #ffdf33; }
+        
+        .nav-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 1.5rem 10px; }
+        .btn-logout-sidebar { margin-top: auto; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 10px; cursor: pointer; }
 
-        .sidebar {
-          width: 220px;
-          background: #006a71;
-          color: white;
-          padding: 1.5rem;
-        }
+        .main-viewport { flex: 1; padding: 2.5rem 3.5rem; overflow-y: auto; }
+        .viewport-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .viewport-header h1 { margin: 0; font-size: 1.8rem; color: #003D40; }
+        .credit-badge { background: white; padding: 8px 16px; border-radius: 50px; border: 1px solid #E0E7E7; font-size: 0.85rem; }
 
-        .sidebar h2 {
-          margin-bottom: 1rem;
-        }
+        .pro-card { background: white; border-radius: 20px; border: 1px solid #E0E7E7; box-shadow: 0 4px 20px rgba(0,61,64,0.04); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .no-padding { padding: 0; overflow: hidden; }
+        .toolbar-filters { display: flex; gap: 15px; align-items: flex-end; }
+        .t-group { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .t-group label { font-size: 0.65rem; font-weight: 800; color: #99AFAF; text-transform: uppercase; }
+        .t-group input, .t-group select { padding: 10px; border-radius: 10px; border: 1px solid #E0E7E7; background: #F9FAFA; font-size: 0.9rem; width: 100%; }
 
-        .sidebar ul {
-          list-style: none;
-          padding: 0;
-        }
+        .layout-slider { background: #F0F4F4; padding: 4px; border-radius: 12px; display: flex; height: 42px; width: 220px; }
+        .layout-slider button { flex: 1; border: none; background: transparent; cursor: pointer; border-radius: 8px; font-size: 0.8rem; transition: 0.2s; }
+        .layout-slider button.active { background: white; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
 
-        .sidebar ul li {
-          margin: 1rem 0;
-        }
+        .modern-table { width: 100%; border-collapse: collapse; }
+        .modern-table th { background: #F9FAFA; padding: 15px 20px; text-align: left; font-size: 0.7rem; color: #99AFAF; border-bottom: 1px solid #E0E7E7; text-transform: uppercase; }
+        .modern-table td { padding: 15px 20px; border-bottom: 1px solid #F0F4F4; font-size: 0.9rem; }
+        .st-name { font-weight: 600; cursor: pointer; color: #003D40; }
+        .st-score { font-weight: 800; color: #48A6A7; font-size: 1.1rem; }
+        .set-editable { background: #003D40; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .active-row { background: #F0FBFB; }
 
-        .sidebar ul li a {
-          color: #f2efe7;
-          text-decoration: none;
-        }
+        .original-grid-system { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .og-card { background: white; border-radius: 20px; padding: 1.8rem; border: 1px solid #E0E7E7; }
+        .og-selected { border-color: #48A6A7; background: #F0FBFB; }
+        .og-header { display: flex; justify-content: space-between; margin-bottom: 1rem; }
+        .og-set { font-size: 0.75rem; font-weight: 900; color: #99AFAF; cursor: pointer; }
+        .og-card h3 { margin: 0 0 5px; color: #003D40; cursor: pointer; }
+        .og-meta { font-size: 0.85rem; color: #889999; margin-bottom: 1.5rem; }
+        .og-score-box { display: flex; justify-content: space-between; background: #F9FAFA; padding: 15px; border-radius: 12px; margin-bottom: 1.5rem; }
+        .sc-item { display: flex; flex-direction: column; align-items: center; }
+        .sc-item span { font-size: 0.6rem; color: #99AFAF; text-transform: uppercase; }
+        .sc-item b { font-size: 1rem; color: #003D40; }
+        .sc-item.total b { color: #48A6A7; font-size: 1.2rem; }
+        .btn-og-print { width: 100%; padding: 12px; background: #003D40; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
 
-        .main {
-          flex: 1;
-          background: #f2efe7;
-          padding: 2rem;
-          overflow-y: auto;
-        }
-
-        .topbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-bottom: 2px solid #9acbd0;
-          padding-bottom: 1rem;
-          margin-bottom: 2rem;
-        }
-
-        .topbar h1 {
-          margin: 0;
-          color: #006a71;
-        }
-
-        .user-info {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-
-        .user-info span {
-          font-weight: 600;
-          color: #006a71;
-        }
-
-        .user-info button {
-          background: #48a6a7;
-          color: white;
-          border: none;
-          padding: 0.5rem 1rem;
-          border-radius: 8px;
-          cursor: pointer;
-        }
-
-        .content {
-          color: #333;
-          font-size: 1.1rem;
-        }
-
-        .mb-4 {
-          margin-bottom: 1rem;
-        }
-
-        label {
-          display: block;
-          margin-bottom: 0.25rem;
-        }
-
-        select {
-          width: 100%;
-          max-width: 300px;
-          padding: 0.5rem;
-          border: 1px solid #ccc;
-          border-radius: 8px;
-          font-size: 1rem;
-          color: #006a71;
-          background-color: white;
-        }
-
-        .results-title {
-          font-weight: 700;
-          color: #006a71;
-          margin-bottom: 1rem;
-          font-size: 1.3rem;
-        }
-
-        .select-all-container {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1rem;
-          max-width: 500px;
-        }
-
-        .delete-btn {
-          background: #cc4444;
-          border: none;
-          color: white;
-          padding: 0.3rem 1rem;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 600;
-          transition: background-color 0.3s ease;
-        }
-        .delete-btn:disabled {
-          background: #aaa;
-          cursor: not-allowed;
-        }
-        .delete-btn:hover:not(:disabled) {
-          background: #a83333;
-        }
-
-        .results-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 1rem;
-        }
-
-        .result-card {
-          background: white;
-          border-radius: 12px;
-          padding: 1rem;
-          box-shadow: 0 0 6px rgb(0 106 113 / 0.1);
-          width: 280px;
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          position: relative;
-        }
-
-        .result-card h3 {
-          margin: 0;
-          color: #006a71;
-          font-weight: 700;
-        }
-
-        .result-card p {
-          margin: 0;
-          font-size: 0.95rem;
-        }
-
-        .error {
-          color: red;
-          font-weight: 600;
-          margin-top: 1rem;
-        }
+        .bulk-control-bar { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(120px); background: #003D40; color: white; padding: 15px 30px; border-radius: 100px; display: flex; align-items: center; gap: 30px; transition: 0.4s; z-index: 1000; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+        .bulk-control-bar.visible { transform: translateX(-50%) translateY(0); }
+        .bc-btn { border: none; padding: 8px 20px; border-radius: 50px; font-weight: bold; cursor: pointer; }
+        .bc-btn.print { background: #48A6A7; color: white; }
+        .bc-btn.delete { background: #E63946; color: white; }
+        .bc-close { background: none; border: none; color: white; cursor: pointer; font-size: 1.2rem; }
+        
+        .fade-in { animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
   );

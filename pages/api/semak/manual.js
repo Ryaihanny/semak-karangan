@@ -52,18 +52,23 @@ function escapeHtml(text) {
   });
 }
 
+
 function generateUnderlinedKarangan(karangan, kesalahanBahasa) {
   let escapedKarangan = escapeHtml(karangan);
-  kesalahanBahasa.forEach(({ ayatSalah }) => {
-    if (!ayatSalah) return;
-    const escapedMistake = ayatSalah.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escapedMistake, 'gi');
-    escapedKarangan = escapedKarangan.replace(
-      regex,
-      match =>
-        `<u style="text-decoration-color:red; text-decoration-thickness: 2px;">${match}</u>`
-    );
-  });
+kesalahanBahasa.forEach((item, idx) => {
+  if (!item || typeof item.ayatSalah !== 'string') {
+    console.warn(`⚠️ generateUnderlinedKarangan skipped kesalahanBahasa[${idx}]:`, item);
+    return;
+  }
+  const escapedMistake = item.ayatSalah.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(escapedMistake, 'gi');
+  escapedKarangan = escapedKarangan.replace(
+    regex,
+    match =>
+      `<u style="text-decoration-color:red; text-decoration-thickness: 2px;">${match}</u>`
+  );
+});
+
   escapedKarangan = escapedKarangan.replace(/\n/g, '<br/>');
   return escapedKarangan;
 }
@@ -81,6 +86,11 @@ function countGayaBahasaUsedInSentence(karangan, gayaList) {
 export default async function handler(req, res) {
   try {
     const { nama, karangan, pictureDescription, pictureUrl } = req.body;
+// 🔹 Debug inputs
+if (typeof karangan !== 'string') console.warn('⚠️ karangan is not a string!', karangan);
+if (typeof pictureDescription !== 'string') console.warn('⚠️ pictureDescription is not a string!', pictureDescription);
+if (typeof pictureUrl !== 'string') console.warn('⚠️ pictureUrl is not a string!', pictureUrl);
+
 
     let markahIsiRaw = 0;
     let markahBahasa = 0;
@@ -172,6 +182,17 @@ Karangan: ${karangan}`,
       kesalahanBahasa = [];
     }
 
+// 🔹 Debug kesalahanBahasa array
+if (!Array.isArray(kesalahanBahasa)) {
+  console.warn('⚠️ kesalahanBahasa is not an array!', kesalahanBahasa);
+} else {
+  kesalahanBahasa.forEach((item, i) => {
+    if (!item || typeof item.ayatSalah !== 'string') {
+      console.warn(`⚠️ kesalahanBahasa[${i}].ayatSalah is invalid:`, item);
+    }
+  });
+}
+
     // ✅ Kesalahan Imbuhan
     imbuhanRules.forEach(rule => {
       const regex = new RegExp(rule.pattern, 'gi');
@@ -210,7 +231,8 @@ Karangan: ${karangan}`,
     }
 
 // ✅ Generate keseluruhan ulasan ringkas
-const ulasanKeseluruhan = generateUlasan(markahIsi, markahBahasa); // ✅ NEW
+const ulasanKeseluruhan = generateUlasan(markahIsi, markahBahasa) || '';
+
 
 
     // ✅ Gaya Bahasa

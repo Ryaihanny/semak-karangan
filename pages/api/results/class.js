@@ -21,20 +21,13 @@ export default async function handler(req, res) {
   }
 
   const idToken = req.headers.authorization?.split('Bearer ')[1];
-  if (!idToken) return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
 
-  let uid;
   try {
     const decodedToken = await admin.auth().verifyIdToken(idToken);
-    uid = decodedToken.uid;
-  } catch {
-    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
-  }
+    const uid = decodedToken.uid;
+    const { set } = req.query;
 
-  const { set } = req.query;
-  if (!set) return res.status(400).json({ error: 'Parameter set required' });
-
-  try {
     const snapshot = await db
       .collection('karanganResults')
       .where('uid', '==', uid)
@@ -42,22 +35,27 @@ export default async function handler(req, res) {
       .orderBy('timestamp', 'asc')
       .get();
 
-    const results = snapshot.docs.map((doc) => {
+const results = snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
         nama: data.nama,
+        kelas: data.kelas || '',
         set: data.set,
         markahIsi: data.markahIsi,
         markahBahasa: data.markahBahasa,
         markahKeseluruhan: data.markahKeseluruhan,
+        ulasan: data.ulasan, 
+        karangan: data.karangan,
+        // ADD THESE 2 LINES BELOW FOR THE PDF:
+        karanganUnderlined: data.karanganUnderlined || '', 
+        kesalahanBahasa: data.kesalahanBahasa || [],
         timestamp: data.timestamp?.toDate ? data.timestamp.toDate().toISOString() : data.timestamp,
       };
     });
 
     return res.status(200).json({ results });
   } catch (error) {
-    console.error('Error fetching class results:', error);
-    return res.status(500).json({ error: 'Internal server error', details: error.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

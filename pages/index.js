@@ -1,208 +1,173 @@
 import { useRouter } from 'next/router';
-import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { useState, useEffect, useCallback } from 'react';
+import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '../lib/firebase';
+import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import Head from 'next/head';
+import Link from 'next/link'; // Added Link
 
 export default function Home() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [loginType, setLoginType] = useState('username'); // 'username' or 'email'
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
 
-  const handleLogin = async () => {
+  // Robust Redirection Logic
+  const redirectUser = useCallback(async (firebaseUser) => {
+    try {
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      
+      if (userDocSnap.exists()) {
+        const role = userDocSnap.data().role?.toLowerCase();
+        if (role === 'admin') router.push('/admin/dashboard');
+        else router.push('/dashboard');
+        return;
+      }
+
+      const q = query(collection(db, 'students'), where('email', '==', firebaseUser.email), limit(1));
+      const studentSnap = await getDocs(q);
+      
+      if (!studentSnap.empty) {
+        localStorage.setItem("studentUser", JSON.stringify({
+          id: studentSnap.docs[0].id,
+          ...studentSnap.docs[0].data()
+        }));
+        router.push('/student-dashboard');
+      }
+    } catch (err) {
+      console.error("Redirect error:", err);
+      setAuthChecking(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) redirectUser(user);
+      else setAuthChecking(false);
+    });
+    return () => unsubscribe();
+  }, [redirectUser]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setLoading(true);
     setError('');
+    const cleanId = identifier.trim().toLowerCase();
+
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push('/dashboard');
+      if (loginType === 'username') {
+        const studentRef = doc(db, 'students', cleanId);
+        const studentSnap = await getDoc(studentRef);
+
+        if (studentSnap.exists() && studentSnap.data().password === password) {
+          localStorage.setItem("studentUser", JSON.stringify({
+            id: studentSnap.id,
+            ...studentSnap.data()
+          }));
+          router.push('/student-dashboard');
+          return;
+        } else {
+          throw new Error("ID Murid atau Kata Laluan salah.");
+        }
+      }
+      const userCredential = await signInWithEmailAndPassword(auth, cleanId, password);
+      await redirectUser(userCredential.user);
     } catch (err) {
-      setError('Log masuk gagal. Sila semak emel dan kata laluan.');
+      setError(err.message || "Gagal log masuk. Sila cuba lagi.");
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    handleLogin();
-  };
+  if (authChecking) {
+    return <div className="loading-screen">🔮 <span>Memuatkan Portal...</span></div>;
+  }
 
   return (
-    <div className="page">
-      <header className="nav">
-        <ul>
-          <li><a href="#about">Tentang</a></li>
-          <li><a href="/signup">Daftar</a></li>
-          <li><a href="#pricing">Harga</a></li>
-          <li><a href="#contact">Hubungi</a></li>
-        </ul>
-      </header>
+    <div className="landing-page">
+      <Head>
+        <title>Si-Pintar | Diari Penulisan AI</title>
+      </Head>
 
-      <main className="container">
-        <section className="left">
-          <h1 className="title">
-            <span>Semak</span>
-            <span>Karangan</span>
-            <span className="dot">.ai</span>
-          </h1>
-          <blockquote className="quote-box">
-            <p>
-              Membantu guru menyemak karangan murid secara automatik – kenal pasti isi penting, analisis kesalahan bahasa, berikan markah dan pembetulan – dalam satu sistem yang pantas.
-            </p>
-          </blockquote>
-        </section>
+      <nav className="glass-nav">
+        <div className="logo">🔮 Si-<span>Pintar</span></div>
+        <Link href="/signup" className="nav-btn">Mula Sekarang</Link>
+      </nav>
 
-        <section className="right">
-          <h2>Log Masuk</h2>
-          <form onSubmit={handleSubmit}>
-            <input type="email" placeholder="Emel" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={loading} />
-            <input type="password" placeholder="Kata Laluan" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={loading} />
-            <button type="submit" disabled={loading}>{loading ? 'Sedang Log Masuk...' : '→'}</button>
-          </form>
-          {error && <p className="error">{error}</p>}
-          <div className="links">
-            <a href="/signup">Daftar Akaun</a> | <a href="/forgot-password">Lupa Kata Laluan?</a>
+      <main className="hero">
+        <div className="hero-text">
+          <div className="badge">✨ Dibina untuk Pelajar Pintar</div>
+          <h1>Tulis Karangan Lebih <span>Hebat</span> Dengan AI.</h1>
+          <p>Dapatkan teguran tatabahasa dan kosa kata secara terus. Belajar menulis dengan seronok!</p>
+          <div className="mini-stats">
+            <div className="m-stat">🚀 <b>Laju</b></div>
+            <div className="m-stat">🎯 <b>Tepat</b></div>
+            <div className="m-stat">🌈 <b>Ceria</b></div>
           </div>
-        </section>
+        </div>
+
+        <div className="login-box-container">
+          <div className="login-card">
+            <h3>Selamat Kembali! 👋</h3>
+            <div className="toggle-slider">
+              <button className={loginType === 'username' ? 'active' : ''} onClick={() => setLoginType('username')}>ID Murid</button>
+              <button className={loginType === 'email' ? 'active' : ''} onClick={() => setLoginType('email')}>Emel Guru</button>
+            </div>
+
+            <form onSubmit={handleLogin}>
+              <div className="input-group">
+                <input type={loginType === 'username' ? 'text' : 'email'} placeholder={loginType === 'username' ? "ID Murid (cth: ali123)" : "Emel Guru"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <input type="password" placeholder="Kata Laluan" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </div>
+              <button type="submit" className="submit-btn" disabled={loading}>{loading ? "Menyemak..." : "Masuk Sekarang"}</button>
+            </form>
+            
+            {/* ADDED: SIGNUP LINK */}
+            <div className="signup-link">
+  Cikgu baru di sini? <Link href="/signup">Daftar Akaun Guru</Link>
+</div>
+
+            {error && <div className="error-pill">{error}</div>}
+          </div>
+        </div>
       </main>
 
-      <style jsx>{`
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
-
-        * { box-sizing: border-box; }
-        body, html, .page {
-          margin: 0;
-          padding: 0;
-          height: 100vh;
-          font-family: 'Poppins', sans-serif;
-          background: #F2EFE7;
-          color: #006A71;
-          overflow: hidden;
-        }
-
-        .nav {
-          position: fixed;
-          top: 24px;
-          right: 40px;
-        }
-        .nav ul {
-          display: flex;
-          gap: 24px;
-          list-style: none;
-          margin: 0;
-          padding: 0;
-        }
-        .nav ul li a {
-          text-decoration: none;
-          font-weight: 600;
-          color: #006A71;
-        }
-
-        .container {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          height: 100%;
-          padding: 6rem 8rem;
-        }
-
-        .left {
-          flex: 1;
-        }
-        .title {
-          font-size: 5rem;
-          font-weight: 800;
-          line-height: 1;
-        }
-        .title span {
-          display: block;
-        }
-        .dot {
-          color: #48A6A7;
-        }
-        .quote-box {
-          margin-top: 2rem;
-          font-size: 1.2rem;
-          color: #444;
-          border-left: 5px solid #48A6A7;
-          padding-left: 1rem;
-          max-width: 500px;
-        }
-
-        .right {
-          background: #ffffffcc;
-          padding: 2.5rem;
-          border-radius: 20px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-          width: 360px;
-        }
-
-        .right h2 {
-          margin-bottom: 1.5rem;
-          font-size: 2rem;
-          color: #006A71;
-          text-align: center;
-        }
-
-        form {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        input {
-          padding: 1rem;
-          border-radius: 12px;
-          border: 1px solid #ccc;
-          font-size: 1rem;
-        }
-
-        button {
-          background: #48A6A7;
-          color: white;
-          font-weight: 600;
-          padding: 1rem;
-          border: none;
-          border-radius: 12px;
-          font-size: 1.2rem;
-          cursor: pointer;
-        }
-
-        button:disabled {
-          background: #9ACBD0;
-        }
-
-        .error {
-          color: red;
-          font-size: 0.9rem;
-          margin-top: 1rem;
-          text-align: center;
-        }
-
-        .links {
-          text-align: center;
-          margin-top: 1rem;
-          font-size: 0.9rem;
-        }
-
-        .links a {
-          color: #006A71;
-          text-decoration: underline;
-        }
-
-        @media (max-width: 768px) {
-          .container {
-            flex-direction: column;
-            padding: 2rem;
-          }
-          .left, .right {
-            width: 100%;
-            text-align: center;
-          }
-          .right {
-            margin-top: 2rem;
-          }
-        }
+      <style jsx global>{`
+        body { margin: 0; background: #F8F7FF; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .landing-page { min-height: 100vh; display: flex; flex-direction: column; }
+        .glass-nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 8%; }
+        .logo { font-size: 1.6rem; font-weight: 800; color: #2D3436; }
+        .logo span { color: #6C63FF; }
+        .nav-btn { text-decoration: none; background: #6C63FF; color: white; padding: 10px 20px; border-radius: 12px; font-weight: 700; font-size: 0.9rem; }
+        .hero { flex: 1; display: flex; align-items: center; padding: 0 8%; gap: 60px; }
+        .hero-text { flex: 1.2; }
+        .badge { background: #EBE9FF; color: #6C63FF; display: inline-block; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 0.8rem; margin-bottom: 20px; }
+        h1 { font-size: 3.8rem; line-height: 1.1; margin-bottom: 20px; color: #2D3436; }
+        h1 span { color: #6C63FF; }
+        p { font-size: 1.2rem; color: #636E72; line-height: 1.6; margin-bottom: 30px; }
+        .mini-stats { display: flex; gap: 20px; }
+        .m-stat { background: white; padding: 10px 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); font-weight: 600; }
+        .login-box-container { flex: 0.8; display: flex; justify-content: center; }
+        .login-card { background: white; padding: 40px; border-radius: 35px; box-shadow: 0 20px 40px rgba(108, 99, 255, 0.1); width: 100%; max-width: 380px; }
+        .login-card h3 { text-align: center; margin-bottom: 25px; color: #2D3436; }
+        .toggle-slider { display: flex; background: #F0F0FF; padding: 5px; border-radius: 15px; margin-bottom: 25px; }
+        .toggle-slider button { flex: 1; border: none; background: none; padding: 10px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: 0.3s; color: #636E72; }
+        .toggle-slider button.active { background: white; color: #6C63FF; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .input-group { margin-bottom: 15px; }
+        input { width: 100%; padding: 15px; border-radius: 15px; border: 2px solid #F0F0FF; font-size: 1rem; outline: none; transition: 0.3s; box-sizing: border-box; }
+        input:focus { border-color: #6C63FF; }
+        .submit-btn { width: 100%; background: #6C63FF; color: white; border: none; padding: 16px; border-radius: 15px; font-weight: 800; font-size: 1rem; cursor: pointer; transition: 0.3s; }
+        .submit-btn:hover { background: #564ED9; transform: translateY(-3px); }
+        .signup-link { text-align: center; margin-top: 20px; font-size: 0.9rem; color: #636E72; }
+        .signup-link :global(a) { color: #6C63FF; font-weight: 700; text-decoration: none; }
+        .error-pill { background: #FFE5E5; color: #D63031; padding: 10px; border-radius: 12px; margin-top: 15px; font-size: 0.85rem; text-align: center; font-weight: 600; }
+        .loading-screen { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #6C63FF; color: white; font-size: 1.5rem; font-weight: 800; }
+        @media (max-width: 1000px) { .hero { flex-direction: column; padding: 40px 5%; text-align: center; } h1 { font-size: 2.5rem; } .mini-stats { justify-content: center; } }
       `}</style>
     </div>
   );

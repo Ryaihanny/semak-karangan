@@ -2,15 +2,23 @@ import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
-import { auth } from '../lib/firebase';  // path as appropriate
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/router';
+import { signOut } from 'firebase/auth';
 
 export default function Semak() {
-const [creditBalance, setCreditBalance] = useState(null);
+  const router = useRouter();
+  const [user, setUser] = useState(null); // Added for consistency with dashboard logic
+  const [creditBalance, setCreditBalance] = useState(null);
   const [pictureDescription, setPictureDescription] = useState('');
+  const [questionImage, setQuestionImage] = useState(null);
+  const [globalLevel, setGlobalLevel] = useState('P6');
+  
   const [pupils, setPupils] = useState([
     {
       id: 1,
       nama: '',
+      kelas: '',
       karangan: '',
       mode: 'manual',
       ocrFiles: [],
@@ -19,42 +27,45 @@ const [creditBalance, setCreditBalance] = useState(null);
       error: null,
       checked: false,
       set: '',
+      level: globalLevel,
     },
   ]);
   const [pdfLoading, setPdfLoading] = useState(false);
-const [includeKarangan, setIncludeKarangan] = useState(true);
+  const [includeKarangan, setIncludeKarangan] = useState(true);
 
-const fetchCredit = async (uid) => {
-  const db = getFirestore();
-  const docRef = doc(db, 'users', uid);
-  const docSnap = await getDoc(docRef);
-
-  if (docSnap.exists()) {
-    const data = docSnap.data();
-    setCreditBalance(data.credits ?? 0);
-  } else {
-    setCreditBalance(0);
-  }
-};
-
-useEffect(() => {
-  const unsubscribe = auth.onAuthStateChanged((user) => {
-    if (user) {
-      fetchCredit(user.uid);
+  // --- LOGIC: FETCH CREDIT (UNTOUCHED) ---
+  const fetchCredit = async (uid) => {
+    const db = getFirestore();
+    const docRef = doc(db, 'users', uid);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      setCreditBalance(data.credits ?? 0);
+      setUser({ uid, ...data });
+    } else {
+      setCreditBalance(0);
     }
-  });
+  };
 
-  return () => unsubscribe(); // optional cleanup
-}, []);
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        fetchCredit(user.uid);
+      } else {
+        router.replace('/');
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
-
-  // Add new pupil row
+  // --- LOGIC: PUPIL MANAGEMENT ---
   const addPupil = () => {
     setPupils((prev) => [
       ...prev,
       {
-        id: prev.length + 1,
+        id: Date.now(),
         nama: '',
+        kelas: '',
         karangan: '',
         mode: 'manual',
         ocrFiles: [],
@@ -63,81 +74,54 @@ useEffect(() => {
         error: null,
         checked: false,
         set: '',
+        level: globalLevel,
       },
     ]);
   };
 
-  // Update pupil property by id
-// Updated
-const updatePupil = (index, key, value) => {
-  setPupils((prev) =>
-    prev.map((p, i) => (i === index ? { ...p, [key]: value } : p))
-  );
-};
+  const updatePupil = (index, key, value) => {
+    setPupils((prev) => prev.map((p, i) => (i === index ? { ...p, [key]: value } : p)));
+  };
 
-
-  // Toggle check/uncheck all pupils
   const toggleAllChecked = (checked) => {
     setPupils((prev) => prev.map((p) => ({ ...p, checked })));
   };
 
-  // Submit selected pupils for bulk analysis
-  const handleSubmitChecked = async () => {
-    await handleSubmitCheckedWrapper();
-  };
-
-  // Wrapper to submit specific pupils by IDs (single submit uses this too)
+// --- LOGIC: SUBMISSION ---
   async function handleSubmitCheckedWrapper(singleIds) {
-
     const user = auth.currentUser;
     const userId = user?.uid;
-
     if (!userId) {
       alert('Sesi tamat. Sila log masuk semula.');
       return;
     }
 
-    const selected = pupils.filter((p) =>
-      singleIds ? singleIds.includes(p.id) : p.checked
-    );
+    const selected = pupils.filter((p) => (singleIds ? singleIds.includes(p.id) : p.checked));
+    if (selected.length === 0) return;
 
-console.log('All pupils:', pupils);
-console.log('Selected pupils:', selected);
-console.log("Selected pupils for processing:", selected);
-
-
-    if (selected.length === 0) {
-      alert('Sila tandakan pelajar yang mahu disemak.');
-      return;
-    }
-
-    // Set loading true for selected pupils and clear previous error/result
     setPupils((prev) =>
       prev.map((p) =>
-        selected.find((sel) => sel.id === p.id)
-          ? { ...p, loading: true, error: null, result: null }
-          : p
+        selected.find((sel) => sel.id === p.id) ? { ...p, loading: true, error: null, result: null } : p
       )
     );
 
     try {
       const formData = new FormData();
-      formData.append('userId', userId);
+      if (questionImage) formData.append('questionImage', questionImage);
 
-const pupilsData = selected.map(p => ({
-  id: p.id,
-  nama: p.nama,
-  karangan: p.karangan,
-  mode: p.mode,
-  set: p.set,
-  checked: true,               // use actual checked value
-  pictureDescription: pictureDescription,  // same description for all selected pupils
-  pictureUrl: p.pictureUrl || '',
-}));
-formData.append('pupils', JSON.stringify(pupilsData));
+      const pupilsData = selected.map((p) => ({
+        id: p.id,
+        nama: p.nama || '',
+        kelas: p.kelas || '',
+        karangan: p.karangan || '',
+        mode: p.mode,
+        set: p.set || '',
+        level: p.level || 'P6',
+        pictureDescription: pictureDescription || '',
+      }));
 
+      formData.append('pupils', JSON.stringify(pupilsData));
 
-      // Append OCR files keyed by "file_<id>" for each pupil in OCR mode
       selected.forEach((p) => {
         if (p.mode === 'ocr' && p.ocrFiles.length > 0) {
           Array.from(p.ocrFiles).forEach((file) => {
@@ -146,455 +130,515 @@ formData.append('pupils', JSON.stringify(pupilsData));
         }
       });
 
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/semak/bulk', {
+        method: 'POST',
+        body: formData,
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
 
-console.log("Sending userId to backend:", userId);
-
-const idToken = await user.getIdToken();
-
-console.log("Sending pupils data to backend:", JSON.stringify(pupilsData, null, 2));
-
-// 2️⃣ Send the request
-const res = await fetch('/api/semak/bulk', {
-  method: 'POST',
-  body: formData,
-  headers: {
-    Authorization: `Bearer ${idToken}`, // ✅ Keep the token
-  },
-});
-
-const json = await res.json();
-console.log('Bulk semak response:', json);
-     
+      const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Ralat pelayan');
-await fetchCredit();
 
+      // --- FIRESTORE SAVING LOGIC (STRICTLY INCLUDED) ---
+      const { collection, addDoc, serverTimestamp, getFirestore } = await import('firebase/firestore');
+      const db = getFirestore();
 
-      // Update pupils with their respective results or errors
+      for (const resItem of json.results) {
+        if (!resItem.error) {
+          const originalPupil = selected.find((p) => String(p.id) === String(resItem.id));
+          
+          if (originalPupil) {
+            const currentLevel = originalPupil.level || 'P6';
+            
+            await addDoc(collection(db, 'karanganResults'), {
+              userId: userId,
+              nama: originalPupil.nama,
+              kelas: originalPupil.kelas,
+              level: currentLevel,
+              set: originalPupil.set || '',
+              karangan: resItem.karangan || originalPupil.karangan,
+              markahIsi: resItem.markahIsi,
+              markahBahasa: resItem.markahBahasa,
+              markahKeseluruhan: resItem.markahKeseluruhan,
+              maxPossible: resItem.maxPossible || (currentLevel === 'P3' || currentLevel === 'P4' ? 15 : 40),
+              ulasan: resItem.ulasan,
+              kesalahanBahasa: resItem.kesalahanBahasa || [],
+              gayaBahasa: resItem.gayaBahasa || [],
+              timestamp: serverTimestamp(),
+            });
+          }
+        }
+      }
+      // --- END FIRESTORE SAVING LOGIC ---
+
+      await fetchCredit(userId);
+
       setPupils((prev) =>
         prev.map((p) => {
           const found = json.results.find((r) => String(r.id) === String(p.id));
           if (!found) return p;
-
           return {
             ...p,
             loading: false,
+            karangan: found.karangan || p.karangan,
             error: found.error || null,
             result: found.error ? null : found,
           };
         })
       );
     } catch (e) {
-      alert('Ralat semasa semakan: ' + e.message);
-      // Reset loading state on error for all selected pupils
+      console.error(e);
       setPupils((prev) =>
-        prev.map((p) =>
-          selected.find((sel) => sel.id === p.id) ? { ...p, loading: false } : p
-        )
+        prev.map((p) => (selected.find((sel) => sel.id === p.id) ? { ...p, loading: false, error: e.message } : p))
       );
     }
   }
 
-  // Generate and download PDF for selected pupils who have result
-// Generate and download PDF for selected pupils who have result
-// Generate and download PDF for selected pupils who have result
-const downloadCombinedPDF = async () => {
-  setPdfLoading(true);
-  const selected = pupils.filter((p) => p.checked && p.result);
-
-  if (selected.length === 0) {
-    alert('Sila tandakan pelajar yang ada keputusan untuk dimuat turun.');
-    setPdfLoading(false);
-    return;
-  }
-
-  const pdf = new jsPDF('p', 'mm', 'a4');
-  const margin = 10;
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const usableWidth = pageWidth - margin * 2;
-  const lineHeight = 7;
-  const fontSize = 12;
-
-  pdf.setFont('Times', 'normal');
-  pdf.setFontSize(fontSize);
-
-  const cleanText = (text) => {
-    if (typeof text !== "string") {
-      return text ? String(text) : "-";
+  const handleSubmitChecked = async () => {
+    const selected = pupils.filter((p) => p.checked);
+    if (selected.length === 0) {
+      alert('Sila tandakan pelajar yang mahu disemak.');
+      return;
     }
-    return text
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/<\/?[^>]+(>|$)/g, '') || '-';
+
+    if (!pictureDescription.trim() && !questionImage) {
+      alert('Sila masukkan deskripsi atau upload gambar soalan.');
+      return;
+    }
+
+    // This loop ensures each student is processed individually for high accuracy
+    for (const pupil of selected) {
+      await handleSubmitCheckedWrapper([pupil.id]);
+    }
   };
 
-  for (let i = 0; i < selected.length; i++) {
-    const p = selected[i];
-    const result = p.result || {};
-    let y = margin;
+ // --- MATCHED STYLE & LOGIC FOR PDF GENERATION ---
+  const downloadCombinedPDF = () => {
+    setPdfLoading(true);
+    try {
+      const itemsToDownload = pupils
+        .filter((p) => p.result && p.checked)
+        .map((p) => ({
+          ...p.result,
+          nama: p.nama,
+          kelas: p.kelas,
+          level: p.level,
+          set: p.set,
+          // FIX 1: Prioritize the transcribed text from AI result so OCR images show up
+          originalKarangan: p.result.karangan || p.karangan 
+        }));
 
-    if (i > 0) pdf.addPage();
-
-    // Header
-    pdf.setFont(undefined, 'bold');
-    pdf.text(`Keputusan Semakan Karangan untuk: ${cleanText(p.nama)}`, margin, y);
-    pdf.setFont(undefined, 'normal');
-    y += lineHeight * 2;
-
-    // Marks
-    pdf.text(`Markah Isi: ${cleanText(result.markahIsi)}`, margin, y);
-    y += lineHeight;
-    pdf.text(`Markah Bahasa: ${cleanText(result.markahBahasa)}`, margin, y);
-    y += lineHeight;
-    pdf.text(`Markah Keseluruhan: ${cleanText(result.markahKeseluruhan)}`, margin, y);
-    y += lineHeight;
-
-    // Ringkasan Ulasan
-    pdf.setFont(undefined, 'bold');
-    pdf.text('Ringkasan Ulasan:', margin, y);
-    pdf.setFont(undefined, 'normal');
-    y += lineHeight;
-
-    const isiSummary = cleanText(result.ulasan?.isi ?? 'Tiada ulasan isi.');
-    pdf.text(`Isi: ${isiSummary}`, margin + 5, y);
-    y += lineHeight;
-
-    const bahasaSummary = cleanText(result.ulasan?.bahasa ?? 'Tiada ulasan bahasa.');
-    pdf.text(`Bahasa: ${bahasaSummary}`, margin + 5, y);
-    y += lineHeight * 2;
-
-    // Karangan Asal
-    pdf.setFont(undefined, 'bold');
-    pdf.text('Karangan Asal (Kesalahan digariskan):', margin, y);
-    pdf.setFont(undefined, 'normal');
-    y += lineHeight;
-
-    if (includeKarangan) {
-      const karanganClean = cleanText(result.karanganUnderlined);
-      const karanganLines = pdf.splitTextToSize(karanganClean, usableWidth);
-
-      for (let lineIndex = 0; lineIndex < karanganLines.length; lineIndex++) {
-        const line = cleanText(karanganLines[lineIndex]);
-        if (y + lineHeight > pageHeight - margin) {
-          pdf.addPage();
-          y = margin;
-        }
-        pdf.text(line, margin, y);
-
-        // Underline ayat salah in this line
-        (result.kesalahanBahasa || []).forEach((item) => {
-          const lineText = String(line || '');
-          const phrase = cleanText(item?.ayatSalah || '').trim();
-          if (!phrase) return; // skip empty phrases
-
-          const regex = new RegExp(phrase, 'gi'); // global, case-insensitive
-          let match;
-          while ((match = regex.exec(lineText)) !== null) {
-            const startX = margin + pdf.getTextWidth(lineText.substring(0, match.index));
-            const phraseWidth = pdf.getTextWidth(phrase);
-            const underlineY = y + 1.5;
-
-            pdf.setDrawColor(255, 0, 0); // red underline
-            pdf.setLineWidth(0.5);
-            pdf.line(startX, underlineY, startX + phraseWidth, underlineY);
-            pdf.setDrawColor(0);
-          }
-        });
-
-        y += lineHeight;
+      if (itemsToDownload.length === 0) {
+        alert("Sila pastikan pelajar telah disemak dan ditandakan.");
+        setPdfLoading(false);
+        return;
       }
-    } else {
-      pdf.text('(Karangan penuh tidak disertakan atas permintaan)', margin, y);
-      y += lineHeight * 2;
+      generatePDF(itemsToDownload);
+    } catch (error) {
+      console.error("PDF Generation Error:", error);
+      alert("Gagal menjana PDF. Sila cuba lagi.");
+    } finally {
+      setPdfLoading(false);
     }
+  };
 
-    // Analisis Kesalahan Bahasa Table
-    if (!result.kesalahanBahasa || result.kesalahanBahasa.length === 0) {
-      pdf.setFont(undefined, 'bold');
-      pdf.text('Analisis Kesalahan Bahasa:', margin, y);
-      pdf.setFont(undefined, 'normal');
-      y += lineHeight;
-      pdf.text('Tiada kesalahan bahasa dikesan.', margin + 5, y);
-      y += lineHeight;
-    } else {
-      autoTable(pdf, {
+  const generatePDF = (items) => {
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const margin = 15;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const usableWidth = pageWidth - (margin * 2);
+
+    const cleanText = (text) => {
+      if (!text) return '-';
+      return String(text)
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/<\/?[^>]+(>|$)/g, '');
+    };
+
+    items.forEach((item, index) => {
+      if (index > 0) doc.addPage();
+      
+      let y = 0;
+
+      // 1. EMERALD HEADER BLOCK
+      doc.setFillColor(0, 61, 64);
+      doc.rect(0, 0, 210, 40, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.text("LAPORAN SEMAKAN SI-PINTAR", 105, 20, { align: "center" });
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("Analisis Karangan Berasaskan Kecerdasan Buatan (AI)", 105, 28, { align: "center" });
+
+      // 2. STUDENT INFO WITH UNDERLINE LOGIC
+      y = 55;
+      doc.setTextColor(0, 61, 64);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      const nameText = `NAMA: ${cleanText(item.nama).toUpperCase()}`;
+      doc.text(nameText, margin, y);
+      
+      const textWidth = doc.getTextWidth(nameText);
+      doc.setDrawColor(0, 61, 64);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y + 2, margin + textWidth, y + 2);
+
+      y += 12;
+      doc.setFontSize(11);
+      doc.setTextColor(60, 60, 60);
+      doc.text(`KELAS: ${item.kelas || '-'}`, margin, y);
+      doc.text(`TAHAP: ${item.level}`, 80, y);
+      doc.text(`SET: ${item.set || '-'}`, 140, y);
+
+      // 3. SCORE TABLE (Dynamic Max Marks)
+      y += 10;
+      
+      // Determine max marks based on Level
+      // P3/P4 usually /15, Others usually /40
+      const isJunior = item.level === 'P3' || item.level === 'P4';
+      const maxIsi = isJunior ? 7 : 20; 
+      const maxBahasa = isJunior ? 8 : 20;
+      const totalMax = maxIsi + maxBahasa; // e.g., 15 or 40
+
+      autoTable(doc, {
         startY: y,
-        head: [['Kategori', 'Ayat Salah', 'Pembetulan', 'Penjelasan']],
-        body: result.kesalahanBahasa.map((item) => [
-          cleanText(item.kategori),
-          cleanText(item.ayatSalah),
-          cleanText(item.cadangan),
-          cleanText(item.penjelasan),
-        ]),
-        margin: { left: margin, right: margin },
-        styles: { font: 'times', fontSize: 11, cellPadding: 2, textColor: 0, lineColor: [0, 0, 0], lineWidth: 0.5 },
-        headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.5 },
-        theme: 'grid',
-        pageBreak: 'auto',
+        head: [['KOMPONEN PENILAIAN', 'MARKAH']],
+        body: [
+          ['Isi & Penghuraian', `${item.markahIsi} / ${maxIsi}`],
+          ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${maxBahasa}`],
+          ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${totalMax}`],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: [0, 61, 64], textColor: [255, 255, 255], fontSize: 11 },
+        styles: { font: 'helvetica', fontSize: 10, cellPadding: 5 },
+        columnStyles: { 1: { halign: 'center', fontStyle: 'bold', fontSize: 12 } }
       });
-      y = pdf.lastAutoTable.finalY + lineHeight;
-    }
 
-    // Gaya Bahasa
-    pdf.setFont(undefined, 'bold');
-    pdf.text('Gaya Bahasa Dikesan:', margin, y);
-    pdf.setFont(undefined, 'normal');
-    y += lineHeight;
+      y = doc.lastAutoTable.finalY + 15;
 
-    if (!result.gayaBahasa || result.gayaBahasa.length === 0) {
-      pdf.text('Tiada gaya bahasa dikesan.', margin, y);
-      y += lineHeight;
-    } else {
-      result.gayaBahasa.forEach((g) => {
-        const wrapped = pdf.splitTextToSize(`- ${cleanText(g)}`, usableWidth);
-        wrapped.forEach((line) => {
-          if (y + lineHeight > pageHeight - margin) {
-            pdf.addPage();
-            y = margin;
-          }
-          pdf.text(cleanText(line), margin, y);
-          y += lineHeight;
-        });
-      });
-    }
-
-    y += lineHeight;
-
-    // Ulasan Keseluruhan
-    pdf.setFont(undefined, 'bold');
-    pdf.text('Ulasan Keseluruhan:', margin, y);
-    pdf.setFont(undefined, 'normal');
-    y += lineHeight;
-
-    const ulasanKeseluruhanLines = pdf.splitTextToSize(
-      cleanText(result.ulasan?.keseluruhan),
-      usableWidth
-    );
-    ulasanKeseluruhanLines.forEach((line) => {
-      if (y + lineHeight > pageHeight - margin) {
-        pdf.addPage();
-        y = margin;
+      // 4. ORIGINAL ESSAY
+      if (includeKarangan && item.originalKarangan) {
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(0, 61, 64);
+        doc.text("TEKS KARANGAN:", margin, y);
+        y += 6;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(40, 40, 40);
+        const wrappedKarangan = doc.splitTextToSize(cleanText(item.originalKarangan), usableWidth);
+        doc.text(wrappedKarangan, margin, y);
+        y += (wrappedKarangan.length * 5) + 12;
       }
-      pdf.text(cleanText(line), margin, y);
-      y += lineHeight;
-    });
-  }
 
-  pdf.save('Laporan_Semakan_Karangan.pdf');
-  setPdfLoading(false);
-};
+      if (y > 240) { doc.addPage(); y = 25; }
+
+      // 5. ULASAN BERSTRUKTUR
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(0, 61, 64);
+      doc.text("ULASAN PENILAIAN:", margin, y);
+      y += 7;
+
+      const ulasanIsi = typeof item.ulasan === 'object' ? item.ulasan?.isi : '-';
+      const ulasanBahasa = typeof item.ulasan === 'object' ? item.ulasan?.bahasa : '-';
+      const ulasanTotal = typeof item.ulasan === 'object' ? item.ulasan?.keseluruhan : item.ulasan;
+
+      autoTable(doc, {
+        startY: y,
+        body: [
+          ['Aspek Isi', cleanText(ulasanIsi)],
+          ['Aspek Bahasa', cleanText(ulasanBahasa)],
+          ['Keseluruhan', cleanText(ulasanTotal)]
+        ],
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 4 },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 35, fillColor: [240, 240, 240] } }
+      });
+
+      y = doc.lastAutoTable.finalY + 12;
+
+// 6. ANALISIS KESALAHAN (FIX 2: Added Kategori Column)
+      if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
+        if (y > 230) { doc.addPage(); y = 25; }
+        doc.setFont("helvetica", "bold");
+        doc.text("ANALISIS KESALAHAN BAHASA:", margin, y);
+        y += 5;
+        autoTable(doc, {
+          startY: y,
+          head: [['Kategori', 'Kesalahan', 'Pembetulan', 'Penjelasan']],
+          body: item.kesalahanBahasa.map(kb => [
+            cleanText(kb.kategori),
+            cleanText(kb.ayatSalah),
+            cleanText(kb.pembetulan || kb.cadangan || '-'), // Added fallback to kb.pembetulan
+            cleanText(kb.penjelasan)
+          ]),
+          theme: 'grid',
+          headStyles: { fillColor: [72, 166, 167] }, 
+          styles: { fontSize: 8 },
+          columnStyles: { 0: { cellWidth: 25, fontStyle: 'bold' } }
+        });
+      }
+
+      // FOOTER
+      const pageCount = doc.internal.getNumberOfPages();
+      doc.setPage(pageCount);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Dicetak pada: ${new Date().toLocaleString('ms-MY')}`, margin, 285);
+      doc.text("Laporan ini dijana secara automatik oleh SI-PINTAR AI", 105, 285, { align: "center" });
+    });
+
+    const filename = items.length === 1 
+      ? `Laporan_${items[0].nama.replace(/\s+/g, '_')}.pdf` 
+      : `Laporan_Pukal_${new Date().getTime()}.pdf`;
+      
+    doc.save(filename);
+  };
 
   return (
-    <div style={{ display: 'flex' }}>
-      {/* Sidebar */}
-<aside style={{ width: 220, backgroundColor: '#003D40', minHeight: '100vh', color: '#fff', padding: '1rem' }}>
-  <h2 style={{ color: '#FFFFFF', marginBottom: '2rem' }}>📘 Menu</h2>
-  <div style={{ marginBottom: '1.5rem', backgroundColor: '#004C4F', padding: '0.8rem', borderRadius: '8px' }}>
-    <strong>Baki Kredit:</strong>
-    <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#FFD700' }}>
-      {creditBalance !== null ? creditBalance : '...'}
-    </div>
-  </div>
-  <nav>
-    <ul style={{ listStyle: 'none', padding: 0, lineHeight: 2 }}>
-      <li><a href="/dashboard" style={{ color: '#fff', textDecoration: 'none' }}>Dashboard</a></li>
-      <li><a href="/semak" style={{ color: '#fff', textDecoration: 'none', fontWeight: 'bold' }}>Semak Karangan</a></li>
-    </ul>
-  </nav>
-</aside>
-
-
-      {/* Main content */}
-      <main style={{ flex: 1, padding: '2rem', backgroundColor: '#F2EFE7' }}>
-        <h1 style={{ textAlign: 'center', marginBottom: '2rem', color: '#006A71' }}>Semak Karangan Pelajar</h1>
-
-        <div style={{ backgroundColor: '#fff3cd', border: '1px solid #ffeeba', padding: 10, borderRadius: 5, marginBottom: '1rem' }}>
-          <strong>🔔 Arahan untuk Guru:</strong>
-          <ul style={{ margin: '5px 0', paddingLeft: '1.2rem' }}>
-            <li>Masukkan <strong>penerangan gambar</strong> di ruang yang disediakan untuk membantu penilaian Markah Isi.</li>
-            <li><strong>Sila namakan set karangan anda dengan nama yang unik</strong> untuk mengelakkan penindihan data.</li>
-            <li>Tekan butang <strong>Semak Murid Terpilih</strong> untuk memproses karangan pelajar.</li>
-            <li>Tandakan murid yang telah disemak untuk muat turun laporan PDF mereka.</li>
-          </ul>
+    <div className="dashboard-layout">
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-icon">SI</div>
+          <div className="logo-text"><h3>SI-PINTAR</h3><span>VERSI GURU</span></div>
         </div>
+        <nav className="sidebar-nav">
+          <div className="nav-header">UTAMA</div>
+          <div className="nav-link" onClick={() => router.push('/dashboard')}>📊 Rekod & Dashboard</div>
+          <div className="nav-link" onClick={() => router.push('/trend')}>📈 Analisis Trend</div>
+          
+          <div className="nav-divider"></div>
+          
+          <div className="nav-header">PENGURUSAN</div>
+          <div className="nav-link" onClick={() => router.push('/urus-kelas')}>🏫 Urus Kelas</div>
+          <div className="nav-link" onClick={() => router.push('/beli-kredit')}>💰 Beli Kredit</div>
+          <div className="nav-link" onClick={() => router.push('/profile')}>👤 Profil Guru</div>
+          
+          <div className="nav-divider"></div>
+          
+          <div className="nav-action-zone">
+            <div className="nav-link highlight active">✍️ Mulakan Semakan</div>
+          </div>
+        </nav>
+        <button className="btn-logout-sidebar" onClick={() => signOut(auth).then(() => router.replace('/'))}>Keluar Sistem</button>
+      </aside>
 
-        <textarea
-          placeholder="Deskripsi Soalan Karangan (contoh: Gambar 1: Dua orang murid sedang...)"
-          value={pictureDescription}
-          onChange={(e) => setPictureDescription(e.target.value)}
-          style={{
-            width: '100%',
-            marginBottom: 10,
-            padding: '1rem',
-            fontSize: '1rem',
-            borderRadius: 5,
-            border: '1.5px solid #48A6A7',
-            resize: 'vertical',
-            backgroundColor: '#FFFFFF',
-          }}
-          rows={3}
-        />
+      <main className="main-content">
+        <header className="topbar">
+          <div className="header-title">
+            <h1>Semak Karangan Pelajar</h1>
+            <p>Sila masukkan butiran tugasan di bawah.</p>
+          </div>
+          <div className="credit-pill">
+            Baki Kredit: <span>{creditBalance !== null ? creditBalance : '...'}</span>
+          </div>
+        </header>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem', border: '1px solid #9ACBD0' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#9ACBD0', color: '#003D40' }}>
-              <th style={{ padding: 10, border: '1px solid #48A6A7' }}>
-                <input
-                  type="checkbox"
-                  onChange={(e) => toggleAllChecked(e.target.checked)}
-                  checked={pupils.length > 0 && pupils.every((p) => p.checked)}
-                  title="Pilih Semua"
-                />
-              </th>
-              <th style={{ padding: 10, border: '1px solid #48A6A7' }}>Nama Murid</th>
-              <th style={{ padding: 10, border: '1px solid #48A6A7' }}>Mod</th>
-              <th style={{ padding: 10, border: '1px solid #48A6A7' }}>Set</th>
-              <th style={{ padding: 10, border: '1px solid #48A6A7' }}>Karangan / Fail</th>
-              <th style={{ padding: 10, border: '1px solid #48A6A7' }}>Tindakan</th>
-              <th style={{ padding: 10, border: '1px solid #48A6A7' }}>Status</th>
-              <th style={{ padding: 10, border: '1px solid #48A6A7' }}>Keputusan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pupils.map((pupil, index) => (
-              <tr key={pupil.id}>
-                <td style={{ padding: 10, border: '1px solid #48A6A7', textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={pupil.checked}
-                    onChange={(e) => updatePupil(index, 'checked', e.target.checked)}
-                  />
-                </td>
-                <td style={{ padding: 10, border: '1px solid #48A6A7' }}>
-                  <input
-                    type="text"
-                    placeholder="Nama Pelajar"
-                    value={pupil.nama}
-                    onChange={(e) => updatePupil(index, 'nama', e.target.value)}
-                    style={{ width: '100%', border: '1px solid #ccc', padding: 6, borderRadius: 4 }}
-                    disabled={pupil.loading}
-                  />
-                </td>
-                <td style={{ padding: 10, border: '1px solid #48A6A7', textAlign: 'center' }}>
-                  <select
-                    value={pupil.mode}
-                    onChange={(e) => updatePupil(index, 'mode', e.target.value)}
-                    style={{ padding: 6, borderRadius: 4 }}
-                    disabled={pupil.loading}
-                  >
-                    <option value="manual">Manual</option>
-                    <option value="ocr">Upload</option>
-                  </select>
-                </td>
-                <td style={{ padding: 10, border: '1px solid #48A6A7' }}>
-                  <input
-                    type="text"
-                    placeholder="Set (Batch)"
-                    value={pupil.set}
-                    onChange={(e) => updatePupil(index, 'set', e.target.value)}
-                    style={{ width: '100%', border: '1px solid #ccc', padding: 6, borderRadius: 4 }}
-                    disabled={pupil.loading}
-                  />
-                </td>
-                <td style={{ padding: 10, border: '1px solid #48A6A7' }}>
-                  {pupil.mode === 'manual' ? (
-                    <textarea
-                      placeholder="Tulis Karangan"
-                      value={pupil.karangan}
-                      onChange={(e) => updatePupil(index, 'karangan', e.target.value)}
-                      style={{ width: '100%', border: '1px solid #ccc', padding: 6, borderRadius: 4, resize: 'vertical' }}
-                      rows={4}
-                      disabled={pupil.loading}
-                    />
-                  ) : (
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => updatePupil(index, 'ocrFiles', e.target.files)}
-                      disabled={pupil.loading}
-                    />
-                  )}
-                </td>
-                <td style={{ padding: 10, border: '1px solid #48A6A7', textAlign: 'center' }}>
-                  <button
-                    onClick={() => handleSubmitCheckedWrapper([pupil.id])}
-                    disabled={pupil.loading || !pupil.nama || (!pupil.karangan && pupil.mode === 'manual') || (pupil.mode === 'ocr' && pupil.ocrFiles.length === 0)}
-                    style={{ padding: '6px 12px', cursor: 'pointer' }}
-                  >
-                    {pupil.loading ? 'Memproses...' : 'Semak'}
-                  </button>
-                </td>
-                <td style={{ padding: 10, border: '1px solid #48A6A7', textAlign: 'center' }}>
-                  {pupil.loading && <span>⏳</span>}
-                  {!pupil.loading && pupil.error && <span style={{ color: 'red' }}>⚠️</span>}
-                  {!pupil.loading && pupil.result && <span style={{ color: 'green' }}>✔️</span>}
-                </td>
-                <td style={{ padding: 10, border: '1px solid #48A6A7', maxWidth: 300, whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
-                  {pupil.error && <div style={{ color: 'red' }}>{pupil.error}</div>}
-{pupil.result && (
-  <>
-    <div><strong>Markah Isi:</strong> {pupil.result?.markahIsi ?? '-'}</div>
-    <div><strong>Markah Bahasa:</strong> {pupil.result?.markahBahasa ?? '-'}</div>
-    <div><strong>Markah Keseluruhan:</strong> {pupil.result?.markahKeseluruhan ?? '-'}</div>
-  </>
-)}
-
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <button
-            onClick={addPupil}
-            style={{ padding: '8px 16px', backgroundColor: '#006A71', color: 'white', border: 'none', borderRadius: 5, cursor: 'pointer' }}
-          >
-            + Tambah Murid
-          </button>
-
-          <div>
-<div style={{ marginBottom: '1rem' }}>
-  <label style={{ cursor: 'pointer' }}>
-    <input
-      type="checkbox"
-      checked={includeKarangan}
-      onChange={(e) => setIncludeKarangan(e.target.checked)}
-      style={{ marginRight: 8 }}
-    />
-    Sertakan Karangan Penuh dalam PDF
-  </label>
-</div>
-
-            <button
-              onClick={handleSubmitChecked}
-              style={{ padding: '8px 16px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: 5, marginRight: 10, cursor: 'pointer' }}
-            >
-              Semak Murid Terpilih
-            </button>
-
-            <button
-              onClick={downloadCombinedPDF}
-              disabled={pdfLoading}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: pdfLoading ? '#6c757d' : '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: 5,
-                cursor: pdfLoading ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {pdfLoading ? 'Memuat turun...' : 'Muat Turun Laporan PDF'}
-            </button>
+        <div className="info-banner">
+          <div className="info-icon">💡</div>
+          <div className="info-text">
+            <strong>Tip Guru:</strong> Anda kini boleh <b>edit teks karangan</b> dan <b>ulasan</b> terus di dalam jadual sebelum menjana PDF.
           </div>
         </div>
+
+        <section className="semak-card">
+          <label className="section-label">Deskripsi Soalan Karangan</label>
+          <div className="question-input-container">
+            <textarea
+              placeholder="Tulis deskripsi soalan ATAU upload gambar soalan di sebelah..."
+              value={pictureDescription}
+              onChange={(e) => setPictureDescription(e.target.value)}
+              className="modern-textarea question-textarea"
+              rows={3}
+            />
+            <div className={`question-image-upload ${questionImage ? 'has-file' : ''}`}>
+               <label className="image-label">
+                  <span className="upload-icon">{questionImage ? '✅' : '📸'}</span>
+                  <span className="upload-text">
+                    {questionImage ? questionImage.name.substring(0, 15) + '...' : 'Upload Gambar Soalan'}
+                  </span>
+                  <input type="file" accept="image/*" onChange={(e) => setQuestionImage(e.target.files[0])} hidden />
+               </label>
+               {questionImage && <button className="btn-remove-img" onClick={() => setQuestionImage(null)}>Padam</button>}
+            </div>
+          </div>
+
+          <div className="control-item">
+  <label>Peringkat:</label>
+  <select 
+    value={globalLevel}
+    onChange={(e) => {
+      const val = e.target.value;
+      setGlobalLevel(val); // Update the "memory" for new rows
+      setPupils(prev => prev.map(p => ({ ...p, level: val }))); // Update existing rows
+    }} 
+    className="modern-select small"
+  >
+    <option value="P6">P6</option>
+    <option value="P5">P5</option>
+    <option value="P4">P4</option>
+    <option value="P3">P3</option>
+  </select>
+</div>
+
+          <div className="table-wrapper">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th><input type="checkbox" onChange={(e) => toggleAllChecked(e.target.checked)} checked={pupils.length > 0 && pupils.every((p) => p.checked)} /></th>
+                  <th>Nama Murid</th>
+                  <th>Kelas</th>
+<th>Set</th>
+                  <th>Karangan (Edit)</th>
+                  <th style={{ textAlign: 'center' }}>Tindakan</th>
+                  <th>Keputusan & Ulasan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pupils.map((pupil, index) => (
+                  <tr key={pupil.id} className={pupil.loading ? 'row-loading' : ''}>
+                    <td><input type="checkbox" checked={pupil.checked} onChange={(e) => updatePupil(index, 'checked', e.target.checked)} /></td>
+                    <td><input type="text" placeholder="Nama" value={pupil.nama} onChange={(e) => updatePupil(index, 'nama', e.target.value)} className="table-input" disabled={pupil.loading} /></td>
+                    <td><input type="text" placeholder="5A" value={pupil.kelas} onChange={(e) => updatePupil(index, 'kelas', e.target.value)} className="table-input" disabled={pupil.loading} /></td>
+<td>
+      <input 
+        type="text" 
+        placeholder="A/B/1" 
+        value={pupil.set} 
+        onChange={(e) => updatePupil(index, 'set', e.target.value)} 
+        className="table-input" 
+        style={{ width: '60px' }}
+        disabled={pupil.loading} 
+      />
+    </td>
+                    <td>
+                      {pupil.mode === 'manual' || pupil.result ? (
+                        <textarea
+                          placeholder="Hasil transkripsi akan muncul di sini..."
+                          value={pupil.karangan}
+                          onChange={(e) => updatePupil(index, 'karangan', e.target.value)}
+                          className="table-textarea"
+                          rows={4}
+                          disabled={pupil.loading}
+                        />
+                      ) : (
+                        <input type="file" accept="image/*" multiple onChange={(e) => updatePupil(index, 'ocrFiles', Array.from(e.target.files))} disabled={pupil.loading} className="file-input" />
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button onClick={() => handleSubmitCheckedWrapper([pupil.id])} disabled={pupil.loading || !pupil.nama} className={`btn-action-small ${pupil.result ? 'done' : ''}`}>
+                        {pupil.loading ? '...' : pupil.result ? 'Semak Semula' : 'Semak'}
+                      </button>
+                      <select 
+                        value={pupil.mode} 
+                        onChange={(e) => updatePupil(index, 'mode', e.target.value)} 
+                        className="table-select-mini"
+                        disabled={pupil.loading}
+                      >
+                        <option value="manual">Manual</option>
+                        <option value="ocr">Upload</option>
+                      </select>
+                    </td>
+                    <td>
+                      {pupil.error && <span className="status-err">⚠️ Ralat</span>}
+                      {pupil.result && (
+                        <div className="mini-result">
+                          <div className="mark-row"><b>{pupil.result.markahKeseluruhan}</b>/{pupil.result.maxPossible}</div>
+                          <textarea 
+                             className="ulasan-edit"
+                             value={pupil.result.ulasan.keseluruhan}
+                             onChange={(e) => {
+                               const newResult = { ...pupil.result };
+                               newResult.ulasan.keseluruhan = e.target.value;
+                               updatePupil(index, 'result', newResult);
+                             }}
+                             rows={3}
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="form-footer">
+            <button onClick={addPupil} className="btn-secondary">+ Tambah Murid</button>
+            <div className="main-actions">
+              <button onClick={handleSubmitChecked} disabled={!pictureDescription.trim() && !questionImage} className="btn-primary">Semak Murid Terpilih</button>
+              <button onClick={downloadCombinedPDF} disabled={pdfLoading} className="btn-success">{pdfLoading ? 'Menjana PDF...' : 'Muat Turun PDF'}</button>
+            </div>
+          </div>
+        </section>
       </main>
+
+      <style jsx>{`
+        .dashboard-layout { display: flex; min-height: 100vh; background: #F2F6F6; font-family: 'Inter', sans-serif; color: #003D40; }
+        .sidebar { width: 280px; background: #003D40; color: white; display: flex; flex-direction: column; padding: 2rem 1.5rem; position: sticky; top: 0; height: 100vh; }
+        .sidebar-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 3rem; }
+        .logo-icon { background: #FFD700; color: #003D40; font-weight: 900; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .logo-text h3 { margin: 0; font-size: 1.1rem; letter-spacing: 1px; }
+        .logo-text span { font-size: 0.6rem; opacity: 0.5; font-weight: 700; }
+        .sidebar-nav { flex: 1; }
+        .nav-header { font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.4); letter-spacing: 1.5px; margin: 1.5rem 0 0.8rem 15px; }
+        .nav-link { padding: 12px 15px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; transition: 0.2s; color: rgba(255,255,255,0.7); font-size: 0.9rem; }
+        .nav-link:hover { background: rgba(255,255,255,0.05); color: white; }
+        .nav-link.active { background: #48A6A7; color: white; font-weight: 600; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .nav-link.highlight { background: #FFD700; color: #003D40; font-weight: 700; margin-top: 10px; }
+        .nav-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 1.5rem 10px; }
+        .btn-logout-sidebar { margin-top: auto; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 10px; cursor: pointer; }
+        .main-content { flex: 1; padding: 2.5rem 3.5rem; overflow-y: auto; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .header-title h1 { margin: 0; font-size: 1.8rem; color: #003D40; }
+        .header-title p { color: #888; margin: 4px 0 0; font-size: 0.9rem; }
+        .credit-pill { background: white; padding: 8px 16px; border-radius: 50px; border: 1px solid #E0E7E7; font-size: 0.85rem; font-weight: 600; }
+        .credit-pill span { color: #48A6A7; font-weight: 800; }
+        .info-banner { display: flex; gap: 1rem; background: #FFF9E6; border: 1px solid #FFE4B3; padding: 1rem; border-radius: 12px; margin-bottom: 2rem; align-items: center; }
+        .info-text { font-size: 0.85rem; color: #7A5C00; line-height: 1.4; }
+        .semak-card { background: white; border-radius: 20px; padding: 2rem; border: 1px solid #E0E7E7; box-shadow: 0 4px 20px rgba(0,61,64,0.04); }
+        .section-label { display: block; font-size: 0.75rem; font-weight: 700; color: #AAA; text-transform: uppercase; margin-bottom: 10px; }
+        .question-input-container { display: flex; gap: 15px; margin-bottom: 1.5rem; align-items: flex-start; }
+        .question-textarea { flex: 1; }
+        .question-image-upload { width: 180px; height: 95px; border: 2px dashed #48A6A7; border-radius: 12px; background: #f0fbfc; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; transition: 0.3s; }
+        .question-image-upload.has-file { border-style: solid; background: #e6f9f0; border-color: #28a745; }
+        .image-label { display: flex; flex-direction: column; align-items: center; cursor: pointer; text-align: center; width: 100%; }
+        .upload-icon { font-size: 1.2rem; }
+        .upload-text { font-size: 0.7rem; color: #003D40; font-weight: 600; margin-top: 4px; padding: 0 5px; }
+        .btn-remove-img { background: none; border: none; color: #dc3545; font-size: 0.65rem; text-decoration: underline; cursor: pointer; }
+        .modern-textarea { width: 100%; padding: 1rem; border-radius: 12px; border: 1px solid #F0F0F0; background: #FAFAFA; font-size: 0.95rem; transition: 0.2s; }
+        .modern-textarea:focus { border-color: #48A6A7; outline: none; background: white; }
+        .control-item { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 600; color: #555; margin-bottom: 1.5rem; }
+        .modern-select.small { padding: 5px 10px; border-radius: 8px; border: 1px solid #DDD; }
+        .table-wrapper { overflow-x: auto; margin-bottom: 2rem; }
+        .modern-table { width: 100%; border-collapse: collapse; min-width: 900px; }
+        .modern-table th { text-align: left; padding: 12px; font-size: 0.75rem; color: #AAA; text-transform: uppercase; border-bottom: 2px solid #F5F5F5; }
+        .modern-table td { padding: 12px; border-bottom: 1px solid #F9F9F9; vertical-align: top; }
+        .table-input, .table-textarea { width: 100%; border: 1px solid #EEE; padding: 8px; border-radius: 8px; font-size: 0.85rem; }
+        .table-textarea { min-height: 80px; font-family: inherit; resize: vertical; }
+        .table-select-mini { display: block; width: 100%; margin-top: 5px; font-size: 0.7rem; border: none; background: #f0f0f0; border-radius: 4px; padding: 2px; }
+        .btn-secondary { background: white; border: 1px solid #DDD; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 600; }
+        .btn-primary { background: #003D40; color: white; border: none; padding: 10px 24px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: 0.2s; }
+        .btn-primary:disabled { background: #CCC; cursor: not-allowed; }
+        .btn-success { background: #48A6A7; color: white; border: none; padding: 10px 24px; border-radius: 10px; cursor: pointer; font-weight: 700; }
+        .btn-action-small { background: #E6F2F2; color: #48A6A7; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; width: 100%; }
+        .btn-action-small.done { background: #E6F9F0; color: #28A745; }
+        .mini-result { font-size: 0.75rem; }
+        .mark-row { color: #48A6A7; font-size: 1rem; margin-bottom: 5px; }
+        .ulasan-edit { width: 100%; font-size: 0.75rem; border: 1px solid #F0F0F0; background: #FFF; padding: 5px; border-radius: 6px; color: #666; font-style: italic; }
+        .row-loading { opacity: 0.5; pointer-events: none; }
+        .status-err { color: #dc3545; font-size: 0.7rem; font-weight: bold; }
+        .file-input { font-size: 0.7rem; }
+      `}</style>
     </div>
   );
 }

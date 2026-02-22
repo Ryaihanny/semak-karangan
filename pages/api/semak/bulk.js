@@ -1,103 +1,44 @@
 import formidable from 'formidable';
 import fs from 'fs';
-import path from 'path';
-import { ImageAnnotatorClient as BulkVisionClient } from '@google-cloud/vision';
+import sharp from 'sharp';
+import admin, { db } from "../../../lib/firebaseAdmin";
 import { analyseKarangan } from '@/lib/analyseKarangan';
-import admin from 'firebase-admin';
-import { generateUlasan } from '@/lib/analyseKarangan'; // ✅ NEW
-import sharp from 'sharp'; // <-- add this at the top
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ✅ Inisialisasi Firebase jika belum ada
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-console.log('🔑 Private key length:', process.env.GOOGLE_PRIVATE_KEY?.length);
-console.log('📧 Client email:', process.env.GOOGLE_CLIENT_EMAIL);
-console.log('🆔 Project ID:', process.env.GOOGLE_PROJECT_ID);
-
-const db = admin.firestore();
-const bulkVisionClient = new BulkVisionClient({
-  projectId: process.env.GOOGLE_PROJECT_ID,
-  credentials: {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
-  },
-});
 export const config = { api: { bodyParser: false } };
 
-// ✅ Simpan hasil analisis ke Firestore (ID: set_id)
-async function saveResultToFirestore(set, id, data, uid) {
-  if (!id || !data.nama) {
-    console.warn('⚠️ Skipping Firestore save — invalid ID or missing nama:', id, data.nama);
-    return;
-  }
+const fileToGenerativePart = (buffer, mimeType) => ({
+  inlineData: { data: buffer.toString("base64"), mimeType }
+});
 
-  const docId = `${set}_${id}`; // 🔑 Unique doc ID per set
-  const docRef = db.collection('karanganResults').doc(docId);
-  await docRef.set({
+async function saveResultToFirestore(data, uid, originalId) {
+  if (!data.nama) return;
+  const docRef = await db.collection('karanganResults').add({
     ...data,
-uid,  // ✅ Save user's UID
-    id: docId,
+    uid,  
+    originalPupilId: originalId,
     timestamp: new Date().toISOString(),
+  });
+  console.log('✅ Saved to Firestore:', docRef.id);
+}
+
+// Fixed Credit Deduction: Now returns true/false to allow conditional deduction
+async function deductCredits(userId, amount) {
+  const userRef = db.collection('users').doc(userId);
+  return db.runTransaction(async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists) throw new Error('User not found');
+    
+    const currentCredits = Number(userDoc.data()?.credits ?? 0);
+    if (currentCredits < amount) throw new Error('Insufficient credits');
+    
+    transaction.update(userRef, { credits: currentCredits - amount });
+    return currentCredits - amount;
   });
 }
 
-async function deductCredits(userId, deductions) {
-  console.log('🧪 Starting credit deduction for userId:', userId);
-  
-  const userRef = db.collection('users').doc(userId);
-  
-  let userDoc;
-  try {
-    userDoc = await userRef.get();
-  } catch (err) {
-    console.error('❌ Firestore get() failed:', err);
-    throw new Error('Failed to fetch user data from Firestore');
-  }
-
-  console.log('📄 userDoc.exists?', userDoc.exists);
-  if (!userDoc.exists) {
-    console.error('🚫 No user found in Firestore for UID:', userId);
-    throw new Error('User not found for credit deduction');
-  }
-
-  const userData = userDoc.data();
-  console.log('📦 userDoc data:', userData);
-
-  const currentCredits = Number(userData?.credits ?? 0);
-  console.log('🔢 currentCredits:', currentCredits, 'deductions needed:', deductions);
-
-  if (isNaN(currentCredits)) {
-    console.error('🚨 Current credits is NaN! Check Firestore data for user:', userId);
-    throw new Error('User credits is not a number');
-  }
-
-  if (currentCredits < deductions) {
-    console.error(`🚫 Not enough credits: Have ${currentCredits}, need ${deductions}`);
-    throw new Error('Insufficient credits');
-  }
-
-  try {
-    await userRef.update({
-      credits: currentCredits - deductions,
-    });
-  } catch (err) {
-    console.error('❌ Failed to update credits in Firestore:', err);
-    throw new Error('Failed to update user credits');
-  }
-
-  console.log(`✅ Successfully deducted ${deductions} credits, remaining: ${currentCredits - deductions}`);
-  return currentCredits - deductions;
-}
-
-// Wrap formidable parse in a promise
 function parseForm(req) {
   return new Promise((resolve, reject) => {
     const form = formidable({ multiples: true });
@@ -109,189 +50,127 @@ function parseForm(req) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed, use POST' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   let fields, files;
   try {
     ({ fields, files } = await parseForm(req));
   } catch (err) {
-    console.error('❌ Form parse error:', err);
-    return res.status(500).json({ error: 'Failed to parse form data', detail: err.message });
+    return res.status(500).json({ error: 'Failed to parse form' });
   }
 
   try {
-    const allPupils = JSON.parse(fields.pupils || '[]');
-    const pupils = allPupils.filter(p => p.checked === true || p.checked === 'true');
+    const pupilsDataRaw = Array.isArray(fields.pupils) ? fields.pupils[0] : fields.pupils;
+    const pupils = JSON.parse(pupilsDataRaw || '[]');
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
 
-    console.log('allPupils parsed from request:', allPupils);
-console.log('pupils checked for processing:', pupils);
+    if (!pupils.length) return res.status(400).json({ error: 'Tiada murid dipilih.' });
+    if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
 
-if (!pupils.length) {
-  return res.status(400).json({ error: 'Tiada murid dipilih untuk semakan.' });
-}
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const uid = decoded.uid;
 
-const idToken = req.headers.authorization?.split('Bearer ')[1];
-if (!idToken) {
-  return res.status(401).json({ error: 'Unauthorized: No token provided' });
-}
+    // We calculate credits but DON'T deduct yet. 
+    // We will deduct only for SUCCESSFUL items later.
+    const results = [];
+    let successfulDeductions = 0;
 
-let uid;
-try {
-  const decoded = await admin.auth().verifyIdToken(idToken);
-  uid = decoded.uid;
-} catch (tokenError) {
-  console.error('❌ Token verification failed:', tokenError.message);
-  return res.status(401).json({ error: 'Invalid or expired token' });
-}
-      console.log('📥 Pupils received:', pupils);
+    // Get the Question Image
+    let questionImagePart = null;
+    const qFile = files.questionImage ? (Array.isArray(files.questionImage) ? files.questionImage[0] : files.questionImage) : null;
+    if (qFile) {
+      const qBuffer = await sharp(fs.readFileSync(qFile.filepath)).jpeg().toBuffer();
+      questionImagePart = fileToGenerativePart(qBuffer, "image/jpeg");
+    }
 
-      // Calculate total credits needed:
-      let totalCreditsNeeded = 0;
-      for (const pupil of pupils) {
-        if (pupil.mode === 'manual') totalCreditsNeeded += 1;
-        else if (pupil.mode === 'ocr') totalCreditsNeeded += 2;
-      }
+    for (const pupil of pupils) {
+      const { id, nama, kelas, level, set, karangan, mode, pictureDescription } = pupil;
+      
+      try {
+        let studentContent = [];
 
-      // Deduct credits before processing:
-console.log('👥 Pupils to process:', pupils.length);
-console.log('🧮 Total credits needed:', totalCreditsNeeded);
-
-// 🧼 Cleaned-up credit deduction:
-try {
-  const remainingCredits = await deductCredits(uid, totalCreditsNeeded);
-  console.log(`🪙 Deducted ${totalCreditsNeeded} credits from user ${uid}`);
-  console.log('📊 Credit balance after deduction:', remainingCredits);
-} catch (creditError) {
-  console.error('❌ Credit deduction failed:', creditError.message);
-  return res.status(403).json({ error: 'Kredit tidak mencukupi untuk melakukan semakan ini.' });
-}
-      const results = [];
-      for (const pupil of pupils) {
-        const { id, nama, set, karangan, mode, pictureDescription, pictureUrl } = pupil;
-        if (!nama) {
-          results.push({ id, error: 'Nama pelajar diperlukan.' });
-          continue;
+        // 1. ADD STIMULUS
+        if (questionImagePart) {
+          studentContent.push(questionImagePart);
+          studentContent.push("Imej di atas adalah soalan/rangsangan karangan.");
+        } 
+        if (pictureDescription) {
+          studentContent.push(`Konteks soalan: ${pictureDescription}`);
         }
 
-if (mode === 'manual') {
-  const safeKarangan = typeof karangan === 'string' ? karangan : '';
-  if (!safeKarangan.trim()) {
-    results.push({ id, error: 'Karangan kosong untuk mod manual.' });
-    continue;
-  }
-
-  try {
-    console.log('🚀 Memulakan analisis karangan untuk:', nama);
-const safePictureDescription = typeof pictureDescription === 'string' ? pictureDescription : '';
-const safePictureUrl = typeof pictureUrl === 'string' ? pictureUrl : '';
-const analysis = await analyseKarangan({
-  nama,
-  set,
-  karangan: safeKarangan,
-  pictureDescription: safePictureDescription,
-  pictureUrl: safePictureUrl,
-});
-
-analysis.karanganUnderlined = safeKarangan; // ✅ Add this line
-const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
-analysis.ulasan.keseluruhan = ulasanKeseluruhan;
-
-console.log('✅ Analisis selesai untuk', nama, 'Isi:', analysis.markahIsi, 'Bahasa:', analysis.markahBahasa);
-
-await saveResultToFirestore(set, id, {
-  nama,
-  set,
-  karangan: safeKarangan,
-  ...analysis,
-}, uid); // ✅ uid is passed as a separate 4th argument
-
-            results.push({ id, ...analysis });
-          } catch (e) {
-            console.error('❌ Manual analysis error:', e);
-            results.push({ id, error: 'Ralat semasa analisis manual.' });
+        // 2. ADD STUDENT ESSAY
+        if (mode === 'ocr') {
+          const studentFiles = files[`file_${id}`];
+          if (!studentFiles) throw new Error("Tiada imej karangan disertakan.");
+          
+          const filesArray = Array.isArray(studentFiles) ? studentFiles : [studentFiles];
+          for (const f of filesArray) {
+            const sBuffer = await sharp(fs.readFileSync(f.filepath)).flatten({ background: '#ffffff' }).jpeg().toBuffer();
+            studentContent.push(fileToGenerativePart(sBuffer, "image/jpeg"));
           }
-        } else if (mode === 'ocr') {
-  const fileItems = files[`file_${id}`];
+          studentContent.push("Sila transkripsi tulisan tangan ini dan semak karangannya.");
+        } else {
+          studentContent.push(`Karangan murid: ${karangan}`);
+        }
 
-  if (!fileItems) {
-    results.push({ id, error: 'Fail OCR tidak dijumpai.' });
-    continue;
-  }
+        // 3. RUN ANALYSIS
+        const analysis = await analyseKarangan({
+          nama,
+          level,
+          studentContent,
+          mode
+        });
 
-  const filesArray = Array.isArray(fileItems) ? fileItems.slice(0, 5) : [fileItems];
+        // 4. SAVE & TRACK SUCCESS
+        await saveResultToFirestore({
+          nama: nama || 'Pelajar',
+          kelas: kelas || '',
+          level: level || 'P6',
+          set: set || 'default',
+          karangan: analysis.transcription || karangan,
+          ...analysis,
+        }, uid, id);
 
-  try {
-    let combinedText = '';
+        results.push({ id, ...analysis });
+        
+        // Count credits to be deducted (1 for manual, 2 for OCR)
+        successfulDeductions += (mode === 'ocr' ? 2 : 1);
 
-    for (const file of filesArray) {
-      try {
-        const filepath = file.filepath || file.path;
-        if (!filepath) continue;
-
-        const fileBuffer = fs.readFileSync(filepath);
-
-// ✅ Convert image to standard RGB JPEG and flatten alpha using sharp
-const buffer = await sharp(fileBuffer)
-  .flatten({ background: { r: 255, g: 255, b: 255 } }) // remove alpha
-  .jpeg({ quality: 90 }) // set JPEG quality
-  .toBuffer();
-
-
-const [visionResult] = await bulkVisionClient.textDetection({
-  image: { content: buffer },
-});
-        const extractedText = visionResult?.textAnnotations?.[0]?.description || '';
-        combinedText += extractedText + '\n\n';
-      } catch (ocrErr) {
-        console.error(`❌ OCR failed for file ${file.originalFilename || file.newFilename}:`, ocrErr);
-        continue; // skip this file but continue processing others
+      } catch (err) {
+        console.error(`Error processing ${nama}:`, err);
+        results.push({ id, error: 'Gagal menganalisis.', detail: err.message });
       }
     }
 
-    const safeKarangan = typeof combinedText === 'string' ? combinedText : '';
-    const safePictureDescription = typeof pictureDescription === 'string' ? pictureDescription : '';
-    const safePictureUrl = typeof pictureUrl === 'string' ? pictureUrl : '';
-
-    if (!safeKarangan.trim()) {
-      results.push({ id, error: 'Tiada teks dijumpai dari fail OCR.' });
-      continue;
+    // FINAL STEP: Deduct credits only for what actually worked
+    if (successfulDeductions > 0) {
+      await deductCredits(uid, successfulDeductions);
     }
 
-    const analysis = await analyseKarangan({
-      nama,
-      set,
-      karangan: safeKarangan,
-      pictureDescription: safePictureDescription,
-      pictureUrl: safePictureUrl,
+    // Standardize results for frontend
+    const safeResults = results.map((r) => {
+      const original = pupils.find(p => String(p.id) === String(r.id)) || {};
+      return {
+        id: r.id,
+        nama: original.nama,
+        kelas: original.kelas,
+        level: original.level,
+        markahIsi: r.markahIsi ?? '-',
+        markahBahasa: r.markahBahasa ?? '-',
+        markahKeseluruhan: r.markahKeseluruhan ?? '-',
+        karangan: r.transcription || original.karangan || '', // Return the new transcription!
+        karanganUnderlined: r.karanganUnderlined ?? r.transcription ?? '',
+        kesalahanBahasa: Array.isArray(r.kesalahanBahasa) ? r.kesalahanBahasa : [],
+        ulasan: r.ulasan || { isi: '', bahasa: '', keseluruhan: '' },
+        gayaBahasa: Array.isArray(r.gayaBahasa) ? r.gayaBahasa : [],
+        error: r.error ?? null,
+      };
     });
 
-    analysis.karanganUnderlined = safeKarangan;
+    res.status(200).json({ results: safeResults });
 
-    const ulasanKeseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
-    analysis.ulasan.keseluruhan = ulasanKeseluruhan;
-
-    await saveResultToFirestore(set, id, {
-      nama,
-      set,
-      karangan: safeKarangan,
-      ...analysis,
-    }, uid);
-
-    results.push({ id, ...analysis });
   } catch (e) {
-    console.error(`❌ OCR analysis error for pupil ${nama} (${id}):`, e);
-    results.push({ id, error: 'Ralat semasa analisis OCR.', detail: e.message });
+    console.error("Bulk Handler Error:", e);
+    res.status(500).json({ error: 'Ralat pelayan.', detail: e.message });
   }
-        } else {
-          results.push({ id, error: 'Mod tidak sah.' });
-        }
-      }
-
-      res.status(200).json({ results });
-    } catch (e) {
-      console.error('❌ Bulk handler error:', e);
-      res.status(500).json({ error: 'Ralat pelayan semasa pemprosesan bulk.', detail: e.message });
-    }
 }
