@@ -18,27 +18,27 @@ export default function BeliKredit() {
   const [userDoc, setUserDoc] = useState(null);
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    if (currentUser === null) {
-      router.replace('/login');
-      return;
-    }
-    setUser(currentUser);
-
-    try {
-      const userRef = doc(db, 'users', currentUser.uid);
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        setUserDoc(userSnap.data());
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser === null) {
+        router.replace('/login');
+        return;
       }
-    } catch (e) {
-      console.error(e);
-    }
-    setLoading(false); // Move it outside try/catch to be 100% sure
-  });
-  return () => unsubscribe();
-}, [router]);
+      setUser(currentUser);
+
+      try {
+        const userRef = doc(db, 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          setUserDoc(userSnap.data());
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      setLoading(false); 
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   const handleCheckout = async (plan) => {
     if (!user) return;
@@ -59,7 +59,11 @@ useEffect(() => {
   if (loading) return <div className="loader-box">Memuatkan Sistem...</div>;
 
   return (
-    <AdminLayout activePage="beli-kredit">
+    <AdminLayout 
+      activePage="beli-kredit" 
+      role={userDoc?.role || 'guru'} 
+      user={{ nama: userDoc?.nama, credits: userDoc?.credits }}
+    >
       <header className="topbar">
         <div className="header-title">
           <h1>Tambah Baki Kredit</h1>
