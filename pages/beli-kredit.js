@@ -20,18 +20,27 @@ export default function BeliKredit() {
 
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    // If Firebase has finished checking and there is NO user
     if (currentUser === null) {
       router.replace('/login');
     } else if (currentUser) {
-      // User is logged in
       setUser(currentUser);
+      
+      // Try to get user data, but don't block the whole page if it's missing
       const docRef = doc(db, 'users', currentUser.uid);
       const snap = await getDoc(docRef);
+      
       if (snap.exists()) {
         setUserDoc(snap.data());
+        // For profile.js, set your states here
+        if (typeof setNama === 'function') setNama(snap.data().nama || '');
+        if (typeof setSekolah === 'function') setSekolah(snap.data().sekolah || '');
+        if (typeof setCredits === 'function') setCredits(snap.data().credits || 0);
+      } else {
+        // If no doc exists, we can create a default one or just stop loading
+        console.log("No user document found for this UID");
       }
-      setLoading(false);
+      
+      setLoading(false); // <--- Move this OUTSIDE the snap.exists check
     }
   });
   return () => unsubscribe();
