@@ -1,152 +1,177 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { auth, db } from '../lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import AdminLayout from '@/components/AdminLayout';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 export default function Profile() {
   const router = useRouter();
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState('guru');
   const [loading, setLoading] = useState(true);
-
+  
+  // Profile State
   const [nama, setNama] = useState('');
   const [sekolah, setSekolah] = useState('');
-  const [credits, setCredits] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        try {
-          const userRef = doc(db, 'users', currentUser.uid);
-          const snap = await getDoc(userRef);
-          if (snap.exists()) {
-            const d = snap.data();
-            setNama(d.nama || '');
-            setSekolah(d.sekolah || '');
-            setCredits(d.credits || 0);
-            setRole(d.role || 'guru');
-          }
-        } catch (err) {
-          console.error("Error fetching profile:", err);
-        }
-        setLoading(false);
-      } else {
+      if (!currentUser) {
         router.replace('/login');
+        return;
       }
+      const userDocSnap = await getDoc(doc(db, 'users', currentUser.uid));
+      const data = userDocSnap.data();
+      setUser({ uid: currentUser.uid, ...data });
+      setNama(data?.nama || '');
+      setSekolah(data?.sekolah || '');
+      setLoading(false);
     });
     return () => unsubscribe();
   }, [router]);
 
-  const saveUserData = async () => {
-    if (!user) return;
+  const handleSave = async () => {
+    if (!auth.currentUser) return;
     setSaving(true);
-    setMessage('');
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await setDoc(userRef, { nama, sekolah }, { merge: true });
-      setMessage('✅ Maklumat berjaya dikemaskini.');
-      setTimeout(() => setMessage(''), 3000);
-    } catch (error) {
-      setMessage('❌ Ralat menyimpan maklumat.');
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        nama: nama,
+        sekolah: sekolah
+      });
+      alert('Profil berjaya dikemaskini!');
+    } catch (err) {
+      console.error(err);
+      alert('Ralat menyimpan maklumat.');
     }
     setSaving(false);
   };
 
-  if (loading) return <div className="loader-box">Memuatkan Profil...</div>;
+  if (loading) return <div className="loader-box"><div className="spinner"></div></div>;
 
   return (
-    <AdminLayout 
-      activePage="profile" 
-      role={role} 
-      user={{ nama, credits }}
-    >
-      <header className="topbar">
-        <div className="header-title">
+    <div className="dashboard-wrapper">
+      {/* --- EXACT SAME SIDEBAR AS DASHBOARD --- */}
+      <aside className="main-sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-icon">SI</div>
+          <div className="logo-text"><h3>SI-PINTAR</h3><span>VERSI GURU</span></div>
+        </div>
+
+        <nav className="sidebar-nav">
+          <div className="nav-header">UTAMA</div>
+          <div className="nav-link" onClick={() => router.push('/dashboard')}>📊 Rekod Murid</div>
+          <div className="nav-link" onClick={() => router.push('/trend')}>📈 Analisis Murid</div>
+          
+          <div className="nav-divider"></div>
+
+          <div className="nav-header">PENGURUSAN</div>
+          <div className="nav-link" onClick={() => router.push('/urus-kelas')}>🏫 Urus Kelas</div>
+          <div className="nav-link" onClick={() => router.push('/beli-kredit')}>💰 Beli Kredit</div>
+          <div className="nav-link active">👤 Profil Guru</div>
+          
+          <div className="nav-divider"></div>
+
+          <div className="nav-action-zone">
+            <div className="nav-link highlight" onClick={() => router.push('/semak')}>✍️ Mulakan Semakan</div>
+          </div>
+        </nav>
+
+        <button className="btn-logout-sidebar" onClick={() => signOut(auth)}>Keluar Sistem</button>
+      </aside>
+
+      {/* --- MAIN VIEWPORT --- */}
+      <main className="main-viewport">
+        <header className="viewport-header">
           <h1>Tetapan Profil</h1>
-          <p>Uruskan maklumat peribadi dan akaun anda sebagai {role === 'admin' ? 'Pentadbir' : 'Guru'}.</p>
-        </div>
-        <div className="credit-pill">
-          Baki Kredit: <span>{credits}</span>
-        </div>
-      </header>
+          <div className="credit-badge">Baki Kredit: <b>{user?.credits || 0}</b></div>
+        </header>
 
-      <section className="profile-container">
-        <div className="profile-card">
-          <div className="card-header">
-            <div className="avatar-large">
-              {nama ? nama.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase()}
+        <div className="fade-in">
+          <div className="pro-card" style={{ maxWidth: '600px' }}>
+            <div className="profile-edit-form">
+              <div className="t-group" style={{ marginBottom: '20px' }}>
+                <label>Nama Penuh</label>
+                <input 
+                  type="text" 
+                  value={nama} 
+                  onChange={(e) => setNama(e.target.value)} 
+                  placeholder="Nama anda"
+                />
+              </div>
+
+              <div className="t-group" style={{ marginBottom: '20px' }}>
+                <label>Sekolah / Institusi</label>
+                <input 
+                  type="text" 
+                  value={sekolah} 
+                  onChange={(e) => setSekolah(e.target.value)} 
+                  placeholder="Nama sekolah"
+                />
+              </div>
+
+              <div className="t-group" style={{ marginBottom: '30px' }}>
+                <label>E-mel (Akaun)</label>
+                <input 
+                  type="text" 
+                  value={auth.currentUser?.email} 
+                  disabled 
+                  style={{ background: '#f0f0f0', color: '#999' }}
+                />
+              </div>
+
+              <button 
+                className="btn-og-print" 
+                onClick={handleSave}
+                disabled={saving}
+              >
+                {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
             </div>
-            <h3>{nama || 'Pengguna Pintar'}</h3>
-            <p>{user?.email}</p>
-          </div>
-
-          <form className="profile-form" onSubmit={(e) => e.preventDefault()}>
-            <div className="input-group">
-              <label>Nama Penuh</label>
-              <input type="text" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Masukkan nama anda" />
-            </div>
-
-            <div className="input-group">
-              <label>Nama Sekolah / Institusi</label>
-              <input type="text" value={sekolah} onChange={(e) => setSekolah(e.target.value)} placeholder="Contoh: SK Taman Melati" />
-            </div>
-
-            <div className="input-group">
-              <label>ID Akaun (Read Only)</label>
-              <input type="text" value={user?.uid} disabled className="disabled-input" />
-            </div>
-
-            <button className="btn-save" onClick={saveUserData} disabled={saving}>
-              {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-            </button>
-            
-            {message && <p className="status-message">{message}</p>}
-          </form>
-        </div>
-
-        <div className="info-side">
-          <div className="info-card">
-            <h4>Akses {role === 'admin' ? 'Pentadbir' : 'Guru'}</h4>
-            <p>Anda log masuk sebagai <b>{role.toUpperCase()}</b>. {role === 'admin' ? 'Akses penuh sistem.' : 'Gunakan menu untuk mula menyemak.'}</p>
-          </div>
-          <div className="info-card teal">
-            <h4>Baki Kredit</h4>
-            <p>Baki anda sekarang adalah {credits}.</p>
-            <button className="btn-white" onClick={() => router.push('/beli-kredit')}>Tambah Kredit</button>
           </div>
         </div>
-      </section>
+      </main>
 
       <style jsx>{`
-        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
-        .header-title h1 { margin: 0; font-size: 1.8rem; color: #003D40; }
-        .header-title p { color: #666; margin: 5px 0 0; }
-        .credit-pill { background: white; padding: 10px 20px; border-radius: 50px; border: 1px solid #E2E8F0; font-size: 0.9rem; font-weight: 600; }
-        .credit-pill span { color: #48A6A7; font-weight: 800; }
-        .profile-container { display: grid; grid-template-columns: 1.5fr 1fr; gap: 2rem; }
-        .profile-card { background: white; border-radius: 20px; padding: 2.5rem; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .card-header { text-align: center; margin-bottom: 2rem; }
-        .avatar-large { width: 80px; height: 80px; background: #48A6A7; color: white; font-size: 2rem; font-weight: 800; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
-        .card-header h3 { margin: 0; color: #003D40; font-size: 1.4rem; }
-        .card-header p { color: #94A3B8; margin: 5px 0 0; font-size: 0.9rem; }
-        .profile-form { display: flex; flex-direction: column; gap: 1.2rem; }
-        .input-group label { display: block; font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 6px; }
-        .input-group input { width: 100%; padding: 12px 16px; border: 1px solid #E2E8F0; border-radius: 12px; background: #F8FAFC; font-size: 1rem; color: #333; }
-        .disabled-input { color: #94A3B8 !important; cursor: not-allowed; }
-        .btn-save { background: #003D40; color: white; padding: 14px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; }
-        .status-message { text-align: center; font-size: 0.9rem; font-weight: 600; color: #48A6A7; margin-top: 10px; }
-        .info-side { display: flex; flex-direction: column; gap: 1.5rem; }
-        .info-card { background: white; padding: 1.8rem; border-radius: 20px; border: 1px solid #E2E8F0; }
-        .info-card h4 { margin-top: 0; color: #003D40; }
-        .info-card.teal { background: #003D40; color: white; border: none; }
-        .btn-white { width: 100%; padding: 10px; background: #FFD700; color: #003D40; border-radius: 10px; cursor: pointer; font-weight: 700; margin-top: 1rem; border: none; }
-        .loader-box { height: 100vh; display: grid; place-items: center; font-weight: bold; color: #003D40; background: #F2F6F6; }
+        /* COPY-PASTED CSS FROM YOUR DASHBOARD.JS TO ENSURE 100% MATCH */
+        .dashboard-wrapper { display: flex; min-height: 100vh; background: #F2F6F6; font-family: 'Inter', sans-serif; color: #003D40; }
+        .main-sidebar { width: 280px; background: #003D40; color: white; display: flex; flex-direction: column; padding: 2rem 1.5rem; position: sticky; top: 0; height: 100vh; }
+        .sidebar-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 3rem; }
+        .logo-icon { background: #FFD700; color: #003D40; font-weight: 900; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .logo-text h3 { margin: 0; font-size: 1.1rem; letter-spacing: 1px; }
+        .logo-text span { font-size: 0.6rem; opacity: 0.5; font-weight: 700; }
+        
+        .sidebar-nav { flex: 1; }
+        .nav-header { font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.4); letter-spacing: 1.5px; margin: 1.5rem 0 0.8rem 15px; }
+        .nav-link { padding: 12px 15px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; transition: 0.2s; color: rgba(255,255,255,0.7); font-size: 0.9rem; }
+        .nav-link:hover { background: rgba(255,255,255,0.05); color: white; }
+        .nav-link.active { background: #48A6A7; color: white; font-weight: 600; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .nav-link.highlight { background: #FFD700; color: #003D40; font-weight: 700; margin-top: 10px; }
+        
+        .nav-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 1.5rem 10px; }
+        .btn-logout-sidebar { margin-top: auto; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 10px; cursor: pointer; }
+
+        .main-viewport { flex: 1; padding: 2.5rem 3.5rem; overflow-y: auto; }
+        .viewport-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .viewport-header h1 { margin: 0; font-size: 1.8rem; color: #003D40; }
+        .credit-badge { background: white; padding: 8px 16px; border-radius: 50px; border: 1px solid #E0E7E7; font-size: 0.85rem; }
+
+        .pro-card { background: white; border-radius: 20px; border: 1px solid #E0E7E7; box-shadow: 0 4px 20px rgba(0,61,64,0.04); padding: 2rem; }
+        
+        .t-group { display: flex; flex-direction: column; gap: 6px; }
+        .t-group label { font-size: 0.65rem; font-weight: 800; color: #99AFAF; text-transform: uppercase; }
+        .t-group input { padding: 12px; border-radius: 10px; border: 1px solid #E0E7E7; background: #F9FAFA; font-size: 1rem; width: 100%; color: #003D40; }
+        
+        .btn-og-print { width: 100%; padding: 14px; background: #003D40; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-og-print:hover { background: #48A6A7; }
+        .btn-og-print:disabled { background: #ccc; }
+
+        .fade-in { animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .loader-box { height: 100vh; display: grid; place-items: center; background: #F2F6F6; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #E0E7E7; border-top: 4px solid #003D40; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       `}</style>
-    </AdminLayout>
+    </div>
   );
 }
