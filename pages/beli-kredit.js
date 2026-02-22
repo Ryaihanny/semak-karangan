@@ -20,31 +20,23 @@ export default function BeliKredit() {
 
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    if (currentUser === null) {
+      router.replace('/login');
+      return;
+    }
+    setUser(currentUser);
+
     try {
-      if (currentUser === null) {
-        router.replace('/login');
-        return;
-      }
-
-      setUser(currentUser);
-
       const userRef = doc(db, 'users', currentUser.uid);
       const userSnap = await getDoc(userRef);
-
       if (userSnap.exists()) {
-        const userData = userSnap.data();
-        // Use the states that actually exist in beli-kredit.js
-        setUserDoc(userData);
-        // If you have a setCredits state, use it. 
-        // Based on your code, you use userDoc?.credits, so setUserDoc is enough.
+        setUserDoc(userSnap.data());
       }
-    } catch (error) {
-      console.error("❌ Beli Kredit Load Error:", error);
-    } finally {
-      setLoading(false);
+    } catch (e) {
+      console.error(e);
     }
+    setLoading(false); // Move it outside try/catch to be 100% sure
   });
-
   return () => unsubscribe();
 }, [router]);
 

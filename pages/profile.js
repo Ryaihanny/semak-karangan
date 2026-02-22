@@ -28,46 +28,41 @@ export default function Profile() {
   };
 
 useEffect(() => {
+  console.log("1. useEffect started");
   const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    // 1. Instant check for no user
+    console.log("2. Auth state changed:", currentUser?.email);
+    
     if (currentUser === null) {
       router.replace('/login');
       return;
     }
 
+    setUser(currentUser);
+
     try {
-      setUser(currentUser);
-
-      // 2. Set a 5-second timeout insurance 
-      // This ensures the loader closes even if the internet/Firebase is slow
-      const timeout = setTimeout(() => {
-        setLoading(false);
-      }, 5000);
-
       const userRef = doc(db, 'users', currentUser.uid);
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
-        const userData = userSnap.data();
-        setNama(userData.nama || '');
-        setSekolah(userData.sekolah || '');
-        setCredits(userData.credits || 0);
-        console.log("✅ Data loaded for role:", userData.role || 'user');
+        const data = userSnap.data();
+        console.log("3. Document found:", data);
+        setNama(data.nama || '');
+        setSekolah(data.sekolah || '');
+        setCredits(data.credits || 0);
       } else {
-        console.warn("⚠️ No Firestore document found for this user. Using defaults.");
+        console.log("3. No document found in Firestore");
       }
-      
-      clearTimeout(timeout);
     } catch (error) {
-      console.error("❌ Profile Load Error:", error);
-    } finally {
-      // 3. Always close the loader
-      setLoading(false);
-    }
+      console.error("4. Firestore Error:", error);
+    } 
+    
+    console.log("5. Setting loading to false now");
+    setLoading(false);
   });
 
   return () => unsubscribe();
 }, [router]);
+
   const saveUserData = async () => {
     if (!user) return;
     setSaving(true);
