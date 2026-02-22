@@ -3,11 +3,12 @@ import { useRouter } from 'next/router';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import AdminLayout from '@/components/AdminLayout'; // Ensure this path is correct
+import AdminLayout from '@/components/AdminLayout';
 
 export default function Profile() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null); // Auth User
+  const [role, setRole] = useState('guru'); // Default role
   const [loading, setLoading] = useState(true);
 
   const [nama, setNama] = useState('');
@@ -16,52 +17,31 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
-  const loadUserData = async (uid) => {
-    const userRef = doc(db, 'users', uid);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-      const data = userSnap.data();
-      setNama(data.nama || '');
-      setSekolah(data.sekolah || '');
-      setCredits(data.credits || 0);
-    }
-  };
-
-useEffect(() => {
-  console.log("1. useEffect started");
-  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    console.log("2. Auth state changed:", currentUser?.email);
-    
-    if (currentUser === null) {
-      router.replace('/login');
-      return;
-    }
-
-    setUser(currentUser);
-
-    try {
-      const userRef = doc(db, 'users', currentUser.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (userSnap.exists()) {
-        const data = userSnap.data();
-        console.log("3. Document found:", data);
-        setNama(data.nama || '');
-        setSekolah(data.sekolah || '');
-        setCredits(data.credits || 0);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        const userRef = doc(db, 'users', currentUser.uid);
+        
+        getDoc(userRef).then((snap) => {
+          if (snap.exists()) {
+            const d = snap.data();
+            setNama(d.nama || '');
+            setSekolah(d.sekolah || '');
+            setCredits(d.credits || 0);
+            setRole(d.role || 'guru'); // Set the role here
+          }
+          setLoading(false);
+        }).catch((err) => {
+          console.error(err);
+          setLoading(false);
+        });
       } else {
-        console.log("3. No document found in Firestore");
+        router.replace('/login');
       }
-    } catch (error) {
-      console.error("4. Firestore Error:", error);
-    } 
-    
-    console.log("5. Setting loading to false now");
-    setLoading(false);
-  });
-
-  return () => unsubscribe();
-}, [router]);
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   const saveUserData = async () => {
     if (!user) return;
@@ -78,14 +58,19 @@ useEffect(() => {
     setSaving(false);
   };
 
+  // One single loading check
   if (loading) return <div className="loader-box">Memuatkan Profil...</div>;
 
   return (
-    <AdminLayout activePage="profile">
+    <AdminLayout 
+      activePage="profile" 
+      role={role} 
+      user={{ nama, credits }} // Passing current state to layout
+    >
       <header className="topbar">
         <div className="header-title">
           <h1>Tetapan Profil</h1>
-          <p>Uruskan maklumat peribadi dan akaun anda sebagai Pentadbir/Guru.</p>
+          <p>Uruskan maklumat peribadi dan akaun anda sebagai {role === 'admin' ? 'Pentadbir' : 'Guru'}.</p>
         </div>
         <div className="credit-pill">
           Baki Kredit: <span>{credits}</span>
@@ -96,10 +81,10 @@ useEffect(() => {
         <div className="profile-card">
           <div className="card-header">
             <div className="avatar-large">
-              {nama ? nama.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+              {nama ? nama.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase()}
             </div>
             <h3>{nama || 'Pengguna Pintar'}</h3>
-            <p>{user.email}</p>
+            <p>{user?.email}</p>
           </div>
 
           <form className="profile-form" onSubmit={(e) => e.preventDefault()}>
@@ -115,7 +100,7 @@ useEffect(() => {
 
             <div className="input-group">
               <label>ID Akaun (Read Only)</label>
-              <input type="text" value={user.uid} disabled className="disabled-input" />
+              <input type="text" value={user?.uid} disabled className="disabled-input" />
             </div>
 
             <button className="btn-save" onClick={saveUserData} disabled={saving}>
@@ -128,8 +113,8 @@ useEffect(() => {
 
         <div className="info-side">
           <div className="info-card">
-            <h4>Akses Pentadbir</h4>
-            <p>Anda log masuk dengan peranan <b>Admin</b>. Anda mempunyai akses penuh untuk mengurus pengguna dan sistem.</p>
+            <h4>Akses {role === 'admin' ? 'Pentadbir' : 'Guru'}</h4>
+            <p>Anda log masuk sebagai <b>{role.toUpperCase()}</b>. {role === 'admin' ? 'Anda mempunyai akses penuh untuk mengurus sistem.' : 'Gunakan menu untuk mula menyemak karangan.'}</p>
           </div>
           <div className="info-card teal">
             <h4>Baki Kredit</h4>
