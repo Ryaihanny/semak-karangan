@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import AdminLayout from '@/components/AdminLayout';
 
 const plans = [
   { id: 'price_1RkLm8JtYEymv1ohQZWw37UY', name: 'Standard', credits: 40, price: 9.90, desc: 'Pilihan guru biasa' },
@@ -59,11 +58,7 @@ export default function BeliKredit() {
   if (loading) return <div className="loader-box">Memuatkan Sistem...</div>;
 
   return (
-    <AdminLayout 
-      activePage="beli-kredit" 
-      role={userDoc?.role || 'guru'} 
-      user={{ nama: userDoc?.nama, credits: userDoc?.credits }}
-    >
+    <div className="standalone-container">
       <header className="topbar">
         <div className="header-title">
           <h1>Tambah Baki Kredit</h1>
@@ -72,6 +67,7 @@ export default function BeliKredit() {
         <div className="credit-pill">
           Baki Semasa: <span>{userDoc?.credits || 0}</span>
         </div>
+        <button className="btn-back" onClick={() => router.back()}>Kembali</button>
       </header>
 
       <section className="pricing-grid">
@@ -101,14 +97,15 @@ export default function BeliKredit() {
       </footer>
 
       <style jsx>{`
+        .standalone-container { padding: 40px; max-width: 1200px; margin: 0 auto; font-family: sans-serif; }
         .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3rem; }
         .header-title h1 { margin: 0; font-size: 1.8rem; color: #003D40; }
         .header-title p { color: #64748B; margin: 5px 0 0; }
         
         .credit-pill { background: white; padding: 10px 20px; border-radius: 50px; border: 1px solid #E2E8F0; font-size: 0.9rem; font-weight: 600; }
         .credit-pill span { color: #48A6A7; font-weight: 800; }
+        .btn-back { padding: 8px 16px; background: #eee; border: none; border-radius: 8px; cursor: pointer; }
 
-        /* Pricing Grid */
         .pricing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
         
         .plan-card { background: white; border-radius: 20px; padding: 3rem 1.5rem; border: 1px solid #E2E8F0; text-align: center; position: relative; transition: 0.3s ease; display: flex; flex-direction: column; }
@@ -127,11 +124,10 @@ export default function BeliKredit() {
         .btn-buy { width: 100%; padding: 14px; background: #003D40; color: white; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; margin-top: auto; }
         .btn-buy:hover { background: #002D30; }
         .popular .btn-buy { background: #48A6A7; }
-        .popular .btn-buy:hover { background: #003D40; }
 
         .pricing-footer { margin-top: 4rem; text-align: center; color: #94A3B8; font-size: 0.8rem; max-width: 600px; margin-left: auto; margin-right: auto; }
         .loader-box { height: 100vh; display: grid; place-items: center; font-weight: bold; color: #003D40; background: #F2F6F6; }
       `}</style>
-    </AdminLayout>
+    </div>
   );
 }
