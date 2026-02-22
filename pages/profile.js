@@ -29,7 +29,7 @@ export default function Profile() {
             setNama(d.nama || '');
             setSekolah(d.sekolah || '');
             setCredits(d.credits || 0);
-            setRole(d.role || 'guru'); // Set the role here
+            setRole(d.role || 'guru'); 
           }
           setLoading(false);
         }).catch((err) => {
@@ -58,14 +58,14 @@ export default function Profile() {
     setSaving(false);
   };
 
-  // One single loading check
+  // Keep only this one loading check
   if (loading) return <div className="loader-box">Memuatkan Profil...</div>;
 
   return (
     <AdminLayout 
       activePage="profile" 
       role={role} 
-      user={{ nama, credits }} // Passing current state to layout
+      user={{ nama, credits }} 
     >
       <header className="topbar">
         <div className="header-title">
