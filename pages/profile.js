@@ -29,15 +29,21 @@ export default function Profile() {
 
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    try {
-      if (!currentUser) {
-        router.replace('/login');
-        return;
-      }
+    // 1. Instant check for no user
+    if (currentUser === null) {
+      router.replace('/login');
+      return;
+    }
 
+    try {
       setUser(currentUser);
 
-      // Fetch the user document to check the role
+      // 2. Set a 5-second timeout insurance 
+      // This ensures the loader closes even if the internet/Firebase is slow
+      const timeout = setTimeout(() => {
+        setLoading(false);
+      }, 5000);
+
       const userRef = doc(db, 'users', currentUser.uid);
       const userSnap = await getDoc(userRef);
 
@@ -46,21 +52,22 @@ useEffect(() => {
         setNama(userData.nama || '');
         setSekolah(userData.sekolah || '');
         setCredits(userData.credits || 0);
-        
-        // This is where you'd handle the "Admin vs Guru" logic
-        console.log("User Role:", userData.role); 
+        console.log("✅ Data loaded for role:", userData.role || 'user');
+      } else {
+        console.warn("⚠️ No Firestore document found for this user. Using defaults.");
       }
+      
+      clearTimeout(timeout);
     } catch (error) {
-      console.error("❌ Auth/Firestore Error:", error);
+      console.error("❌ Profile Load Error:", error);
     } finally {
-      // This MUST run to close the "Memuatkan" screen
+      // 3. Always close the loader
       setLoading(false);
     }
   });
 
   return () => unsubscribe();
 }, [router]);
-
   const saveUserData = async () => {
     if (!user) return;
     setSaving(true);
