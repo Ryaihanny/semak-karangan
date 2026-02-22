@@ -21,30 +21,26 @@ export default function BeliKredit() {
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
     try {
-      if (!currentUser) {
+      if (currentUser === null) {
         router.replace('/login');
         return;
       }
 
       setUser(currentUser);
 
-      // Fetch the user document to check the role
       const userRef = doc(db, 'users', currentUser.uid);
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
-        setNama(userData.nama || '');
-        setSekolah(userData.sekolah || '');
-        setCredits(userData.credits || 0);
-        
-        // This is where you'd handle the "Admin vs Guru" logic
-        console.log("User Role:", userData.role); 
+        // Use the states that actually exist in beli-kredit.js
+        setUserDoc(userData);
+        // If you have a setCredits state, use it. 
+        // Based on your code, you use userDoc?.credits, so setUserDoc is enough.
       }
     } catch (error) {
-      console.error("❌ Auth/Firestore Error:", error);
+      console.error("❌ Beli Kredit Load Error:", error);
     } finally {
-      // This MUST run to close the "Memuatkan" screen
       setLoading(false);
     }
   });
