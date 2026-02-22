@@ -318,7 +318,7 @@ const handleBulkDeleteAssignments = async () => {
       <div className="nav-divider"></div>
       <div className="nav-header">PENGURUSAN</div>
       <div className="nav-link" onClick={() => router.push('/admin/urus-kelas')}>🏫 Urus Kelas</div>
-      <div className="nav-link" onClick={() => router.push('/profile')}>👤 Profil Guru</div>
+      <div className="nav-link" onClick={() => router.push('/admin/profile')}>👤 Profil Guru</div>
     </>
   )}
 </nav>
