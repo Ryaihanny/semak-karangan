@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+    }
+
+    // --- RULES ---
+
+// 1. Users
+match /users/{userId} {
+  // Allow anyone to read, or change to: if isSignedIn() for more security
+  allow read: if true; 
+  
+  // Allow creation if authenticated
+  allow create: if request.auth != null; 
+  
+  // FIXED UPDATE RULE:
+  allow update: if 
+    // Case 1: The user is updating their own basic info (Nama/Sekolah)
+    (request.auth != null && request.auth.uid == userId) || 
+    
+    // Case 2: Credit deduction logic (Simplified to avoid infinite isAdmin loop)
+    (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['credits']) &&
+     request.resource.data.credits == resource.data.credits - 1) ||
+     
+    // Case 3: Actual Admin override
+    isAdmin();
+  
+  allow delete: if isAdmin();
+}
+    // 2. Classes
+    match /classes/{classId} {
+      allow read: if true; 
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.teacherId == request.auth.uid || isAdmin());
+    }
+
+    // 3. Assignments
+    match /assignments/{assignmentId} {
+      allow read: if true; 
+      allow create, update, delete: if isSignedIn(); 
+    }
+
+    // 4. Students
+    match /students/{studentId} {
+      allow get: if true; 
+      allow list: if true; 
+      allow create, update, delete: if true; 
+    }
+
+    // 5. karanganResults
+    match /karanganResults/{docId} {
+      allow read, create, update: if true; 
+      allow delete: if isAdmin();
+    }
+
+    // 6. Drafts
+    match /drafts/{draftId} {
+      allow read, write: if true; 
+    }
+
+    // 7. General/Legacy Collections
+    match /semakan/{docId} {
+      allow read, create: if true;
+      allow update, delete: if isSignedIn() || isAdmin();
+    }
+    
+    match /submissions/{subId} {
+      allow read, write: if true;
+    }
+  }
+}
