@@ -6,7 +6,7 @@ import Head from 'next/head';
 export default function AdminLayout({ children, activePage, user, role }) {
   const router = useRouter();
 
-  // Dynamic Menu based on role
+  // 1. Safety Guard: Define menus
   const adminMenu = [
     { id: 'dashboard', label: 'Admin Dashboard', icon: '📊', path: '/admin/dashboard' },
     { id: 'users', label: 'Urus Pengguna', icon: '👥', path: '/admin/users' },
@@ -21,24 +21,29 @@ export default function AdminLayout({ children, activePage, user, role }) {
     { id: 'beli-kredit', label: 'Beli Kredit', icon: '💰', path: '/beli-kredit' },
   ];
 
-  const menuItems = role === 'admin' ? adminMenu : guruMenu;
+  // 2. Fallback Logic: Ensure menuItems is NEVER undefined
+  const currentRole = role || 'guru'; 
+  const menuItems = currentRole === 'admin' ? adminMenu : guruMenu;
 
   return (
     <div className="admin-container">
-      <Head><title>{role === 'admin' ? 'Admin Master' : 'Guru Console'} | SI-PINTAR</title></Head>
+      <Head>
+        <title>{currentRole === 'admin' ? 'Admin Master' : 'Guru Console'} | SI-PINTAR</title>
+      </Head>
       
       <aside className="admin-sidebar">
         <div className="brand-header">
           <div className="logo-box">SP</div>
           <div className="brand-info">
             <h3>SI-PINTAR</h3>
-            <span>{role === 'admin' ? 'MASTER CONSOLE' : 'GURU PORTAL'}</span>
+            <span>{currentRole === 'admin' ? 'MASTER CONSOLE' : 'GURU PORTAL'}</span>
           </div>
         </div>
 
         <nav className="nav-menu">
-          <p className="nav-label">MENU {role === 'admin' ? 'ADMIN' : 'GURU'}</p>
-          {menuItems.map((item) => (
+          <p className="nav-label">MENU {currentRole === 'admin' ? 'ADMIN' : 'GURU'}</p>
+          {/* 3. Safety Check on map */}
+          {menuItems && menuItems.map((item) => (
             <button 
               key={item.id}
               className={`nav-item ${activePage === item.id ? 'active' : ''}`}
@@ -51,9 +56,9 @@ export default function AdminLayout({ children, activePage, user, role }) {
 
         <div className="sidebar-footer">
           <div className="user-info">
-            {/* Matches your Firestore field 'nama' or 'username' */}
-            <p>{user?.nama || user?.username || 'Pengguna'}</p>
-            <small>Kredit: {user?.credits || 0}</small>
+            {/* 4. Ensure name and credits always have fallback values */}
+            <p>{user?.nama || user?.username || 'Memuatkan...'}</p>
+            <small>Kredit: {user?.credits ?? 0}</small>
           </div>
           <button className="btn-logout" onClick={() => signOut(auth).then(() => router.push('/'))}>
             Log Keluar
@@ -68,13 +73,13 @@ export default function AdminLayout({ children, activePage, user, role }) {
       </main>
 
       <style jsx>{`
-        .admin-container { display: flex; height: 100vh; background: #f4f7f6; overflow: hidden; }
-        .admin-sidebar { width: 280px; background: #003032; color: white; padding: 25px; display: flex; flex-direction: column; }
+        .admin-container { display: flex; height: 100vh; background: #f4f7f6; overflow: hidden; width: 100%; }
+        .admin-sidebar { width: 280px; background: #003032; color: white; padding: 25px; display: flex; flex-direction: column; flex-shrink: 0; }
         .brand-header { display: flex; gap: 12px; margin-bottom: 40px; }
         .logo-box { background: #ffd700; color: #003032; width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; font-weight: 900; }
         .brand-info h3 { margin: 0; font-size: 1.2rem; letter-spacing: 1px; }
         .brand-info span { font-size: 0.7rem; color: #48a6a7; font-weight: 700; }
-        .nav-menu { flex: 1; }
+        .nav-menu { flex: 1; overflow-y: auto; }
         .nav-label { font-size: 11px; color: #48a6a7; font-weight: 800; margin-bottom: 15px; }
         .nav-item { 
           width: 100%; text-align: left; background: none; border: none; color: #99afaf; 
@@ -83,11 +88,12 @@ export default function AdminLayout({ children, activePage, user, role }) {
         }
         .nav-item:hover { background: rgba(255,255,255,0.05); color: white; }
         .nav-item.active { background: #48a6a7; color: white; font-weight: 600; box-shadow: 0 4px 12px rgba(72, 166, 167, 0.3); }
-        .admin-body { flex: 1; overflow-y: auto; padding: 40px; }
+        .admin-body { flex: 1; overflow-y: auto; padding: 40px; background: #f4f7f6; }
         .sidebar-footer { margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); }
         .user-info { margin-bottom: 15px; }
-        .user-info p { margin: 0; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-info p { margin: 0; font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; }
         .btn-logout { width: 100%; padding: 12px; background: #ff4d4d; border: none; border-radius: 10px; color: white; font-weight: bold; cursor: pointer; }
+        .btn-logout:hover { background: #cc0000; }
       `}</style>
     </div>
   );
