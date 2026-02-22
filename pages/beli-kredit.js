@@ -20,29 +20,35 @@ export default function BeliKredit() {
 
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    if (currentUser === null) {
-      router.replace('/login');
-    } else if (currentUser) {
-      setUser(currentUser);
-      
-      // Try to get user data, but don't block the whole page if it's missing
-      const docRef = doc(db, 'users', currentUser.uid);
-      const snap = await getDoc(docRef);
-      
-      if (snap.exists()) {
-        setUserDoc(snap.data());
-        // For profile.js, set your states here
-        if (typeof setNama === 'function') setNama(snap.data().nama || '');
-        if (typeof setSekolah === 'function') setSekolah(snap.data().sekolah || '');
-        if (typeof setCredits === 'function') setCredits(snap.data().credits || 0);
-      } else {
-        // If no doc exists, we can create a default one or just stop loading
-        console.log("No user document found for this UID");
+    try {
+      if (!currentUser) {
+        router.replace('/login');
+        return;
       }
-      
-      setLoading(false); // <--- Move this OUTSIDE the snap.exists check
+
+      setUser(currentUser);
+
+      // Fetch the user document to check the role
+      const userRef = doc(db, 'users', currentUser.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        setNama(userData.nama || '');
+        setSekolah(userData.sekolah || '');
+        setCredits(userData.credits || 0);
+        
+        // This is where you'd handle the "Admin vs Guru" logic
+        console.log("User Role:", userData.role); 
+      }
+    } catch (error) {
+      console.error("❌ Auth/Firestore Error:", error);
+    } finally {
+      // This MUST run to close the "Memuatkan" screen
+      setLoading(false);
     }
   });
+
   return () => unsubscribe();
 }, [router]);
 
