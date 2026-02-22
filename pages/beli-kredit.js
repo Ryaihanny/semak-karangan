@@ -18,20 +18,24 @@ export default function BeliKredit() {
   const [userDoc, setUserDoc] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        router.replace('/login');
-      } else {
-        setUser(currentUser);
-        const docRef = doc(db, 'users', currentUser.uid);
-        const snap = await getDoc(docRef);
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    // If Firebase has finished checking and there is NO user
+    if (currentUser === null) {
+      router.replace('/login');
+    } else if (currentUser) {
+      // User is logged in
+      setUser(currentUser);
+      const docRef = doc(db, 'users', currentUser.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
         setUserDoc(snap.data());
-        setLoading(false);
       }
-    });
-    return () => unsubscribe();
-  }, [router]);
+      setLoading(false);
+    }
+  });
+  return () => unsubscribe();
+}, [router]);
 
   const handleCheckout = async (plan) => {
     if (!user) return;

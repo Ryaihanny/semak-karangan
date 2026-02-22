@@ -27,18 +27,18 @@ export default function Profile() {
     }
   };
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        router.replace('/login');
-      } else {
-        setUser(currentUser);
-        await loadUserData(currentUser.uid);
-        setLoading(false);
-      }
-    });
-    return () => unsubscribe();
-  }, [router]);
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    if (currentUser === null) {
+      router.replace('/login');
+    } else if (currentUser) {
+      setUser(currentUser);
+      await loadUserData(currentUser.uid);
+      setLoading(false);
+    }
+  });
+  return () => unsubscribe();
+}, [router]);
 
   const saveUserData = async () => {
     if (!user) return;
