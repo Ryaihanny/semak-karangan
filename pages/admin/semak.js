@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore'; // Cleaned up imports
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/router';
-import { signOut } from 'firebase/auth';
-
-// Import Shared Layout
 import AdminLayout from '@/components/AdminLayout';
 
 export default function Semak() {
@@ -40,13 +37,17 @@ export default function Semak() {
 
   // --- LOGIC: FETCH CREDIT ---
   const fetchCredit = async (uid) => {
-    const db = getFirestore();
-    const docRef = doc(db, 'users', uid);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      const userData = docSnap.data();
-      setCreditBalance(userData.credits ?? 0);
-      setUser({ uid, ...userData });
+    try {
+      const db = getFirestore();
+      const docRef = doc(db, 'users', uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        setCreditBalance(userData.credits ?? 0);
+        setUser({ uid, ...userData });
+      }
+    } catch (err) {
+      console.error("Error fetching credits:", err);
     }
   };
 
@@ -101,6 +102,7 @@ export default function Semak() {
     const selected = pupils.filter((p) => (singleIds ? singleIds.includes(p.id) : p.checked));
     if (selected.length === 0) return;
 
+    // Set loading state
     setPupils((prev) =>
       prev.map((p) =>
         selected.find((sel) => sel.id === p.id) ? { ...p, loading: true, error: null, result: null } : p
@@ -133,43 +135,22 @@ export default function Semak() {
       });
 
       const idToken = await userAuth.getIdToken();
+      
+      // NOTE: If your backend is a separate Railway service, 
+      // change '/api/semak/bulk' to 'https://your-backend-url.railway.app/api/semak/bulk'
       const res = await fetch('/api/semak/bulk', {
         method: 'POST',
         body: formData,
-        headers: { Authorization: `Bearer ${idToken}` },
+        headers: { 
+            Authorization: `Bearer ${idToken}`,
+            // Do NOT set Content-Type header manually when using FormData
+        },
       });
 
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Ralat pelayan');
 
-      const { collection, addDoc, serverTimestamp, getFirestore } = await import('firebase/firestore');
-      const db = getFirestore();
-
-      for (const resItem of json.results) {
-        if (!resItem.error) {
-          const originalPupil = selected.find((p) => String(p.id) === String(resItem.id));
-          if (originalPupil) {
-            const currentLevel = originalPupil.level || 'P6';
-            await addDoc(collection(db, 'karanganResults'), {
-              userId: userId,
-              nama: originalPupil.nama,
-              kelas: originalPupil.kelas,
-              level: currentLevel,
-              set: originalPupil.set || '',
-              karangan: resItem.karangan || originalPupil.karangan,
-              markahIsi: resItem.markahIsi,
-              markahBahasa: resItem.markahBahasa,
-              markahKeseluruhan: resItem.markahKeseluruhan,
-              maxPossible: resItem.maxPossible || (currentLevel === 'P3' || currentLevel === 'P4' ? 15 : 40),
-              ulasan: resItem.ulasan,
-              kesalahanBahasa: resItem.kesalahanBahasa || [],
-              timestamp: serverTimestamp(),
-            });
-          }
-        }
-      }
-
-      await fetchCredit(userId);
+      // Update UI with results
       setPupils((prev) =>
         prev.map((p) => {
           const found = json.results.find((r) => String(r.id) === String(p.id));
@@ -183,8 +164,17 @@ export default function Semak() {
           };
         })
       );
+
+      // Refresh credits
+      await fetchCredit(userId);
+
     } catch (e) {
-      setPupils((prev) => prev.map((p) => (selected.find((sel) => sel.id === p.id) ? { ...p, loading: false, error: e.message } : p)));
+      console.error("Submission Error:", e);
+      setPupils((prev) => 
+        prev.map((p) => 
+            selected.find((sel) => sel.id === p.id) ? { ...p, loading: false, error: e.message } : p
+        )
+      );
     }
   }
 
@@ -193,12 +183,13 @@ export default function Semak() {
     if (selected.length === 0) return alert('Sila tandakan pelajar.');
     if (!pictureDescription.trim() && !questionImage) return alert('Sila masukkan deskripsi atau upload gambar soalan.');
     
+    // Process one by one to avoid timeout issues on large batches
     for (const pupil of selected) {
       await handleSubmitCheckedWrapper([pupil.id]);
     }
   };
 
-  // --- PDF GENERATION LOGIC ---
+  // --- PDF GENERATION LOGIC (UNCHANGED) ---
   const downloadCombinedPDF = () => {
     setPdfLoading(true);
     try {
@@ -316,7 +307,6 @@ export default function Semak() {
             <p>Gunakan AI untuk menyemak tugasan dengan pantas.</p>
           </div>
           <div className="topbar-actions">
-            {/* Mode Switcher */}
             <div className="mode-toggle-inline">
               <button className={isAdminMode ? 'active' : ''} onClick={handleToggleAdmin}>Admin View</button>
               <button className={!isAdminMode ? 'active' : ''} onClick={() => setIsAdminMode(false)}>Guru View</button>
@@ -402,7 +392,7 @@ export default function Semak() {
                       </select>
                     </td>
                     <td>
-                      {pupil.error && <span style={{color:'red', fontSize:'10px'}}>⚠️ Ralat</span>}
+                      {pupil.error && <span style={{color:'red', fontSize:'10px'}}>⚠️ Ralat: {pupil.error}</span>}
                       {pupil.result && (
                         <div className="mini-result">
                           <div style={{fontWeight:'bold', color:'#48A6A7'}}>{pupil.result.markahKeseluruhan}/{pupil.result.maxPossible}</div>
@@ -443,11 +433,9 @@ export default function Semak() {
         .main-content { padding: 1.5rem 0; }
         .topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; }
         .topbar-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-        
         .mode-toggle-inline { display: flex; background: #f0f4f4; padding: 4px; border-radius: 10px; }
         .mode-toggle-inline button { border: none; padding: 6px 15px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.2s; color: #668385; background: transparent; }
         .mode-toggle-inline button.active { background: #003032; color: #ffd700; }
-
         .credit-pill { background: white; padding: 8px 16px; border-radius: 50px; border: 1px solid #EEE; font-size: 0.9rem; font-weight: 700; }
         .credit-pill span { color: #48A6A7; }
         .semak-card { background: white; border-radius: 20px; padding: 2rem; border: 1px solid #EEE; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
@@ -456,7 +444,6 @@ export default function Semak() {
         .modern-textarea { width: 100%; padding: 1rem; border-radius: 12px; border: 1px solid #F0F0F0; background: #FAFAFA; resize: none; font-family: inherit; }
         .question-image-upload { width: 100px; height: 100px; border: 2px dashed #DDD; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-direction: column; }
         .question-image-upload.has-file { border-color: #28A745; background: #E6F9F0; }
-        
         .table-wrapper { overflow-x: auto; margin-bottom: 2rem; }
         .modern-table { width: 100%; border-collapse: collapse; min-width: 800px; }
         .modern-table th { text-align: left; padding: 12px; font-size: 0.7rem; color: #AAA; text-transform: uppercase; border-bottom: 2px solid #F5F5F5; }
@@ -464,7 +451,6 @@ export default function Semak() {
         .table-input, .table-textarea { width: 100%; border: 1px solid #EEE; padding: 8px; border-radius: 8px; font-size: 0.85rem; outline: none; transition: 0.2s; }
         .table-input:focus, .table-textarea:focus { border-color: #48A6A7; }
         .table-textarea { min-height: 60px; }
-        
         .btn-action-small { background: #E6F2F2; color: #48A6A7; border: none; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; width: 100%; }
         .btn-action-small.done { background: #E6F9F0; color: #28A745; }
         .btn-primary { background: #003D40; color: white; border: none; padding: 10px 24px; border-radius: 10px; cursor: pointer; font-weight: 700; }
