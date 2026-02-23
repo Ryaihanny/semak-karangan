@@ -250,7 +250,7 @@ const handleMassAddCredits = async () => {
       // 1. Deduct total from teacher
       batch.update(teacherRef, { credits: increment(-totalNeeded) });
 
-      // 2. Add to each student (THIS IS THE PART YOU ARE ADDING)
+      // 2. Add to each student
       selectedStudents.forEach(sid => {
         const sRef = doc(db, 'students', sid);
         const uRef = doc(db, 'users', sid);
@@ -258,8 +258,12 @@ const handleMassAddCredits = async () => {
         // Update the management collection
         batch.update(sRef, { credits: increment(amount) });
         
-        // Update (or create) the auth/engine collection
-        batch.set(uRef, { credits: increment(amount) }, { merge: true }); 
+        // Update the auth/engine collection (using set with merge to handle new users)
+        batch.set(uRef, { 
+            credits: increment(amount),
+            role: "student",
+            updatedAt: serverTimestamp() 
+        }, { merge: true }); 
       });
 
       await batch.commit();
@@ -268,9 +272,45 @@ const handleMassAddCredits = async () => {
       fetchData();
     } catch (e) {
       console.error(e);
-      alert("Ralat sistem semasa memproses kredit.");
+      alert("Ralat sistem semasa memproses kredit: " + e.message);
     }
 };
+
+const handleAddCredits = async (studentId) => {
+    const amountStr = prompt("Berapa banyak kuota semakan AI ingin ditambah? (Ditolak dari kredit anda)");
+    const amount = parseInt(amountStr);
+    if (!amount || isNaN(amount) || amount <= 0) return;
+    
+    try {
+      const teacherRef = doc(db, 'users', classData.teacherId);
+      const teacherSnap = await getDoc(teacherRef);
+      const teacherCredits = teacherSnap.data().credits || 0;
+
+      if (teacherCredits < amount) return alert("Kredit anda tidak mencukupi.");
+
+      const batch = writeBatch(db);
+      
+      // 1. Deduct from Teacher
+      batch.update(teacherRef, { credits: increment(-amount) });
+      
+      // 2. Add to Student Management Collection
+      batch.update(doc(db, 'students', studentId), { credits: increment(amount) });
+      
+      // 3. Add to Student Engine/Auth Collection
+      batch.set(doc(db, 'users', studentId), { 
+          credits: increment(amount),
+          role: "student",
+          updatedAt: serverTimestamp()
+      }, { merge: true });
+      
+      await batch.commit();
+      alert("Kuota berjaya dikemaskini.");
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      alert("Ralat mengemaskini kuota: " + e.message);
+    }
+  };
 
 const handleAddCredits = async (studentId) => {
     const amountStr = prompt("Berapa banyak kuota semakan AI ingin ditambah? (Ditolak dari kredit anda)");
