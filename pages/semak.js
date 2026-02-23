@@ -131,7 +131,7 @@ export default function Semak() {
       });
 
       const idToken = await user.getIdToken();
-      const res = await fetch('/api/semak/bulk', {
+      const res = await fetch('https://semak-karangan-production.up.railway.app/api/semak/bulk', {
         method: 'POST',
         body: formData,
         headers: { Authorization: `Bearer ${idToken}` },
