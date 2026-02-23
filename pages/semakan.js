@@ -44,43 +44,43 @@ useEffect(() => {
         if (studentSnap.exists()) {
           setCredits(studentSnap.data().credits ?? 0);
         } else {
-          // IMPORTANT: If the user doc doesn't exist, create a starter doc
-          // This prevents the permission error during update
+          // IMPORTANT: Create document with 5 starter credits to prevent permission errors
           console.log("Creating new user document for credits...");
           await setDoc(studentRef, { 
-            credits: 5, // Give them starter credits
+            credits: 5, 
             name: studentName,
-            role: 'student'
+            role: 'student',
+            createdAt: serverTimestamp()
           }, { merge: true });
           setCredits(5);
         }
       } catch (err) {
         console.error("Error fetching credits:", err);
-        setCredits(0); // Stop the "..." loading state
+        setCredits(0);
       }
         
-        if (taskId) {
-          try {
-            const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-            const snap = await getDoc(draftRef);
-            if (snap.exists()) {
-              setEssay(snap.data().essay);
-            }
-          } catch (err) {
-            console.error("Error loading draft:", err);
+      if (taskId) {
+        try {
+          const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+          const snap = await getDoc(draftRef);
+          if (snap.exists()) {
+            setEssay(snap.data().essay);
           }
+        } catch (err) {
+          console.error("Error loading draft:", err);
         }
       }
-    };
+    }
+  };
 
-    const unsubscribe = onAuthStateChanged(auth, () => {
-      setAuthReady(true);
-      identifyAndLoad();
-    });
-
+  const unsubscribe = onAuthStateChanged(auth, () => {
+    setAuthReady(true);
     identifyAndLoad();
-    return () => unsubscribe();
-  }, [taskId, studentId]);
+  });
+
+  identifyAndLoad();
+  return () => unsubscribe();
+}, [taskId, studentId, studentName]); // Added studentName to ensure setDoc has latest name
 
   useEffect(() => {
     if (taskId) {
@@ -115,64 +115,70 @@ useEffect(() => {
     }
   };
 
-  // --- 3. HANDLE SEMAK (WITH CREDIT DEDUCTION) ---
-  const handleSemak = async (e) => {
-    if (e) e.preventDefault();
+// --- 3. HANDLE SEMAK (WITH CREDIT DEDUCTION & REFUND) ---
+const handleSemak = async (e) => {
+  if (e) e.preventDefault();
 
-    // Credit Guard
-    if (credits !== null && credits <= 0) {
-      return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu untuk tambah kredit! 💎");
-    }
+  // Credit Guard
+  if (credits !== null && credits <= 0) {
+    return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu untuk tambah kredit! 💎");
+  }
 
-    // Word Count Guard
-    const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
-    if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. Tulis sedikit lagi! ✍️");
+  // Word Count Guard
+  const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
+  if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. Tulis sedikit lagi! ✍️");
+  
+  setLoading(true);
+  const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
+  const currentClassId = classId || router.query.classId || savedUser.enrolledClasses?.[0] || "umum";
+  const finalStudentId = activeId || studentId || savedUser.id;
+
+  if (!finalStudentId) {
+    setLoading(false);
+    return alert("ID tidak dikesan. Sila muat semula halaman.");
+  }
+
+  const userRef = doc(db, 'users', finalStudentId);
+
+  try {
+    // 1. DEDUCT CREDIT FIRST
+    await updateDoc(userRef, { 
+      credits: increment(-1) 
+    });
+    setCredits(prev => prev - 1);
+
+    // 2. Call AI API
+    const response = await fetch('/api/submit-karangan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        essay, 
+        taskId: taskId || router.query.taskId, 
+        classId: currentClassId, 
+        studentId: finalStudentId, 
+        nama: studentName || nama || "Pelajar", 
+        submissionId: submissionId || router.query.submissionId,
+        status: "submitted"
+      }),
+    });
+
+    const data = await response.json();
     
-    setLoading(true);
-    const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
-    const currentClassId = classId || router.query.classId || savedUser.enrolledClasses?.[0] || "umum";
-    const finalStudentId = activeId || studentId || savedUser.id;
-
-    try {
-      // 1. DEDUCT CREDIT ONLY IN 'users'
-      // This is the only update needed. Your Firebase Rule allows this specifically.
-      const userRef = doc(db, 'users', finalStudentId);
-      
-      await updateDoc(userRef, { 
-        credits: increment(-1) 
-      });
-
-      // REMOVED THE studentRef UPDATE LINE FROM HERE
-      // That line was causing the "Missing or insufficient permissions" error.
-
-      setCredits(prev => prev - 1);
-
-      // 2. Call AI API
-      const response = await fetch('/api/submit-karangan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          essay, 
-          taskId: taskId || router.query.taskId, 
-          classId: currentClassId, 
-          studentId: finalStudentId, 
-          nama: studentName || nama || "Pelajar", 
-          submissionId: submissionId || router.query.submissionId,
-          status: "submitted"
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
-
-      // 3. Success! Move to Analysis
-      router.push(`/analisis/${data.id}?classId=${currentClassId}`);
-    } catch (err) {
-      console.error("Submission Error:", err);
-      alert(err.message || "Masalah teknikal. Cuba lagi.");
-      setLoading(false);
+    if (!response.ok) {
+      // REFUND CREDIT IF API FAILS
+      await updateDoc(userRef, { credits: increment(1) });
+      setCredits(prev => prev + 1);
+      throw new Error(data.message || "Gagal memproses karangan.");
     }
-  };
+
+    // 3. Success! Move to Analysis
+    router.push(`/analisis/${data.id}?classId=${currentClassId}`);
+  } catch (err) {
+    console.error("Submission Error:", err);
+    alert(err.message || "Masalah teknikal. Cuba lagi.");
+    setLoading(false);
+  }
+};
 
   return (
     <div style={styles.container}>
