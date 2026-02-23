@@ -16,6 +16,11 @@ export default async function handler(req, res) {
   // FIXED: Added submissionId to destructuring
   const { essay, studentId, taskId, studentLevel, classId, submissionId, nama: providedName } = req.body;
 
+  // NEW: Safety check to prevent Firestore crash if studentId is missing
+  if (!studentId) {
+    return res.status(400).json({ success: false, message: "ID Pelajar tidak dikesan." });
+  }
+
   try {
     /**
      * 1. ROBUST DATA FETCHING
@@ -116,8 +121,7 @@ export default async function handler(req, res) {
     }
 
     // --- DEDUCT CREDIT ---
-    // DISABLED: Deducting here causes "Double Charging" because SemakanPage.js 
-    // already deducts the credit before calling the API.
+    // DISABLED: Deducting here causes "Double Charging"
     /*
     if (studentId && userSnap.exists) {
       await db.collection('users').doc(studentId).update({
@@ -134,6 +138,10 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Critical Submission Error:", error);
-    return res.status(500).json({ error: error.message });
+    // Ensure we always return JSON to prevent "Unexpected token <" error
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || "Internal Server Error" 
+    });
   }
 }

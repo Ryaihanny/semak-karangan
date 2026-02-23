@@ -119,12 +119,10 @@ useEffect(() => {
 const handleSemak = async (e) => {
   if (e) e.preventDefault();
 
-  // Credit Guard
   if (credits !== null && credits <= 0) {
     return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu untuk tambah kredit! 💎");
   }
 
-  // Word Count Guard
   const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
   if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. Tulis sedikit lagi! ✍️");
   
@@ -162,16 +160,22 @@ const handleSemak = async (e) => {
       }),
     });
 
+    // CHECK IF RESPONSE IS JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const textError = await response.text();
+      console.error("Server returned non-JSON:", textError);
+      throw new Error("Server error (500). Sila semak Railway Logs.");
+    }
+
     const data = await response.json();
     
     if (!response.ok) {
-      // REFUND CREDIT IF API FAILS
       await updateDoc(userRef, { credits: increment(1) });
       setCredits(prev => prev + 1);
       throw new Error(data.message || "Gagal memproses karangan.");
     }
 
-    // 3. Success! Move to Analysis
     router.push(`/analisis/${data.id}?classId=${currentClassId}`);
   } catch (err) {
     console.error("Submission Error:", err);
