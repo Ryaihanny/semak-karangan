@@ -115,7 +115,7 @@ useEffect(() => {
     }
   };
 
-// --- 3. HANDLE SEMAK (WITH CREDIT DEDUCTION & REFUND) ---
+// --- 3. HANDLE SEMAK ---
 const handleSemak = async (e) => {
   if (e) e.preventDefault();
 
@@ -132,14 +132,11 @@ const handleSemak = async (e) => {
   const currentClassId = classId || router.query.classId || savedUser.enrolledClasses?.[0] || "umum";
   const finalStudentId = activeId || studentId || savedUser.id;
 
-if (!finalStudentId || finalStudentId === "undefined") {
+  if (!finalStudentId || finalStudentId === "undefined") {
     setLoading(false);
     return alert("ID Pelajar tidak sah. Sila login semula.");
-}
+  }
 
-  const userRef = doc(db, 'users', finalStudentId);
-
- // 2. Call AI API
   try {
     const response = await fetch('/api/submit-karangan', {
       method: 'POST',
@@ -155,12 +152,11 @@ if (!finalStudentId || finalStudentId === "undefined") {
       }),
     });
 
-    // CHECK IF RESPONSE IS JSON
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
       const textError = await response.text();
       console.error("Server returned non-JSON:", textError);
-      throw new Error("Server error (500). Sila semak Railway Logs.");
+      throw new Error("Server error. Sila semak Railway Logs.");
     }
 
     const data = await response.json();
@@ -169,7 +165,6 @@ if (!finalStudentId || finalStudentId === "undefined") {
        throw new Error(data.message || "Gagal memproses.");
     }
 
-    // SUCCESS: Update the UI credit count
     if (data.remainingCredits !== undefined) {
         setCredits(data.remainingCredits);
     }
@@ -178,86 +173,90 @@ if (!finalStudentId || finalStudentId === "undefined") {
   } catch (err) {
     console.error("Submission Error:", err);
     alert(err.message || "Masalah teknikal.");
+  } finally {
     setLoading(false);
   }
+}; // <--- THIS WAS MISSING: Closes handleSemak
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.topNav}>
-        <button onClick={() => router.back()} style={styles.backBtn}>⬅️ Kembali</button>
-        <h1 style={styles.title}>🚀 Misi Karangan</h1>
-      </div>
+// --- 4. RENDER UI ---
+return (
+  <div style={styles.container}>
+    <div style={styles.topNav}>
+      <button onClick={() => router.back()} style={styles.backBtn}>⬅️ Kembali</button>
+      <h1 style={styles.title}>🚀 Misi Karangan</h1>
+    </div>
 
-      <div style={styles.mainLayout}>
-        <div style={styles.sidebar}>
-          <div style={styles.briefCard}>
-            <h3 style={{marginTop: 0}}>📋 Arahan Cikgu:</h3>
-            {taskData?.imageUrl && <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />}
-            <p style={styles.taskText}>{taskData?.instructions || "Sila tulis karangan berdasarkan tajuk yang diberikan."}</p>
-          </div>
-
-          <div style={styles.toolboxCard}>
-            <h4 style={styles.toolTitle}>🛠️ Kotak Alatan Ajaib</h4>
-            <div style={styles.tabRow}>
-              {Object.keys(tools).map(key => (
-                <button 
-                  key={key} 
-                  onClick={() => setActiveTool(key)}
-                  style={{...styles.tabBtn, backgroundColor: activeTool === key ? '#6C5CE7' : '#FFF', color: activeTool === key ? '#FFF' : '#6C5CE7'}}
-                >
-                  {tools[key].label}
-                </button>
-              ))}
-            </div>
-            <div style={styles.toolContent}>
-              {tools[activeTool].items.map((item, i) => (
-                <div key={i} style={styles.toolItem} onClick={() => { navigator.clipboard.writeText(item); alert("Disalin! ✨"); }}>
-                  <span>{item}</span>
-                  <span style={{fontSize: '10px', color: '#6C5CE7'}}>📋 Salin</span>
-                </div>
-              ))}
-            </div>
-          </div>
+    <div style={styles.mainLayout}>
+      <div style={styles.sidebar}>
+        <div style={styles.briefCard}>
+          <h3 style={{marginTop: 0}}>📋 Arahan Cikgu:</h3>
+          {taskData?.imageUrl && <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />}
+          <p style={styles.taskText}>{taskData?.instructions || "Sila tulis karangan berdasarkan tajuk yang diberikan."}</p>
         </div>
 
-        <div style={styles.editorArea}>
-          <div style={styles.inputHeader}>
-            <span>✍️ Tulis di sini:</span>
-            <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
+        <div style={styles.toolboxCard}>
+          <h4 style={styles.toolTitle}>🛠️ Kotak Alatan Ajaib</h4>
+          <div style={styles.tabRow}>
+            {Object.keys(tools).map(key => (
+              <button 
+                key={key} 
+                onClick={() => setActiveTool(key)}
+                style={{...styles.tabBtn, backgroundColor: activeTool === key ? '#6C5CE7' : '#FFF', color: activeTool === key ? '#FFF' : '#6C5CE7'}}
+              >
+                {tools[key].label}
+              </button>
+            ))}
           </div>
-          <textarea value={essay} onChange={(e) => setEssay(e.target.value)} placeholder="Tulis di sini..." style={styles.textarea} />
+          <div style={styles.toolContent}>
+            {tools[activeTool].items.map((item, i) => (
+              <div key={i} style={styles.toolItem} onClick={() => { navigator.clipboard.writeText(item); alert("Disalin! ✨"); }}>
+                <span>{item}</span>
+                <span style={{fontSize: '10px', color: '#6C5CE7'}}>📋 Salin</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
-          <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>
-              Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName}
-            </span>
-            <span style={{ fontWeight: 'bold', color: '#6C5CE7', background: '#E0E7FF', padding: '2px 8px', borderRadius: '4px' }}>
-              💎 Kredit: {credits !== null ? credits : '...'}
-            </span>
-          </div>
+      <div style={styles.editorArea}>
+        <div style={styles.inputHeader}>
+          <span>✍️ Tulis di sini:</span>
+          <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
+        </div>
+        <textarea value={essay} onChange={(e) => setEssay(e.target.value)} placeholder="Tulis di sini..." style={styles.textarea} />
 
-          <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-            <button 
-              onClick={handleSaveProgress} 
-              disabled={isSaving}
-              style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}
-            >
-              {isSaving ? "⏳..." : "💾 Simpan Progress"}
-            </button>
-            <button 
-              onClick={handleSemak} 
-              disabled={loading}
-              style={{ ...styles.submitBtn, flex: 2 }}
-            >
-              {loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}
-            </button>
-          </div>
+        <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>
+            Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName}
+          </span>
+          <span style={{ fontWeight: 'bold', color: '#6C5CE7', background: '#E0E7FF', padding: '2px 8px', borderRadius: '4px' }}>
+            💎 Kredit: {credits !== null ? credits : '...'}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+          <button 
+            onClick={handleSaveProgress} 
+            disabled={isSaving}
+            style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}
+          >
+            {isSaving ? "⏳..." : "💾 Simpan Progress"}
+          </button>
+          <button 
+            onClick={handleSemak} 
+            disabled={loading}
+            style={{ ...styles.submitBtn, flex: 2 }}
+          >
+            {loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}
+          </button>
         </div>
       </div>
     </div>
-  );
-}
+  </div>
+);
+} // <--- Closes SemakanPage function
 
+// Leave 'const styles = { ... }' outside at the bottom.
 const styles = {
   container: { backgroundColor: '#F0F3F7', minHeight: '100vh', padding: '20px' },
   topNav: { display: 'flex', alignItems: 'center', marginBottom: '20px', maxWidth: '1200px', margin: '0 auto 20px auto' },
