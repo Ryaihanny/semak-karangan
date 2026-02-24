@@ -29,36 +29,41 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
 
+  // 1. DATA EXTRACTION
   const { essay, studentId, taskId, studentLevel, classId, submissionId, nama: providedName } = req.body;
 
-  if (!studentId) {
-    return res.status(400).json({ success: false, message: "ID Pelajar tidak dikesan." });
+  if (!studentId || !essay) {
+    return res.status(400).json({ success: false, message: "ID Pelajar atau karangan tidak dikesan." });
   }
 
   try {
-    // 1. Fetch Data
-    const [userSnap, taskSnap] = await Promise.all([
-      db.collection('users').doc(studentId).get(),
-      taskId && taskId !== 'umum' ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
-    ]);
+    // 2. FETCH DATA (Added Error Catching for Firestore)
+    let userSnap, taskSnap;
+    try {
+      [userSnap, taskSnap] = await Promise.all([
+        db.collection('users').doc(studentId).get(),
+        (taskId && taskId !== 'umum') ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
+      ]);
+    } catch (dbErr) {
+      console.error("Firestore Fetch Error:", dbErr);
+      throw new Error("Gagal menyambung ke pangkalan data.");
+    }
 
     const userData = userSnap.exists ? userSnap.data() : {};
-    
-    // FIX: Prioritize providedName so it doesn't default to database "Johan"
     const effectiveName = providedName || userData.name || "Pelajar";
-    const effectiveLevel = userData.level || studentLevel || 'P4';
+    const effectiveLevel = studentLevel || userData.level || 'P6'; // Default to P6 if missing
     const taskData = taskSnap.exists ? taskSnap.data() : { title: 'Misi Karangan' };
-    const config = LEVEL_SETTINGS[effectiveLevel] || LEVEL_SETTINGS['P4'];
+    const config = LEVEL_SETTINGS[effectiveLevel] || LEVEL_SETTINGS['P6'];
 
-    // 2. AI ANALYSIS
+    // 3. AI ANALYSIS (Synced with bulk logic)
     const analysis = await analyseKarangan({
       nama: effectiveName,
-      studentContent: [essay],
+      studentContent: [`Karangan murid: ${essay}`], // Wrapped exactly like bulk
       level: effectiveLevel,
       stimulus: taskData.imageUrl || taskData.attachmentUrl || null
     });
 
-    // 3. PREPARE PAYLOAD
+    // 4. PREPARE PAYLOAD
     const isiMark = Number(analysis.markahIsi || 0);
     const bahasaMark = Number(analysis.markahBahasa || 0);
     const totalMark = isiMark + bahasaMark;
@@ -67,13 +72,13 @@ export default async function handler(req, res) {
       nama: effectiveName,
       level: effectiveLevel,
       classId: classId || "umum", 
-      status: "completed", // Changed from murni_in_progress to show it's done
-      tajuk: taskData.title || analysis.tajuk || "Analisis Karangan",
+      status: "completed",
+      tajuk: taskData.title || "Analisis Karangan",
       karanganAsal: essay,
       karanganUnderlined: analysis.karanganUnderlined || essay,
       markah: totalMark, 
       markahKeseluruhan: totalMark,
-      ulasanKeseluruhan: analysis.ulasan?.keseluruhan || (typeof analysis.ulasan === 'string' ? analysis.ulasan : "Tahniah!"),
+      ulasanKeseluruhan: analysis.ulasan?.keseluruhan || "Tahniah!",
       ulasanIsi: analysis.ulasan?.isi || "",
       ulasanBahasa: analysis.ulasan?.bahasa || "",
       pemarkahan: {
@@ -89,7 +94,7 @@ export default async function handler(req, res) {
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     };
 
-    // 4. SAVE TO FIRESTORE
+    // 5. SAVE & DEDUCT
     const resultsRef = db.collection('karanganResults');
     let docId;
     
@@ -101,10 +106,13 @@ export default async function handler(req, res) {
       docId = newDoc.id;
     }
 
-    // 5. DEDUCT CREDIT
-    const remaining = await deductCredits(studentId, 1);
-
-    console.log(`✅ Analysis completed for ${effectiveName}. ID: ${docId}`);
+    // Try to deduct credits but don't crash if it fails (optional safety)
+    let remaining = 0;
+    try {
+      remaining = await deductCredits(studentId, 1);
+    } catch (creditErr) {
+      console.error("Credit Deduction Failed:", creditErr);
+    }
 
     return res.status(200).json({ 
       success: true, 
@@ -113,10 +121,10 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error("Critical Error:", error);
+    console.error("API Route Error:", error);
     return res.status(500).json({ 
         success: false, 
-        message: error.message || "Gagal memproses karangan." 
+        message: error.message || "Ralat pelayan." 
     });
   }
 }
