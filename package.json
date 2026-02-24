@@ -2,10 +2,10 @@
   "name": "semak-karangan",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
+"scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p ${PORT:-8080}",
+    "start": "next start", 
     "lint": "next lint"
   },
   "dependencies": {
