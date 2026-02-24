@@ -20,6 +20,14 @@ async function deductCredits(userId, amount) {
     return newTotal;
   });
 }
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+    responseLimit: false,
+  },
+};
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
