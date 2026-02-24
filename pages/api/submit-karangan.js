@@ -15,7 +15,6 @@ async function deductCredits(userId, amount) {
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) return 0;
     const currentCredits = Number(userDoc.data()?.credits ?? 0);
-    // CHANGE 1: Safety check - don't deduct if credits are already 0
     if (currentCredits <= 0) throw new Error("Kredit tidak mencukupi"); 
     const newTotal = Math.max(0, currentCredits - amount);
     transaction.update(userRef, { credits: newTotal });
@@ -24,7 +23,6 @@ async function deductCredits(userId, amount) {
 }
 
 export default async function handler(req, res) {
-  // CHANGE 2: Add CORS Headers (This prevents Railway from blocking the request)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -42,11 +40,13 @@ export default async function handler(req, res) {
     // 1. Fetch Data
     const [userSnap, taskSnap] = await Promise.all([
       db.collection('users').doc(studentId).get(),
-      taskId ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
+      taskId && taskId !== 'umum' ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
     ]);
 
     const userData = userSnap.exists ? userSnap.data() : {};
-    const effectiveName = userData.name || providedName || "Pelajar";
+    
+    // FIX: Prioritize providedName so it doesn't default to database "Johan"
+    const effectiveName = providedName || userData.name || "Pelajar";
     const effectiveLevel = userData.level || studentLevel || 'P4';
     const taskData = taskSnap.exists ? taskSnap.data() : { title: 'Misi Karangan' };
     const config = LEVEL_SETTINGS[effectiveLevel] || LEVEL_SETTINGS['P4'];
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
       nama: effectiveName,
       studentContent: [essay],
       level: effectiveLevel,
-      stimulus: taskData.imageUrl || null
+      stimulus: taskData.imageUrl || taskData.attachmentUrl || null
     });
 
     // 3. PREPARE PAYLOAD
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
       nama: effectiveName,
       level: effectiveLevel,
       classId: classId || "umum", 
-      status: "murni_in_progress", 
+      status: "completed", // Changed from murni_in_progress to show it's done
       tajuk: taskData.title || analysis.tajuk || "Analisis Karangan",
       karanganAsal: essay,
       karanganUnderlined: analysis.karanganUnderlined || essay,
@@ -102,8 +102,10 @@ export default async function handler(req, res) {
       docId = newDoc.id;
     }
 
-    // 5. DEDUCT CREDIT (Backend only)
+    // 5. DEDUCT CREDIT
     const remaining = await deductCredits(studentId, 1);
+
+    console.log(`✅ Analysis completed for ${effectiveName}. ID: ${docId}`);
 
     return res.status(200).json({ 
       success: true, 
@@ -113,7 +115,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Critical Error:", error);
-    // CHANGE 3: Ensure even errors return JSON
     return res.status(500).json({ 
         success: false, 
         message: error.message || "Gagal memproses karangan." 
