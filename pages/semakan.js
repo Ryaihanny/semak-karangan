@@ -142,9 +142,9 @@ if (!finalStudentId || finalStudentId === "undefined") {
  // 2. Call AI API
   try {
 const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
         essay, 
         studentId: finalStudentId, 
         taskId: taskId || router.query.taskId,
