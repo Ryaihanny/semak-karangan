@@ -13,51 +13,33 @@ const LEVEL_SETTINGS = {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
 
-  // FIXED: Added submissionId to destructuring
   const { essay, studentId, taskId, studentLevel, classId, submissionId, nama: providedName } = req.body;
 
-  // NEW: Safety check to prevent Firestore crash if studentId is missing
   if (!studentId) {
     return res.status(400).json({ success: false, message: "ID Pelajar tidak dikesan." });
   }
 
   try {
-    /**
-     * 1. ROBUST DATA FETCHING
-     */
-    // CHANGED: Fetch from 'users' collection to check credits (matching semakan.js logic)
-    const [studentSnap, taskSnap, userSnap] = await Promise.all([
-      studentId ? db.collection('students').doc(studentId).get() : Promise.resolve({ exists: false }),
-      taskId ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false }),
-      studentId ? db.collection('users').doc(studentId).get() : Promise.resolve({ exists: false })
+    // 1. Fetch only what is necessary. Use 'users' as the primary source.
+    const [userSnap, taskSnap] = await Promise.all([
+      db.collection('users').doc(studentId).get(),
+      taskId ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
     ]);
 
-    // --- CREDIT CHECK LOGIC ---
-    if (userSnap.exists) {
-      const userData = userSnap.data();
-      const currentCredits = userData.credits ?? 0;
-      // Safety check: Since frontend deducts first, balance should be >= 0
-      if (currentCredits < 0) { 
-        return res.status(403).json({ message: "Kredit tidak mencukupi. Sila hubungi cikgu." });
-      }
-    }
-
-    // FALLBACKS: Fixed ReferenceError for 'nama'
-    const studentData = studentSnap.exists ? studentSnap.data() : { level: studentLevel || 'P4', name: providedName || 'Pelajar' };
+    // If user doesn't exist in 'users', fallback to 'providedName'
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const effectiveName = userData.name || providedName || "Pelajar";
+    const effectiveLevel = userData.level || studentLevel || 'P4';
+    
     const taskData = taskSnap.exists ? taskSnap.data() : { title: 'Misi Karangan', imageUrl: null };
-
-    // FIXED: Renamed to effectiveLevel to avoid duplicate declaration error
-    const effectiveLevel = studentData.level || studentLevel || 'P4';
     const stimulusImage = taskData.imageUrl || null;
     const config = LEVEL_SETTINGS[effectiveLevel] || LEVEL_SETTINGS['P4'];
 
-    console.log(`Mission Control: Analyzing for ${studentData.name} (${effectiveLevel})`);
+    console.log(`Mission Control: Analyzing for ${effectiveName} (${effectiveLevel})`);
 
-    /**
-     * 2. AI ANALYSIS
-     */
+    // 2. AI ANALYSIS
     const analysis = await analyseKarangan({
-      nama: studentData.name || "Pelajar",
+      nama: effectiveName,
       studentContent: [essay],
       level: effectiveLevel,
       stimulus: stimulusImage 

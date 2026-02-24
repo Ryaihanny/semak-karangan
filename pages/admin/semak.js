@@ -94,89 +94,108 @@ export default function Semak() {
   };
 
   // --- LOGIC: SUBMISSION ---
-  async function handleSubmitCheckedWrapper(singleIds) {
-    const userAuth = auth.currentUser;
-    const userId = userAuth?.uid;
-    if (!userId) return;
+async function handleSubmitCheckedWrapper(singleIds) {
+  const userAuth = auth.currentUser;
+  const userId = userAuth?.uid;
+  if (!userId) return;
 
-    const selected = pupils.filter((p) => (singleIds ? singleIds.includes(p.id) : p.checked));
-    if (selected.length === 0) return;
+  const selected = pupils.filter((p) => (singleIds ? singleIds.includes(p.id) : p.checked));
+  if (selected.length === 0) return;
 
-    // Set loading state
-    setPupils((prev) =>
-      prev.map((p) =>
-        selected.find((sel) => sel.id === p.id) ? { ...p, loading: true, error: null, result: null } : p
-      )
-    );
+  setPupils((prev) =>
+    prev.map((p) =>
+      selected.find((sel) => sel.id === p.id) ? { ...p, loading: true, error: null, result: null } : p
+    )
+  );
 
-    try {
-      const formData = new FormData();
-      if (questionImage) formData.append('questionImage', questionImage);
+  try {
+    const formData = new FormData();
+    if (questionImage) formData.append('questionImage', questionImage);
 
-      const pupilsData = selected.map((p) => ({
-        id: p.id,
-        nama: p.nama || '',
-        kelas: p.kelas || '',
-        karangan: p.karangan || '',
-        mode: p.mode,
-        set: p.set || '',
-        level: p.level || 'P6',
-        pictureDescription: pictureDescription || '',
-      }));
+    const pupilsData = selected.map((p) => ({
+      id: p.id,
+      nama: p.nama || '',
+      kelas: p.kelas || '',
+      karangan: p.karangan || '',
+      mode: p.mode,
+      set: p.set || '',
+      level: p.level || 'P6',
+      pictureDescription: pictureDescription || '',
+    }));
 
-      formData.append('pupils', JSON.stringify(pupilsData));
+    formData.append('pupils', JSON.stringify(pupilsData));
 
-      selected.forEach((p) => {
-        if (p.mode === 'ocr' && p.ocrFiles.length > 0) {
-          Array.from(p.ocrFiles).forEach((file) => {
-            formData.append(`file_${p.id}`, file);
+    selected.forEach((p) => {
+      if (p.mode === 'ocr' && p.ocrFiles.length > 0) {
+        Array.from(p.ocrFiles).forEach((file) => {
+          formData.append(`file_${p.id}`, file);
+        });
+      }
+    });
+
+    const idToken = await userAuth.getIdToken();
+    const res = await fetch('https://semak-karangan-production.up.railway.app/api/semak/bulk', {
+      method: 'POST',
+      body: formData,
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || 'Ralat pelayan');
+
+    // --- ADD THIS SAVING LOGIC BACK IN ---
+    const db = getFirestore();
+    for (const resItem of json.results) {
+      if (!resItem.error) {
+        const originalPupil = selected.find((p) => String(p.id) === String(resItem.id));
+        if (originalPupil) {
+          const currentLevel = originalPupil.level || 'P6';
+          await addDoc(collection(db, 'karanganResults'), {
+            userId: userId,
+            nama: originalPupil.nama,
+            kelas: originalPupil.kelas,
+            level: currentLevel,
+            set: originalPupil.set || '',
+            karangan: resItem.karangan || originalPupil.karangan,
+            markahIsi: resItem.markahIsi,
+            markahBahasa: resItem.markahBahasa,
+            markahKeseluruhan: resItem.markahKeseluruhan,
+            maxPossible: resItem.maxPossible || (currentLevel === 'P3' || currentLevel === 'P4' ? 15 : 40),
+            ulasan: resItem.ulasan,
+            kesalahanBahasa: resItem.kesalahanBahasa || [],
+            gayaBahasa: resItem.gayaBahasa || [],
+            timestamp: serverTimestamp(),
           });
         }
-      });
-
-      const idToken = await userAuth.getIdToken();
-      
-      // NOTE: If your backend is a separate Railway service, 
-      // change '/api/semak/bulk' to 'https://your-backend-url.railway.app/api/semak/bulk'
-      const res = await fetch('/api/semak/bulk', {
-        method: 'POST',
-        body: formData,
-        headers: { 
-            Authorization: `Bearer ${idToken}`,
-            // Do NOT set Content-Type header manually when using FormData
-        },
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Ralat pelayan');
-
-      // Update UI with results
-      setPupils((prev) =>
-        prev.map((p) => {
-          const found = json.results.find((r) => String(r.id) === String(p.id));
-          if (!found) return p;
-          return {
-            ...p,
-            loading: false,
-            karangan: found.karangan || p.karangan,
-            error: found.error || null,
-            result: found.error ? null : found,
-          };
-        })
-      );
-
-      // Refresh credits
-      await fetchCredit(userId);
-
-    } catch (e) {
-      console.error("Submission Error:", e);
-      setPupils((prev) => 
-        prev.map((p) => 
-            selected.find((sel) => sel.id === p.id) ? { ...p, loading: false, error: e.message } : p
-        )
-      );
+      }
     }
+    // --- END SAVING LOGIC ---
+
+    setPupils((prev) =>
+      prev.map((p) => {
+        const found = json.results.find((r) => String(r.id) === String(p.id));
+        if (!found) return p;
+        return {
+          ...p,
+          loading: false,
+          karangan: found.karangan || p.karangan,
+          error: found.error || null,
+          result: found.error ? null : found,
+        };
+      })
+    );
+
+    await fetchCredit(userId);
+
+  } catch (e) {
+    console.error("Submission Error:", e);
+    setPupils((prev) => 
+      prev.map((p) => 
+        selected.find((sel) => sel.id === p.id) ? { ...p, loading: false, error: e.message } : p
+      )
+    );
   }
+}
 
   const handleSubmitChecked = async () => {
     const selected = pupils.filter((p) => p.checked);

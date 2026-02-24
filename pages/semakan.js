@@ -131,10 +131,10 @@ const handleSemak = async (e) => {
   const currentClassId = classId || router.query.classId || savedUser.enrolledClasses?.[0] || "umum";
   const finalStudentId = activeId || studentId || savedUser.id;
 
-  if (!finalStudentId) {
+if (!finalStudentId || finalStudentId === "undefined") {
     setLoading(false);
-    return alert("ID tidak dikesan. Sila muat semula halaman.");
-  }
+    return alert("ID Pelajar tidak sah. Sila login semula.");
+}
 
   const userRef = doc(db, 'users', finalStudentId);
 
@@ -146,7 +146,7 @@ const handleSemak = async (e) => {
     setCredits(prev => prev - 1);
 
     // 2. Call AI API
-    const response = await fetch('/api/submit-karangan', {
+    const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', { ... })
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
