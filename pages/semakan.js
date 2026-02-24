@@ -84,7 +84,7 @@ useEffect(() => {
 
   useEffect(() => {
     if (taskId) {
-      fetch(`/api/get-task?taskId=${taskId}`)
+      fetch(`https://semak-karangan-production.up.railway.app/api/get-task?taskId=${taskId}`)
         .then(res => res.json())
         .then(data => setTaskData(data))
         .catch(err => console.error("Gagal muat turun tugasan:", err));
@@ -115,7 +115,7 @@ useEffect(() => {
     }
   };
 
-// --- 3. HANDLE SEMAK ---
+// --- 3. HANDLE SEMAK (FIXED SYNTAX) ---
 const handleSemak = async (e) => {
   if (e) e.preventDefault();
 
@@ -138,7 +138,8 @@ const handleSemak = async (e) => {
   }
 
   try {
-    const response = await fetch('/api/submit-karangan', {
+    // FIX: Removed the extra { ... } that was breaking the fetch syntax
+    const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
