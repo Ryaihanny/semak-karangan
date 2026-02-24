@@ -120,13 +120,14 @@ const handleSemak = async (e) => {
   if (e) e.preventDefault();
 
   if (credits !== null && credits <= 0) {
-    return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu untuk tambah kredit! 💎");
+    return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu! 💎");
   }
 
   const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
-  if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. Tulis sedikit lagi! ✍️");
+  if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. ✍️");
   
   setLoading(true);
+
   const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
   const currentClassId = classId || router.query.classId || savedUser.enrolledClasses?.[0] || "umum";
   const finalStudentId = activeId || studentId || savedUser.id;
@@ -138,23 +139,17 @@ if (!finalStudentId || finalStudentId === "undefined") {
 
   const userRef = doc(db, 'users', finalStudentId);
 
+ // 2. Call AI API
   try {
-    // 1. DEDUCT CREDIT FIRST
-    await updateDoc(userRef, { 
-      credits: increment(-1) 
-    });
-    setCredits(prev => prev - 1);
-
-    // 2. Call AI API
-    const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', { ... })
+const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         essay, 
-        taskId: taskId || router.query.taskId, 
-        classId: currentClassId, 
         studentId: finalStudentId, 
-        nama: studentName || nama || "Pelajar", 
+        taskId: taskId || router.query.taskId,
+        classId: currentClassId,
+        nama: studentName,
         submissionId: submissionId || router.query.submissionId,
         status: "submitted"
       }),
@@ -168,18 +163,21 @@ if (!finalStudentId || finalStudentId === "undefined") {
       throw new Error("Server error (500). Sila semak Railway Logs.");
     }
 
-    const data = await response.json();
+const data = await response.json();
     
     if (!response.ok) {
-      await updateDoc(userRef, { credits: increment(1) });
-      setCredits(prev => prev + 1);
-      throw new Error(data.message || "Gagal memproses karangan.");
+       throw new Error(data.message || "Gagal memproses.");
+    }
+
+    // SUCCESS: Update the UI credit count based on what the server says
+    if (data.remainingCredits !== undefined) {
+        setCredits(data.remainingCredits);
     }
 
     router.push(`/analisis/${data.id}?classId=${currentClassId}`);
   } catch (err) {
     console.error("Submission Error:", err);
-    alert(err.message || "Masalah teknikal. Cuba lagi.");
+    alert(err.message || "Masalah teknikal.");
     setLoading(false);
   }
 };
