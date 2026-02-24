@@ -141,7 +141,7 @@ if (!finalStudentId || finalStudentId === "undefined") {
 
  // 2. Call AI API
   try {
-const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
+const response = await fetch('/api/submit-karangan', ...
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
