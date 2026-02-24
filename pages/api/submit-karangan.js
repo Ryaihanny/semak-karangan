@@ -1,6 +1,5 @@
 import { analyseKarangan } from '@/lib/analyseKarangan';
-import { db } from '@/lib/firebaseAdmin';
-import admin from 'firebase-admin';
+import admin, { db } from '@/lib/firebaseAdmin';
 
 const LEVEL_SETTINGS = {
   'P3': { maxIsi: 8,  maxBahasa: 7,  total: 15 },
