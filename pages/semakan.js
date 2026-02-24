@@ -141,10 +141,10 @@ if (!finalStudentId || finalStudentId === "undefined") {
 
  // 2. Call AI API
   try {
-const response = await fetch('/api/submit-karangan', ...
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
+    const response = await fetch('/api/submit-karangan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         essay, 
         studentId: finalStudentId, 
         taskId: taskId || router.query.taskId,
@@ -163,13 +163,13 @@ const response = await fetch('/api/submit-karangan', ...
       throw new Error("Server error (500). Sila semak Railway Logs.");
     }
 
-const data = await response.json();
+    const data = await response.json();
     
     if (!response.ok) {
        throw new Error(data.message || "Gagal memproses.");
     }
 
-    // SUCCESS: Update the UI credit count based on what the server says
+    // SUCCESS: Update the UI credit count
     if (data.remainingCredits !== undefined) {
         setCredits(data.remainingCredits);
     }
@@ -180,7 +180,6 @@ const data = await response.json();
     alert(err.message || "Masalah teknikal.");
     setLoading(false);
   }
-};
 
   return (
     <div style={styles.container}>
