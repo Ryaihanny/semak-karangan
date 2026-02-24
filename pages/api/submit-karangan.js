@@ -15,6 +15,8 @@ async function deductCredits(userId, amount) {
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) return 0;
     const currentCredits = Number(userDoc.data()?.credits ?? 0);
+    // CHANGE 1: Safety check - don't deduct if credits are already 0
+    if (currentCredits <= 0) throw new Error("Kredit tidak mencukupi"); 
     const newTotal = Math.max(0, currentCredits - amount);
     transaction.update(userRef, { credits: newTotal });
     return newTotal;
@@ -22,6 +24,12 @@ async function deductCredits(userId, amount) {
 }
 
 export default async function handler(req, res) {
+  // CHANGE 2: Add CORS Headers (This prevents Railway from blocking the request)
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
 
   const { essay, studentId, taskId, studentLevel, classId, submissionId, nama: providedName } = req.body;
@@ -57,7 +65,7 @@ export default async function handler(req, res) {
     const totalMark = isiMark + bahasaMark;
 
     const finalPayload = {
-      nama: effectiveName, // FIXED THIS
+      nama: effectiveName,
       level: effectiveLevel,
       classId: classId || "umum", 
       status: "murni_in_progress", 
@@ -66,7 +74,7 @@ export default async function handler(req, res) {
       karanganUnderlined: analysis.karanganUnderlined || essay,
       markah: totalMark, 
       markahKeseluruhan: totalMark,
-      ulasanKeseluruhan: analysis.ulasan?.keseluruhan || analysis.ulasan || "Tahniah!",
+      ulasanKeseluruhan: analysis.ulasan?.keseluruhan || (typeof analysis.ulasan === 'string' ? analysis.ulasan : "Tahniah!"),
       ulasanIsi: analysis.ulasan?.isi || "",
       ulasanBahasa: analysis.ulasan?.bahasa || "",
       pemarkahan: {
@@ -94,7 +102,7 @@ export default async function handler(req, res) {
       docId = newDoc.id;
     }
 
-    // 5. DEDUCT CREDIT
+    // 5. DEDUCT CREDIT (Backend only)
     const remaining = await deductCredits(studentId, 1);
 
     return res.status(200).json({ 
@@ -105,6 +113,10 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Critical Error:", error);
-    return res.status(500).json({ success: false, message: error.message });
+    // CHANGE 3: Ensure even errors return JSON
+    return res.status(500).json({ 
+        success: false, 
+        message: error.message || "Gagal memproses karangan." 
+    });
   }
 }
