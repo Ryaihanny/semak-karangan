@@ -3,126 +3,98 @@ import fs from 'fs';
 import sharp from 'sharp';
 import admin, { db } from "../../../lib/firebaseAdmin";
 import { analyseKarangan } from '@/lib/analyseKarangan';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
+// Next.js config to disable body parser for Formidable
 export const config = { api: { bodyParser: false } };
 
 const fileToGenerativePart = (buffer, mimeType) => ({
   inlineData: { data: buffer.toString("base64"), mimeType }
 });
 
-async function saveResultToFirestore(data, uid, originalId) {
-  if (!data.nama) return;
-  const docRef = await db.collection('karanganResults').add({
-    ...data,
-    uid,  
-    originalPupilId: originalId,
-    timestamp: new Date().toISOString(),
-  });
-  console.log('✅ Saved to Firestore:', docRef.id);
-}
-
-// Fixed Credit Deduction: Now returns true/false to allow conditional deduction
-async function deductCredits(userId, amount) {
-  const userRef = db.collection('users').doc(userId);
-  return db.runTransaction(async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists) throw new Error('User not found');
-    
-    const currentCredits = Number(userDoc.data()?.credits ?? 0);
-    if (currentCredits < amount) throw new Error('Insufficient credits');
-    
-    transaction.update(userRef, { credits: currentCredits - amount });
-    return currentCredits - amount;
-  });
-}
-
-function parseForm(req) {
-  return new Promise((resolve, reject) => {
-    const form = formidable({ multiples: true });
-    form.parse(req, (err, fields, files) => {
-      if (err) reject(err);
-      else resolve({ fields, files });
-    });
-  });
-}
-
 export default async function handler(req, res) {
-res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', 'https://semakbijak.com');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+  // 1. CORS & Headers (Exactly matching your Railway domain)
+  const allowedOrigins = [
+    'https://semakbijak.com',
+    'https://www.semakbijak.com',
+    'https://semak-karangan-production.up.railway.app'
+  ];
 
-  // Handle the browser "preflight" check
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
   }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  let fields, files;
-  try {
-    ({ fields, files } = await parseForm(req));
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to parse form' });
-  }
+  // 2. Parse Multipart Form Data
+  const form = formidable({ multiples: true });
+  const { fields, files } = await new Promise((resolve, reject) => {
+    form.parse(req, (err, fields, files) => {
+      if (err) reject(err);
+      resolve({ fields, files });
+    });
+  });
 
   try {
+    // 3. Extract and Verify Auth
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+
+    // 4. Parse Pupils Data from Frontend
     const pupilsDataRaw = Array.isArray(fields.pupils) ? fields.pupils[0] : fields.pupils;
     const pupils = JSON.parse(pupilsDataRaw || '[]');
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
-
-    if (!pupils.length) return res.status(400).json({ error: 'Tiada murid dipilih.' });
-    if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
-
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    const uid = decoded.uid;
-
-    // We calculate credits but DON'T deduct yet. 
-    // We will deduct only for SUCCESSFUL items later.
+    
     const results = [];
-    let successfulDeductions = 0;
 
-    // Get the Question Image
+    // 5. Process Question Image (Shared stimulus)
     let questionImagePart = null;
     const qFile = files.questionImage ? (Array.isArray(files.questionImage) ? files.questionImage[0] : files.questionImage) : null;
     if (qFile) {
-      const qBuffer = await sharp(fs.readFileSync(qFile.filepath)).jpeg().toBuffer();
+      const qBuffer = await sharp(fs.readFileSync(qFile.filepath)).jpeg({ quality: 70 }).toBuffer();
       questionImagePart = fileToGenerativePart(qBuffer, "image/jpeg");
     }
 
+    // 6. Process Individual Pupils
     for (const pupil of pupils) {
-      const { id, nama, kelas, level, set, karangan, mode, pictureDescription } = pupil;
+      const { id, nama, level, karangan, mode, pictureDescription } = pupil;
       
       try {
         let studentContent = [];
 
-        // 1. ADD STIMULUS
+        // Add Stimulus (Image + Description)
         if (questionImagePart) {
           studentContent.push(questionImagePart);
           studentContent.push("Imej di atas adalah soalan/rangsangan karangan.");
-        } 
+        }
         if (pictureDescription) {
           studentContent.push(`Konteks soalan: ${pictureDescription}`);
         }
 
-        // 2. ADD STUDENT ESSAY
+        // Add Essay Content
         if (mode === 'ocr') {
-          const studentFiles = files[`file_${id}`];
+          const studentFiles = files[`file_${id}`]; // Matches frontend formData.append(`file_${p.id}`, file)
           if (!studentFiles) throw new Error("Tiada imej karangan disertakan.");
           
           const filesArray = Array.isArray(studentFiles) ? studentFiles : [studentFiles];
           for (const f of filesArray) {
-            const sBuffer = await sharp(fs.readFileSync(f.filepath)).flatten({ background: '#ffffff' }).jpeg().toBuffer();
+            const sBuffer = await sharp(fs.readFileSync(f.filepath))
+              .flatten({ background: '#ffffff' })
+              .jpeg({ quality: 70 })
+              .toBuffer();
             studentContent.push(fileToGenerativePart(sBuffer, "image/jpeg"));
           }
           studentContent.push("Sila transkripsi tulisan tangan ini dan semak karangannya.");
         } else {
-          studentContent.push(`Karangan murid: ${karangan}`);
+          studentContent.push(`Teks Karangan Murid: ${karangan}`);
         }
 
-        // 3. RUN ANALYSIS
+        // 7. Call AI Analysis
         const analysis = await analyseKarangan({
           nama,
           level,
@@ -130,20 +102,7 @@ res.setHeader('Access-Control-Allow-Credentials', true);
           mode
         });
 
-        // 4. SAVE & TRACK SUCCESS
-        await saveResultToFirestore({
-          nama: nama || 'Pelajar',
-          kelas: kelas || '',
-          level: level || 'P6',
-          set: set || 'default',
-          karangan: analysis.transcription || karangan,
-          ...analysis,
-        }, uid, id);
-
         results.push({ id, ...analysis });
-        
-        // Count credits to be deducted (1 for manual, 2 for OCR)
-        successfulDeductions += (mode === 'ocr' ? 2 : 1);
 
       } catch (err) {
         console.error(`Error processing ${nama}:`, err);
@@ -151,35 +110,11 @@ res.setHeader('Access-Control-Allow-Credentials', true);
       }
     }
 
-    // FINAL STEP: Deduct credits only for what actually worked
-    if (successfulDeductions > 0) {
-      await deductCredits(uid, successfulDeductions);
-    }
-
-    // Standardize results for frontend
-    const safeResults = results.map((r) => {
-      const original = pupils.find(p => String(p.id) === String(r.id)) || {};
-      return {
-        id: r.id,
-        nama: original.nama,
-        kelas: original.kelas,
-        level: original.level,
-        markahIsi: r.markahIsi ?? '-',
-        markahBahasa: r.markahBahasa ?? '-',
-        markahKeseluruhan: r.markahKeseluruhan ?? '-',
-        karangan: r.transcription || original.karangan || '', // Return the new transcription!
-        karanganUnderlined: r.karanganUnderlined ?? r.transcription ?? '',
-        kesalahanBahasa: Array.isArray(r.kesalahanBahasa) ? r.kesalahanBahasa : [],
-        ulasan: r.ulasan || { isi: '', bahasa: '', keseluruhan: '' },
-        gayaBahasa: Array.isArray(r.gayaBahasa) ? r.gayaBahasa : [],
-        error: r.error ?? null,
-      };
-    });
-
-    res.status(200).json({ results: safeResults });
+    // 8. Return formatted results to Frontend
+    res.status(200).json({ results });
 
   } catch (e) {
-    console.error("Bulk Handler Error:", e);
+    console.error("Bulk Handler Main Error:", e);
     res.status(500).json({ error: 'Ralat pelayan.', detail: e.message });
   }
 }
