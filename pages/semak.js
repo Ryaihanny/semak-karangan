@@ -366,27 +366,38 @@ export default function Semak() {
 
       y = doc.lastAutoTable.finalY + 12;
 
-// 6. ANALISIS KESALAHAN (FIX 2: Added Kategori Column)
-      if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
-        if (y > 230) { doc.addPage(); y = 25; }
-        doc.setFont("helvetica", "bold");
-        doc.text("ANALISIS KESALAHAN BAHASA:", margin, y);
-        y += 5;
-        autoTable(doc, {
-          startY: y,
-          head: [['Kategori', 'Kesalahan', 'Pembetulan', 'Penjelasan']],
-          body: item.kesalahanBahasa.map(kb => [
-            cleanText(kb.kategori),
-            cleanText(kb.ayatSalah),
-            cleanText(kb.pembetulan || kb.cadangan || '-'), // Added fallback to kb.pembetulan
-            cleanText(kb.penjelasan)
-          ]),
-          theme: 'grid',
-          headStyles: { fillColor: [72, 166, 167] }, 
-          styles: { fontSize: 8 },
-          columnStyles: { 0: { cellWidth: 25, fontStyle: 'bold' } }
-        });
-      }
+// 6. ANALISIS KESALAHAN (FIXED: 4 Columns with Category & Full Sentence)
+if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
+  if (y > 230) { doc.addPage(); y = 25; }
+  
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(0, 61, 64);
+  doc.text("ANALISIS KESALAHAN BAHASA:", margin, y);
+  y += 5;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Kategori', 'Kesalahan Asal', 'Pembetulan (Ayat Penuh)', 'Penjelasan']],
+    body: item.kesalahanBahasa.map(kb => [
+      cleanText(kb.kategori || 'Umum'),
+      cleanText(kb.ayatSalah),
+      cleanText(kb.pembetulan), // This now pulls the full sentence from the AI
+      cleanText(kb.penjelasan)
+    ]),
+    theme: 'grid',
+    headStyles: { fillColor: [72, 166, 167], textColor: [255, 255, 255] }, 
+    styles: { fontSize: 8, cellPadding: 3 },
+    columnStyles: { 
+      0: { cellWidth: 25, fontStyle: 'bold' },
+      1: { cellWidth: 45 },
+      2: { cellWidth: 50, textColor: [0, 100, 0] }, // Greenish for the fix
+      3: { cellWidth: 45 }
+    }
+  });
+  
+  y = doc.lastAutoTable.finalY + 10;
+}
 
       // FOOTER
       const pageCount = doc.internal.getNumberOfPages();
