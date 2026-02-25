@@ -12,8 +12,11 @@ export default function Signup() {
     nama: '',
     email: '',
     password: '',
+    confirmPassword: '', // 1. Tambah confirmPassword
     sekolah: ''
   });
+  
+  const [showPass, setShowPass] = useState(false); // 2. State untuk lihat password
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,10 +29,20 @@ export default function Signup() {
     setLoading(true);
     setError('');
 
-    try {
-      console.log("Mula pendaftaran..."); // Debugging
+    // 3. Logik Pengesahan Kata Laluan
+    if (formData.password !== formData.confirmPassword) {
+      setError("Kata laluan tidak sepadan!");
+      setLoading(false);
+      return;
+    }
 
-      // 1. Create Account in Firebase Auth
+    if (formData.password.length < 6) {
+      setError("Kata laluan mestilah sekurang-kurangnya 6 aksara.");
+      setLoading(false);
+      return;
+    }
+
+    try {
       const userCredential = await createUserWithEmailAndPassword(
         auth, 
         formData.email.trim(), 
@@ -37,31 +50,20 @@ export default function Signup() {
       );
       const user = userCredential.user;
       
-      console.log("Auth Berjaya. UID:", user.uid); // Debugging
-
-      // 2. Save to 'users' collection with 20 FREE CREDITS
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         nama: formData.nama,
         email: formData.email.trim().toLowerCase(),
         role: 'guru', 
         sekolah: formData.sekolah,
-        credits: 20, // <--- 20 Free Credits Added Here
+        credits: 20,
         createdAt: new Date().toISOString()
       });
 
-      console.log("Firestore Berjaya disimpan!"); // Debugging
-
-      // 3. Redirect to Teacher Dashboard
       router.push('/dashboard');
-
     } catch (err) {
-      console.error("Ralat penuh:", err); // Look at F12 console for this!
-      
       if (err.code === 'auth/email-already-in-use') {
         setError("Emel ini telah digunakan. Sila log masuk.");
-      } else if (err.code === 'auth/operation-not-allowed') {
-        setError("Sila aktifkan 'Email/Password' di Firebase Console Authentication.");
       } else {
         setError(`Ralat: ${err.message}`);
       }
@@ -93,9 +95,36 @@ export default function Signup() {
             <input name="email" type="email" placeholder="cikgu@email.com" onChange={handleChange} required />
           </div>
 
+          {/* Bahagian Kata Laluan dengan Butang 'Lihat' */}
           <div className="input-group">
             <label>Kata Laluan</label>
-            <input name="password" type="password" placeholder="Minima 6 aksara" onChange={handleChange} required />
+            <div className="pass-wrapper">
+              <input 
+                name="password" 
+                type={showPass ? "text" : "password"} 
+                placeholder="Minima 6 aksara" 
+                onChange={handleChange} 
+                required 
+              />
+              <button 
+                type="button" 
+                className="btn-show" 
+                onClick={() => setShowPass(!showPass)}
+              >
+                {showPass ? "Sembunyi" : "Lihat"}
+              </button>
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label>Sahkan Kata Laluan</label>
+            <input 
+              name="confirmPassword" 
+              type={showPass ? "text" : "password"} 
+              placeholder="Taip semula kata laluan" 
+              onChange={handleChange} 
+              required 
+            />
           </div>
 
           <button type="submit" className="signup-btn" disabled={loading}>
@@ -118,6 +147,13 @@ export default function Signup() {
         
         .input-group { margin-bottom: 15px; }
         label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 5px; color: #2D3436; }
+        
+        .pass-wrapper { position: relative; display: flex; align-items: center; }
+        .btn-show { 
+          position: absolute; right: 10px; background: none; border: none; 
+          color: #6C63FF; font-size: 0.75rem; font-weight: 700; cursor: pointer; 
+        }
+
         input { width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #F0F0FF; box-sizing: border-box; font-size: 1rem; outline: none; transition: 0.3s; }
         input:focus { border-color: #6C63FF; }
         
