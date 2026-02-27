@@ -3,131 +3,146 @@ import { getPeribahasaByLevel } from '../../lib/peribahasaData';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 
-export default function MatchingGamePage() {
+export default function QuizGamePage() {
   const router = useRouter();
-  const [cards, setCards] = useState([]);
-  const [flipped, setFlipped] = useState([]); // Menyimpan index kad yang dibuka
-  const [solved, setSolved] = useState([]);   // Menyimpan id pasangan yang sudah betul
-  const [level, setLevel] = useState('P4');   // Contoh Level P4
+  const [gameState, setGameState] = useState('START'); // START, PLAYING, END
+  const [level, setLevel] = useState('P3');
+  const [question, setQuestion] = useState(null);
+  const [options, setOptions] = useState([]);
+  const [score, setScore] = useState(0);
+  const [questionCount, setQuestionCount] = useState(0);
+  const [feedback, setFeedback] = useState(null); // 'BETUL' atau 'SALAH'
 
-  useEffect(() => {
-    setupGame();
-  }, []);
+  const totalQuestions = 10;
 
-  const setupGame = () => {
-    // 1. Ambil data silibus
-    const rawData = getPeribahasaByLevel(level);
-    
-    // 2. Pilih 6 peribahasa secara rawak untuk satu pusingan
-    const selected = [...rawData].sort(() => 0.5 - Math.random()).slice(0, 6);
-    
-    // 3. Pecahkan kepada 12 kad (6 Peribahasa + 6 Maksud)
-    const gameCards = [
-      ...selected.map(item => ({ id: `p-${item.p}`, content: item.p, pairId: item.p, type: 'P' })),
-      ...selected.map(item => ({ id: `m-${item.p}`, content: item.m, pairId: item.p, type: 'M' }))
-    ].sort(() => 0.5 - Math.random()); // Acak kedudukan kad
-    
-    setCards(gameCards);
-    setFlipped([]);
-    setSolved([]);
+  const startNewGame = (selectedLevel) => {
+    setLevel(selectedLevel);
+    setScore(0);
+    setQuestionCount(0);
+    setGameState('PLAYING');
+    generateQuestion(selectedLevel);
   };
 
-  const handleCardClick = (index) => {
-    if (flipped.length === 2 || flipped.includes(index) || solved.includes(cards[index].pairId)) return;
+  const generateQuestion = (currentLevel) => {
+    const allData = getPeribahasaByLevel(currentLevel);
+    
+    // Pilih 1 peribahasa sebagai soalan
+    const correctAns = allData[Math.floor(Math.random() * allData.length)];
+    
+    // Ambil 2 maksud salah secara rawak
+    const distractors = allData
+      .filter(item => item.p !== correctAns.p)
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 2);
 
-    const newFlipped = [...flipped, index];
-    setFlipped(newFlipped);
+    // Gabung dan acak pilihan jawapan
+    const allOptions = [
+      { text: correctAns.m, isCorrect: true },
+      { text: distractors[0].m, isCorrect: false },
+      { text: distractors[1].m, isCorrect: false }
+    ].sort(() => 0.5 - Math.random());
 
-    if (newFlipped.length === 2) {
-      const firstCard = cards[newFlipped[0]];
-      const secondCard = cards[newFlipped[1]];
+    setQuestion(correctAns);
+    setOptions(allOptions);
+    setFeedback(null);
+  };
 
-      if (firstCard.pairId === secondCard.pairId) {
-        setSolved([...solved, firstCard.pairId]);
-        setFlipped([]);
-      } else {
-        setTimeout(() => setFlipped([]), 1000); // Tutup balik kalau salah selepas 1 saat
-      }
+  const handleAnswer = (isCorrect) => {
+    if (feedback) return; // Elakkan double click
+
+    if (isCorrect) {
+      setScore(score + 1);
+      setFeedback('BETUL ✅');
+    } else {
+      setFeedback(`SALAH ❌ Jawapan: ${question.m}`);
     }
+
+    setTimeout(() => {
+      if (questionCount + 1 < totalQuestions) {
+        setQuestionCount(questionCount + 1);
+        generateQuestion(level);
+      } else {
+        setGameState('END');
+      }
+    }, 2000);
   };
 
   return (
     <div className="game-container">
-      <Head><title>Uji Minda Peribahasa | Si-Pintar</title></Head>
-      
-      <header className="game-header">
-        <button onClick={() => router.back()} className="back-btn">← Kembali</button>
-        <h1>🎮 Padanan Peribahasa ({level})</h1>
-        <p>Cari pasangan Peribahasa dan Maksud yang betul!</p>
-      </header>
+      <Head><title>Kuiz Peribahasa Si-Pintar</title></Head>
 
-      <div className="game-grid">
-        {cards.map((card, index) => {
-          const isFlipped = flipped.includes(index);
-          const isSolved = solved.includes(card.pairId);
-          
-          return (
-            <div 
-              key={card.id} 
-              className={`game-card ${isFlipped ? 'flipped' : ''} ${isSolved ? 'solved' : ''}`}
-              onClick={() => handleCardClick(index)}
-            >
-              <div className="card-inner">
-                <div className="card-front">?</div>
-                <div className="card-back">{card.content}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {solved.length === 6 && (
-        <div className="win-overlay">
-          <div className="win-modal">
-            <h2>Syabas! 🎉</h2>
-            <p>Anda telah menguasai {level} hari ini.</p>
-            <button onClick={setupGame}>Main Lagi</button>
+      {gameState === 'START' && (
+        <div className="menu-card">
+          <h1>🎯 Cabaran Peribahasa</h1>
+          <p>Pilih tahap anda untuk bermula:</p>
+          <div className="level-grid">
+            {['P3', 'P4', 'P5', 'P6'].map(l => (
+              <button key={l} onClick={() => startNewGame(l)} className={`lvl-btn ${l}`}>
+                Tahap {l}
+              </button>
+            ))}
           </div>
+          <button onClick={() => router.back()} className="back-link">Kembali ke Dashboard</button>
+        </div>
+      )}
+
+      {gameState === 'PLAYING' && (
+        <div className="quiz-card">
+          <div className="quiz-header">
+            <span>Soalan {questionCount + 1}/{totalQuestions}</span>
+            <span className="score-pill">Skor: {score}</span>
+          </div>
+
+          <h2 className="peribahasa-text">"{question?.p}"</h2>
+          <p className="instruction">Apakah maksud peribahasa di atas?</p>
+
+          <div className="options-list">
+            {options.map((opt, i) => (
+              <button 
+                key={i} 
+                onClick={() => handleAnswer(opt.isCorrect)}
+                className={`opt-btn ${feedback && opt.isCorrect ? 'correct' : ''}`}
+                disabled={!!feedback}
+              >
+                {opt.text}
+              </button>
+            ))}
+          </div>
+
+          {feedback && <div className={`feedback-msg ${feedback.includes('BETUL') ? 'win' : 'lose'}`}>{feedback}</div>}
+        </div>
+      )}
+
+      {gameState === 'END' && (
+        <div className="menu-card">
+          <h1>Selesai! 🎉</h1>
+          <p className="final-score">Skor Akhir: {score} / {totalQuestions}</p>
+          <button onClick={() => setGameState('START')} className="primary-btn">Main Semula</button>
+          <button onClick={() => router.back()} className="back-link">Keluar</button>
         </div>
       )}
 
       <style jsx>{`
-        .game-container { min-height: 100vh; background: #f0f4f8; padding: 40px 20px; font-family: sans-serif; }
-        .game-header { text-align: center; margin-bottom: 30px; }
-        .back-btn { background: #003d40; color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor: pointer; }
+        .game-container { min-height: 100vh; background: #f0f2f5; display: flex; align-items: center; justify-content: center; padding: 20px; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .menu-card, .quiz-card { background: white; padding: 40px; border-radius: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; }
         
-        .game-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
-          gap: 15px; 
-          max-width: 900px; 
-          margin: 0 auto; 
-        }
+        .level-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0; }
+        .lvl-btn { padding: 20px; border-radius: 15px; border: none; color: white; font-weight: 800; cursor: pointer; transition: 0.2s; }
+        .P3 { background: #ff7675; } .P4 { background: #74b9ff; } .P5 { background: #55e6c1; } .P6 { background: #6c5ce7; }
+        .lvl-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
 
-        .game-card { height: 160px; perspective: 1000px; cursor: pointer; }
-        .card-inner { 
-          position: relative; width: 100%; height: 100%; 
-          transition: transform 0.6s; transform-style: preserve-3d; 
-          box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 15px;
-        }
-        .game-card.flipped .card-inner { transform: rotateY(180deg); }
-        .game-card.solved .card-inner { transform: rotateY(180deg); opacity: 0.6; border: 3px solid #00b894; }
+        .peribahasa-text { font-size: 1.8rem; color: #1a1a2e; margin: 20px 0; font-style: italic; }
+        .options-list { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .opt-btn { padding: 15px; border-radius: 12px; border: 2px solid #eef2f6; background: white; cursor: pointer; text-align: left; transition: 0.2s; font-size: 0.95rem; }
+        .opt-btn:hover:not(:disabled) { background: #f0f7ff; border-color: #74b9ff; }
+        .opt-btn.correct { background: #d1fae5; border-color: #10b981; color: #065f46; font-weight: bold; }
 
-        .card-front, .card-back { 
-          position: absolute; width: 100%; height: 100%; 
-          backface-visibility: hidden; display: flex; align-items: center; 
-          justify-content: center; padding: 15px; text-align: center; 
-          border-radius: 15px; font-weight: bold; font-size: 0.9rem;
-        }
-        .card-front { background: #003d40; color: white; font-size: 2rem; }
-        .card-back { background: white; color: #333; transform: rotateY(180deg); }
+        .feedback-msg { margin-top: 20px; padding: 10px; border-radius: 10px; font-weight: bold; }
+        .win { color: #10b981; } .lose { color: #ef4444; }
 
-        .win-overlay { 
-          position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
-          background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; 
-        }
-        .win-modal { background: white; padding: 40px; border-radius: 20px; text-align: center; }
-        .win-modal button { background: #55E6C1; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .score-pill { background: #1a1a2e; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; }
+        .primary-btn { background: #6c5ce7; color: white; border: none; padding: 15px 30px; border-radius: 15px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px;}
+        .back-link { display: block; margin-top: 20px; color: #64748b; background: none; border: none; cursor: pointer; width: 100%; }
       `}</style>
     </div>
   );
