@@ -128,7 +128,7 @@ const handleBulkDeleteAssignments = async () => {
     }).sort((a, b) => a.nama.localeCompare(b.nama));
   }, [myResults, searchQuery, selectedTahap, selectedKelas, selectedSet]);
 
-  const generatePDF = (items) => {
+const generatePDF = (items) => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const margin = 10;
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -224,19 +224,32 @@ const handleBulkDeleteAssignments = async () => {
         y += 7;
       });
 
+      // --- UPDATED 4-COLUMN ANALYSIS TABLE ---
       if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
         y += 5;
         if (y > 230) { doc.addPage(); y = 20; }
         doc.setTextColor(200, 0, 0);
         doc.setFont("times", "bold");
         doc.text("ANALISIS KESALAHAN:", margin, y);
+        
         autoTable(doc, {
           startY: y + 2,
-          head: [['Kesalahan', 'Pembetulan', 'Penjelasan']],
-          body: item.kesalahanBahasa.map(k => [k.ayatSalah, k.cadangan, k.penjelasan]),
-          theme: 'striped',
-          styles: { font: 'times', fontSize: 9 },
-          headStyles: { fillColor: [200, 0, 0] }
+          head: [['Kategori', 'Ayat Salah', 'Pembetulan', 'Penjelasan']],
+          body: item.kesalahanBahasa.map(k => [
+            cleanText(k.kategori || 'Umum'),
+            cleanText(k.ayatSalah),
+            cleanText(k.pembetulan || k.cadangan), // Uses pembetulan, falls back to cadangan if empty
+            cleanText(k.penjelasan)
+          ]),
+          theme: 'grid',
+          styles: { font: 'times', fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [200, 0, 0], textColor: [255, 255, 255] },
+          columnStyles: { 
+            0: { cellWidth: 25 },
+            1: { cellWidth: 45 },
+            2: { cellWidth: 55, textColor: [0, 100, 0], fontStyle: 'bold' }, // Green & Bold for corrections
+            3: { cellWidth: 45 }
+          }
         });
         y = doc.lastAutoTable.finalY + 10;
       }
