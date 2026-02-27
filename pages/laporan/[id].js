@@ -77,60 +77,81 @@ export default function LaporanAnalisis() {
           </div>
         </div>
 
-        {/* ESSAY VIEW - Clean & Flexible */}
-        <div className="white-card">
-          <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
-          <div className="essay-text">
-            {(data.text || data.karangan || data.karanganAsal || "Teks tidak ditemui.")
-              .split('\n')
-              .map((paragraph, pIdx) => {
-                let highlightedParagraph = paragraph;
-                const errors = data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [];
-                
-                errors.forEach((err) => {
-                  const wrongPhrase = err.ayatSalah || err.original || err.sentence || err.kesalahan;
-                  if (wrongPhrase && highlightedParagraph.includes(wrongPhrase)) {
-                    highlightedParagraph = highlightedParagraph.split(wrongPhrase).join(
-                      `<u style="text-decoration-color: #d63031; text-decoration-thickness: 2px; cursor: help;" title="${err.penjelasan || 'Sila semak analisis di bawah'}">${wrongPhrase}</u>`
-                    );
-                  }
-                });
+ {/* 1. BAHAGIAN HASIL PENULISAN - Dengan Garisan Bawah Merah */}
+<div className="white-card">
+  <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
+  <div className="essay-text">
+    {(data.text || data.karangan || data.karanganAsal || "Teks tidak ditemui.")
+      .split('\n')
+      .map((paragraph, pIdx) => {
+        let highlightedParagraph = paragraph;
+        
+        // Mengesan semua variasi array kesalahan dari AI
+        const errors = data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [];
+        
+        errors.forEach((err) => {
+          const wrongPhrase = err.ayatSalah || err.original || err.sentence || err.kesalahan;
+          // Hanya gariskan jika perkataan itu wujud dalam perenggan tersebut
+          if (wrongPhrase && highlightedParagraph.includes(wrongPhrase)) {
+            const regex = new RegExp(wrongPhrase, "g");
+            highlightedParagraph = highlightedParagraph.replace(regex, 
+              `<u style="text-decoration: underline wavy #d63031; text-decoration-thickness: 2px; text-underline-offset: 4px; cursor: help;" title="${err.penjelasan || 'Sila semak analisis di bawah'}">${wrongPhrase}</u>`
+            );
+          }
+        });
 
-                return <p key={pIdx} dangerouslySetInnerHTML={{ __html: highlightedParagraph }} />;
-              })}
-          </div>
-        </div>
+        return (
+          <p key={pIdx} style={{ marginBottom: '15px' }} dangerouslySetInnerHTML={{ __html: highlightedParagraph }} />
+        );
+    })}
+  </div>
+</div>
 
-        {/* ANALYSIS TABLE */}
-        <div className="white-card">
-          <h3 className="card-title">🔍 Analisis Kesalahan Bahasa</h3>
-          <p className="subtitle">Belajar dari kesilapan adalah kunci kejayaan!</p>
-          <div className="table-wrapper">
-            <table className="analysis-table">
-              <thead>
-                <tr>
-                  <th>Kategori</th>
-                  <th>Ayat Asal</th>
-                  <th>Pembetulan</th>
-                  <th>Penjelasan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [])?.map((k, idx) => (
-                  <tr key={idx}>
-                    <td><span className="cat-tag">{k.kategori || k.category || 'Umum'}</span></td>
-                    <td className="text-err">{k.ayatSalah || k.original || k.sentence || k.kesalahan || "—"}</td>
-                    <td className="text-fix">{k.pembetulan || k.correction || k.pembetulanPenjelasan || "—"}</td>
-                    <td className="text-desc">{k.penjelasan || k.explanation || "—"}</td>
-                  </tr>
-                ))}
-                {(!data.kesalahanBahasa && !data.kesalahan_bahasa && !data.error_analysis) && (
-                  <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>Tiada kesalahan dikesan.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+{/* 2. BAHAGIAN JADUAL ANALISIS - Memenuhkan Kolum Yang Kosong */}
+<div className="white-card">
+  <h3 className="card-title">🔍 Analisis Kesalahan Bahasa</h3>
+  <p className="subtitle">Belajar dari kesilapan adalah kunci kejayaan!</p>
+  <div className="table-wrapper">
+    <table className="analysis-table">
+      <thead>
+        <tr>
+          <th>Kategori</th>
+          <th>Ayat Asal</th>
+          <th>Pembetulan</th>
+          <th>Penjelasan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {(data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [])?.map((k, idx) => (
+          <tr key={idx}>
+            <td>
+              <span className="cat-tag">
+                {k.kategori || k.category || 'Tatabahasa'}
+              </span>
+            </td>
+            <td className="text-err">
+              {k.ayatSalah || k.original || k.sentence || k.kesalahan || "—"}
+            </td>
+            <td className="text-fix">
+              {k.pembetulan || k.correction || k.pembetulanPenjelasan || "—"}
+            </td>
+            <td className="text-desc">
+              {k.penjelasan || k.explanation || "Tiada penjelasan tambahan."}
+            </td>
+          </tr>
+        ))}
+        {/* Jika array benar-benar kosong */}
+        {(!(data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis)?.length) && (
+          <tr>
+            <td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: '#999' }}>
+              Tiada kesalahan dikesan. Syabas, penulisan anda sangat mantap!
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
 
         <div className="white-card feedback-area">
           <h3 className="card-title">🌟 Pesanan Guru Si-Pintar</h3>
