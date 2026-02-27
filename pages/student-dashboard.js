@@ -231,7 +231,7 @@ export default function StudentDashboard() {
               <div className="game-icon">📖</div>
               <div className="game-info">
                 <h4>Kamus Flashcard</h4>
-                <p>Ulangkaji peribahasa silibus {user?.level || 'CITA/CEKAP'}</p>
+                <p>Ulangkaji peribahasa {user?.level || 'CITA/CEKAP'}</p>
               </div>
             </div>
             <div className="game-link-card highlight" onClick={() => router.push('/peribahasa/main')}>
