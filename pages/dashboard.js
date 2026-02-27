@@ -180,38 +180,37 @@ export default function Dashboard() {
         y += 7;
       });
 
-// --- CARI BAHAGIAN INI DI DALAM dashboard.js ---
-if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
-  y += 5;
-  if (y > 230) { doc.addPage(); y = 20; }
-  
-  doc.setTextColor(200, 0, 0); // Warna Merah untuk Header
-  doc.setFont("times", "bold");
-  doc.text("ANALISIS KESALAHAN BAHASA:", margin, y);
-  
-  autoTable(doc, {
-    startY: y + 2,
-    // Tambah kolum 'Kategori' dan tukar nama 'Pembetulan' kepada 'Ayat Betul (Penuh)'
-    head: [['Kategori', 'Kesalahan Asal', 'Ayat Betul (Penuh)', 'Penjelasan']],
-    body: item.kesalahanBahasa.map(k => [
-      cleanText(k.kategori || 'Umum'),   // Ambil kategori dari AI
-      cleanText(k.ayatSalah),           // Petikan salah
-      cleanText(k.pembetulan),          // Ambil AYAT PENUH (pastikan guna k.pembetulan)
-      cleanText(k.penjelasan)           // Sebab salah
-    ]),
-    theme: 'grid',
-    styles: { font: 'times', fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [200, 0, 0], textColor: [255, 255, 255] },
-    columnStyles: { 
-      0: { cellWidth: 25 }, // Kategori
-      1: { cellWidth: 45 }, // Kesalahan
-      2: { cellWidth: 55, textColor: [0, 100, 0] }, // Ayat Betul (Warna Hijau)
-      3: { cellWidth: 45 }  // Penjelasan
-    }
-  });
-  
-  y = doc.lastAutoTable.finalY + 10;
-}
+      // --- FIXED ANALISIS KESALAHAN PORTION ---
+      if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
+        y += 5;
+        if (y > 230) { doc.addPage(); y = 20; }
+        
+        doc.setTextColor(200, 0, 0);
+        doc.setFont("times", "bold");
+        doc.text("ANALISIS KESALAHAN BAHASA:", margin, y);
+        
+        autoTable(doc, {
+          startY: y + 2,
+          head: [['Kategori', 'Ayat Salah', 'Pembetulan', 'Penjelasan']],
+          body: item.kesalahanBahasa.map(k => [
+            cleanText(k.kategori || 'Umum'),
+            cleanText(k.ayatSalah),
+            cleanText(k.pembetulan),
+            cleanText(k.penjelasan)
+          ]),
+          theme: 'grid',
+          styles: { font: 'times', fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [200, 0, 0], textColor: [255, 255, 255] },
+          columnStyles: { 
+            0: { cellWidth: 25 }, // Kategori
+            1: { cellWidth: 45 }, // Ayat Salah
+            2: { cellWidth: 55, textColor: [0, 100, 0], fontStyle: 'bold' }, // Pembetulan (Green & Bold)
+            3: { cellWidth: 45 }  // Penjelasan
+          }
+        });
+        
+        y = doc.lastAutoTable.finalY + 10;
+      }
 
       if (y > 240) { doc.addPage(); y = 20; }
       doc.setFillColor(245, 250, 250);
