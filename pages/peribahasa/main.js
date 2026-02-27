@@ -99,7 +99,7 @@ export default function QuizGamePage() {
                 className="climber-icon" 
                 style={{ left: `${progressPercent}%` }}
               >
-                🧗
+                🚀
               </div>
             </div>
             <div className="base-label">Mula</div>

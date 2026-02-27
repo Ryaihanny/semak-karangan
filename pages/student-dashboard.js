@@ -125,27 +125,6 @@ export default function StudentDashboard() {
       </header>
 
       <main className="container content">
-        {/* GAME & LEARNING HUB SECTION */}
-        <div className="game-hub">
-          <h3 className="section-title">🎯 Hub Permainan & Ulangkaji</h3>
-          <div className="game-cards-container">
-            <div className="game-link-card" onClick={() => router.push('/peribahasa/belajar')}>
-              <div className="game-icon">📖</div>
-              <div className="game-info">
-                <h4>Kamus Flashcard</h4>
-                <p>Ulangkaji peribahasa silibus {user?.level || 'CITA/CEKAP'}</p>
-              </div>
-            </div>
-            <div className="game-link-card highlight" onClick={() => router.push('/peribahasa/main')}>
-              <div className="game-icon">🎮</div>
-              <div className="game-info">
-                <h4>Main Padanan</h4>
-                <p>Uji minda dan kumpul markah tinggi!</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <h3 className="section-title">📂 Tugasan Kelas Aktif</h3>
         <div className="mission-grid">
           {assignments.map(task => {
@@ -242,6 +221,28 @@ export default function StudentDashboard() {
             </div>
           </div>
         )}
+
+        {/* GAME & LEARNING HUB SECTION (Moved Down) */}
+        <div className="game-hub" style={{ marginTop: '60px' }}>
+          <h3 className="section-title">Sudah selesai?</h3>
+          <p style={{ color: '#64748b', marginBottom: '20px', marginTop: '-15px' }}>Ayuh ulangkaji peribahasa sementara menunggu rakan-rakan yang lain.</p>
+          <div className="game-cards-container">
+            <div className="game-link-card" onClick={() => router.push('/peribahasa/belajar')}>
+              <div className="game-icon">📖</div>
+              <div className="game-info">
+                <h4>Kamus Flashcard</h4>
+                <p>Ulangkaji peribahasa silibus {user?.level || 'CITA/CEKAP'}</p>
+              </div>
+            </div>
+            <div className="game-link-card highlight" onClick={() => router.push('/peribahasa/main')}>
+              <div className="game-icon">🎮</div>
+              <div className="game-info">
+                <h4>Main Padanan</h4>
+                <p>Uji minda dan kumpul markah tinggi!</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
 
       <style jsx>{`
