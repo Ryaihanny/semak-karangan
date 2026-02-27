@@ -21,6 +21,34 @@ export default function SemakanPage() {
   const [studentName, setStudentName] = useState(nama || "Pelajar");
   const [credits, setCredits] = useState(null);
 
+  // --- NEW STATES FOR AI COACH ---
+  const [coachSuggestion, setCoachSuggestion] = useState("");
+  const [isCoaching, setIsCoaching] = useState(false);
+
+  const getAICoachHelp = async () => {
+    if (essay.trim().split(/\s+/).filter(Boolean).length < 5) {
+      return alert("Tulis sekurang-kurangnya 5 patah perkataan untuk dibantu! ✍️");
+    }
+    
+    setIsCoaching(true);
+    try {
+      const res = await fetch('/api/ai-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          currentDraft: essay, 
+          level: taskData?.level || "Primary" 
+        }),
+      });
+      const data = await res.json();
+      setCoachSuggestion(data.suggestion);
+    } catch (err) {
+      alert("Maaf, Cikgu AI sedang berehat.");
+    } finally {
+      setIsCoaching(false);
+    }
+  };
+
   const tools = {
     mula: { label: "🌅 Mula", items: ["Pada suatu hari yang cerah...", "Suasana di _____ sungguh riuh-rendah.", "Kelihatan orang ramai sedang..."] },
     hubung: { label: "🔗 Hubung", items: ["Seterusnya,", "Dalam pada itu,", "Oleh hal yang demikian,", "Tiba-tiba..."] },
@@ -44,7 +72,6 @@ useEffect(() => {
         if (studentSnap.exists()) {
           setCredits(studentSnap.data().credits ?? 0);
         } else {
-          // IMPORTANT: Create document with 5 starter credits to prevent permission errors
           console.log("Creating new user document for credits...");
           await setDoc(studentRef, { 
             credits: 5, 
@@ -80,7 +107,7 @@ useEffect(() => {
 
   identifyAndLoad();
   return () => unsubscribe();
-}, [taskId, studentId, studentName]); // Added studentName to ensure setDoc has latest name
+}, [taskId, studentId, studentName]);
 
   useEffect(() => {
     if (taskId) {
@@ -115,7 +142,7 @@ useEffect(() => {
     }
   };
 
-// --- 3. HANDLE SEMAK (FIXED SYNTAX) ---
+// --- 3. HANDLE SEMAK ---
 const handleSemak = async (e) => {
   if (e) e.preventDefault();
 
@@ -138,7 +165,6 @@ const handleSemak = async (e) => {
   }
 
   try {
-    // FIX: Removed the extra { ... } that was breaking the fetch syntax
     const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -155,20 +181,14 @@ const handleSemak = async (e) => {
 
     const contentType = response.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      const textError = await response.text();
-      console.error("Server returned non-JSON:", textError);
       throw new Error("Server error. Sila semak Railway Logs.");
     }
 
     const data = await response.json();
     
-    if (!response.ok) {
-       throw new Error(data.message || "Gagal memproses.");
-    }
+    if (!response.ok) throw new Error(data.message || "Gagal memproses.");
 
-    if (data.remainingCredits !== undefined) {
-        setCredits(data.remainingCredits);
-    }
+    if (data.remainingCredits !== undefined) setCredits(data.remainingCredits);
 
     router.push(`/analisis/${data.id}?classId=${currentClassId}`);
   } catch (err) {
@@ -177,7 +197,7 @@ const handleSemak = async (e) => {
   } finally {
     setLoading(false);
   }
-}; // <--- THIS WAS MISSING: Closes handleSemak
+};
 
 // --- 4. RENDER UI ---
 return (
@@ -224,7 +244,28 @@ return (
           <span>✍️ Tulis di sini:</span>
           <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
         </div>
+
+        {/* AI COACH BUTTON */}
+        <button 
+          onClick={getAICoachHelp}
+          disabled={isCoaching}
+          style={styles.coachBtn}
+        >
+          {isCoaching ? "🪄 Sedang memikirkan idea..." : "💡 Minta Idea AI (Coach)"}
+        </button>
+
         <textarea value={essay} onChange={(e) => setEssay(e.target.value)} placeholder="Tulis di sini..." style={styles.textarea} />
+
+        {/* COACH SUGGESTION OVERLAY */}
+        {coachSuggestion && (
+          <div style={styles.coachOverlay}>
+            <div style={styles.coachContent}>
+              <h3 style={{marginTop: 0, color: '#6C5CE7'}}>💡 Bimbingan Cikgu AI</h3>
+              <div style={{ whiteSpace: 'pre-line', marginBottom: '15px', fontSize: '14px', lineHeight: '1.6' }}>{coachSuggestion}</div>
+              <button onClick={() => setCoachSuggestion("")} style={styles.closeCoachBtn}>Faham, Terima Kasih!</button>
+            </div>
+          </div>
+        )}
 
         <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>
@@ -255,9 +296,8 @@ return (
     </div>
   </div>
 );
-} // <--- Closes SemakanPage function
+}
 
-// Leave 'const styles = { ... }' outside at the bottom.
 const styles = {
   container: { backgroundColor: '#F0F3F7', minHeight: '100vh', padding: '20px' },
   topNav: { display: 'flex', alignItems: 'center', marginBottom: '20px', maxWidth: '1200px', margin: '0 auto 20px auto' },
@@ -278,5 +318,9 @@ const styles = {
   inputHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' },
   wordCount: { color: '#6C5CE7' },
   textarea: { width: '100%', height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none' },
-  submitBtn: { width: '100%', padding: '15px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' }
+  submitBtn: { width: '100%', padding: '15px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' },
+  coachBtn: { width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '10px', border: '1px solid #FFEEBA', backgroundColor: '#FFF3CD', color: '#856404', fontWeight: 'bold', cursor: 'pointer' },
+  coachOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
+  coachContent: { backgroundColor: 'white', padding: '25px', borderRadius: '20px', maxWidth: '500px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' },
+  closeCoachBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer' }
 };
