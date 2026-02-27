@@ -84,111 +84,178 @@ export default function AssignmentTracker() {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-// --- generatePDF Part (Combined into one PDF) ---
+// --- generatePDF Diperkasakan (Sama seperti Dashboard) ---
   const generatePDF = () => {
-    const items = studentStatuses.filter(s => s.checked && s.result);
-    if (items.length === 0) return alert("Sila pilih pelajar yang mempunyai hasil karangan.");
+    const selectedStudents = studentStatuses.filter(s => s.checked && s.result);
+    if (selectedStudents.length === 0) return alert("Sila pilih pelajar yang mempunyai hasil karangan.");
 
-    // 1. Create the single document once here
     const doc = new jsPDF('p', 'mm', 'a4');
+    const margin = 10;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const usableWidth = pageWidth - margin * 2;
 
-    items.forEach((item, index) => {
-      // 2. Add a new page for every student except the first one
-      if (index > 0) {
-        doc.addPage();
-      }
+    const cleanText = (text) => {
+      if (!text) return '-';
+      return String(text)
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/<\/?[^>]+(>|$)/g, '');
+    };
 
-      const studentName = (item.nama || item.name || "Pelajar");
+    selectedStudents.forEach((student, index) => {
+      if (index > 0) doc.addPage();
+      
+      const item = {
+        nama: student.nama || student.name || "Pelajar",
+        level: student.level || "P6",
+        kelas: classNameDisplay,
+        set: student.result?.set || "-",
+        markahIsi: student.markahIsi || 0,
+        markahBahasa: student.markahBahasa || 0,
+        markahKeseluruhan: student.score || 0,
+        karangan: student.result?.karangan || student.result?.karanganAsal || "",
+        kesalahanBahasa: student.result?.kesalahanBahasa || [],
+        ulasan: student.result?.ulasan || "Tiada ulasan."
+      };
 
-      // --- HEADER --- (Untouched Design)
+      // --- HEADER ---
       doc.setFillColor(0, 61, 64);
       doc.rect(0, 0, 210, 40, 'F');
       doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      doc.text("LAPORAN ANALISIS SI-PINTAR", 105, 25, { align: "center" });
-
-      // --- STUDENT INFO ---
-      doc.setTextColor(40, 40, 40);
+      doc.setFont("times", "bold");
+      doc.setFontSize(20);
+      doc.text("LAPORAN SEMAKAN SI-PINTAR", 105, 18, { align: "center" });
       doc.setFontSize(10);
-      doc.text(`NAMA: ${studentName.toUpperCase()}`, 15, 50);
-      doc.text(`KELAS: ${classNameDisplay}`, 15, 56);
-      doc.text(`TARIKH: ${new Date().toLocaleDateString('ms-MY')}`, 195, 50, { align: 'right' });
+      doc.setFont("times", "normal");
+      doc.text("Standard Penilaian Karangan MOE Singapura", 105, 26, { align: "center" });
 
-      // --- MARKS TABLE ---
-      const p56 = ['P5', 'P6'].includes(item.level);
-      const scale = p56 ? { isi: 20, bahasa: 20, total: 40 } : { isi: 8, bahasa: 7, total: 15 };
+      let y = 50;
+      doc.setTextColor(0, 61, 64);
+      doc.setFontSize(12);
+      doc.setFont("times", "bold");
+      doc.text(`NAMA: ${cleanText(item.nama).toUpperCase()}`, margin, y);
       
+      doc.setFontSize(10);
+      doc.setFont("times", "normal");
+      doc.setTextColor(80, 80, 80);
+      y += 7;
+      doc.text(`Peringkat: ${item.level}`, margin, y);
+      doc.text(`Kelas: ${item.kelas}`, 60, y);
+      doc.text(`Set: ${item.set}`, 110, y);
+      doc.text(`Tarikh: ${new Date().toLocaleDateString('ms-MY')}`, 160, y);
+
+      y += 8;
+      const isJunior = (item.level === 'P3' || item.level === 'P4');
+      const maxIsi = isJunior ? 7 : 20;
+      const maxBhs = isJunior ? 8 : 20;
+      const totalMax = isJunior ? 15 : 40;
+
       autoTable(doc, {
-        startY: 65,
-        head: [['KOMPONEN PENILAIAN', 'MARKAH']],
+        startY: y,
+        head: [['KRITERIA', 'MARKAH']],
         body: [
-          ['Isi & Penghuraian', `${item.markahIsi || 0} / ${scale.isi}`],
-          ['Bahasa & Tatabahasa', `${item.markahBahasa || 0} / ${scale.bahasa}`],
-          ['JUMLAH KESELURUHAN', `${item.score || 0} / ${scale.total}`]
+          ['Isi & Huraian', `${item.markahIsi} / ${maxIsi}`],
+          ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${maxBhs}`],
+          ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${totalMax}`],
         ],
         theme: 'grid',
-        headStyles: { fillColor: [0, 61, 64] }
+        headStyles: { fillColor: [0, 61, 64], textColor: [255, 255, 255] },
+        styles: { font: 'times', fontSize: 10 },
+        columnStyles: { 1: { halign: 'center', fontStyle: 'bold' } }
       });
 
-      let currentY = doc.lastAutoTable.finalY + 12;
-      doc.setFont("helvetica", "bold");
-      doc.text("ULASAN CIKGU AI:", 15, currentY);
-      doc.setFont("helvetica", "italic");
-      const ulasan = item.result?.ulasan || "Tiada ulasan.";
-      const splitUlasan = doc.splitTextToSize(ulasan, 180);
-      doc.text(splitUlasan, 15, currentY + 6);
-      currentY += (splitUlasan.length * 6) + 15;
+      y = doc.lastAutoTable.finalY + 12;
 
-      // --- TEXT RENDERING (Underline) ---
-      doc.setFont("helvetica", "bold");
-      doc.text("TEKS KARANGAN:", 15, currentY);
-      doc.setFont("helvetica", "normal");
-      let cursorX = 15;
-      let cursorY = currentY + 8;
-      const maxWidth = 190;
-      const lineHeight = 7;
+      doc.setTextColor(0, 61, 64);
+      doc.setFont("times", "bold");
+      doc.text("TEKS KARANGAN:", margin, y);
+      y += 7;
+      doc.setFont("times", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(11);
 
-      const rawHTML = item.result?.karanganUnderlined || item.result?.karanganAsal || "";
-      const parts = rawHTML.split(/(<u[^>]*>.*?<\/u>|<span[^>]*underline[^>]*>.*?<\/span>)/gi);
-
-      parts.forEach(part => {
-        const isUnderlined = /<u|<span/i.test(part);
-        const cleanText = part.replace(/<\/?[^>]+(>|$)/g, "").replace(/&nbsp;/g, " ");
-        const words = cleanText.split(/(\s+)/);
-        words.forEach(word => {
-          if (word === "") return;
-          const wordWidth = doc.getTextWidth(word);
-          if (cursorX + wordWidth > maxWidth) {
-            cursorX = 15;
-            cursorY += lineHeight;
-          }
-          doc.text(word, cursorX, cursorY);
-          if (isUnderlined && word.trim() !== "") {
-            doc.setDrawColor(230, 57, 70); 
-            doc.setLineWidth(0.4);
-            doc.line(cursorX, cursorY + 1, cursorX + wordWidth, cursorY + 1);
-          }
-          cursorX += wordWidth;
-        });
+      const rawKarangan = cleanText(item.karangan);
+      const lines = doc.splitTextToSize(rawKarangan, usableWidth);
+      
+      lines.forEach((line) => {
+        if (y > 275) { doc.addPage(); y = 20; }
+        doc.text(line, margin, y);
+        
+        // Garisan bawah untuk kesalahan
+        if (item.kesalahanBahasa) {
+          item.kesalahanBahasa.forEach((error) => {
+            const phrase = error.ayatSalah;
+            if (phrase && line.includes(phrase)) {
+              const startX = margin + doc.getTextWidth(line.substring(0, line.indexOf(phrase)));
+              const phraseWidth = doc.getTextWidth(phrase);
+              doc.setDrawColor(200, 0, 0);
+              doc.setLineWidth(0.2);
+              doc.line(startX, y + 1, startX + phraseWidth, y + 1);
+            }
+          });
+        }
+        y += 7;
       });
 
-      // --- ANALYSIS TABLE ---
-      const listKesalahan = item.result?.kesalahanBahasa || [];
-      if (listKesalahan.length > 0) {
-        if (cursorY > 200) doc.addPage();
+      // --- ANALISIS KESALAHAN BAHASA ---
+      if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
+        y += 5;
+        if (y > 230) { doc.addPage(); y = 20; }
+        
+        doc.setTextColor(200, 0, 0);
+        doc.setFont("times", "bold");
+        doc.text("ANALISIS KESALAHAN BAHASA:", margin, y);
+        
         autoTable(doc, {
-          startY: cursorY > 200 ? 20 : cursorY + 15,
-          head: [['Kategori', 'Ayat Salah', 'Pembetulan', 'Penjelasan']],
-          body: listKesalahan.map(k => [k.kategori || "Umum", k.ayatSalah || "-", k.pembetulan || "-", k.penjelasan || "-"]),
-          headStyles: { fillColor: [72, 166, 167] },
-          styles: { fontSize: 8, cellPadding: 3 },
-          columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 45 }, 2: { cellWidth: 45 } }
+          startY: y + 2,
+          head: [['Kategori', 'Kesalahan Asal', 'Ayat Betul (Penuh)', 'Penjelasan']],
+          body: item.kesalahanBahasa.map(k => [
+            cleanText(k.kategori || 'Umum'),
+            cleanText(k.ayatSalah || k.kesalahan),
+            cleanText(k.pembetulan || k.pembetulanPenjelasan),
+            cleanText(k.penjelasan)
+          ]),
+          theme: 'grid',
+          styles: { font: 'times', fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [200, 0, 0], textColor: [255, 255, 255] },
+          columnStyles: { 
+            0: { cellWidth: 25 }, 
+            1: { cellWidth: 45 }, 
+            2: { cellWidth: 55, textColor: [0, 100, 0] }, 
+            3: { cellWidth: 45 } 
+          }
         });
+        
+        y = doc.lastAutoTable.finalY + 10;
       }
+
+      // --- ULASAN KESELURUHAN ---
+      if (y > 240) { doc.addPage(); y = 20; }
+      doc.setFillColor(245, 250, 250);
+      doc.rect(margin, y, usableWidth, 25, 'F');
+      doc.setTextColor(0, 61, 64);
+      doc.setFont("times", "bold");
+      doc.text("ULASAN KESELURUHAN:", margin + 3, y + 8);
+      doc.setFont("times", "normal");
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      
+      const ulasanSummary = typeof item.ulasan === 'object' 
+        ? cleanText(item.ulasan?.keseluruhan || "") 
+        : cleanText(item.ulasan);
+        
+      const wrappedUlasan = doc.splitTextToSize(ulasanSummary, usableWidth - 6);
+      doc.text(wrappedUlasan, margin + 3, y + 15);
+
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text("Keputusan ini dijana secara digital berasaskan sistem SI-PINTAR.", 105, 290, { align: "center" });
     });
 
-    // 3. One single save call for the entire compiled document
     const batchFileName = `Koleksi_Laporan_${classNameDisplay.replace(/[^a-z0-9]/gi, '_')}.pdf`;
     doc.save(batchFileName);
   };
