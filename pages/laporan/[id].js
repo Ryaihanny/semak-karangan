@@ -28,61 +28,75 @@ export default function LaporanAnalisis() {
     fetchResult();
   }, [id]);
 
-  if (loading) return <div className="loader">🚀 Memuatkan Laporan...</div>;
+  if (loading) return <div className="loader">🚀 Menyusun Laporan Hebat Anda...</div>;
   if (!data) return <div className="loader">Data tidak ditemui.</div>;
 
-  const isP5P6 = data.level === 'P5' || data.level === 'P6';
-  const totalMax = isP5P6 ? 40 : 15;
+  const isJunior = data.level === 'P3' || data.level === 'P4';
+  const maxIsi = isJunior ? 7 : 20;
+  const maxBhs = isJunior ? 8 : 20;
+  const totalMax = isJunior ? 15 : 40;
+  
+  const totalScore = data.markah || data.pemarkahan?.jumlah || 0;
+  const percentage = Math.round((totalScore / totalMax) * 100);
 
   return (
     <div className="report-container">
-      <Head><title>Laporan Analisis | Si-Pintar</title></Head>
+      <Head><title>Tahniah! Laporan Anda | Si-Pintar</title></Head>
       
       <header className="report-header">
         <div className="inner-nav">
-          <button onClick={() => router.push('/student-dashboard')} className="back-btn">← Ke Dashboard</button>
+          <button onClick={() => router.push('/student-dashboard')} className="back-btn">← Kembali ke Dashboard</button>
           <div className="logo">🔮 Si-Pintar</div>
         </div>
         <div className="hero-section">
-          <h1>Analisis Karangan</h1>
-          <p>{data.tajuk || "Latihan Penulisan"}</p>
+          <div className="badge-level">{data.level}</div>
+          <h1>Tahniah, {data.studentName || 'Wira'}! 🎉</h1>
+          <p className="tajuk-misi">Misi: {data.tajuk || "Latihan Penulisan"}</p>
         </div>
       </header>
 
       <main className="report-content">
-        {/* SCORE CARDS */}
-        <div className="grid-stats">
-          <div className="stat-card">
-            <span className="label">ISI & HURAIAN</span>
-            <span className="value">{data.pemarkahan?.isi || 0}</span>
+        {/* PROGRESS SCORE SECTION */}
+        <div className="score-main-card">
+          <div className="circular-progress">
+            <div className="score-display">
+              <span className="big-score">{totalScore}</span>
+              <span className="divider">/</span>
+              <span className="max-score">{totalMax}</span>
+            </div>
+            <p className="score-label">Skor Keseluruhan</p>
           </div>
-          <div className="stat-card">
-            <span className="label">BAHASA</span>
-            <span className="value">{data.pemarkahan?.bahasa || 0}</span>
-          </div>
-          <div className="stat-card highlight">
-            <span className="label">JUMLAH SKOR</span>
-            <span className="value">{data.markah || data.pemarkahan?.jumlah || 0} / {totalMax}</span>
+          
+          <div className="detailed-bars">
+            <div className="bar-item">
+              <div className="bar-labels"><span>Isi & Huraian</span> <span>{data.pemarkahan?.isi || 0}/{maxIsi}</span></div>
+              <div className="bar-track"><div className="bar-fill blue" style={{width: `${((data.pemarkahan?.isi || 0)/maxIsi)*100}%`}}></div></div>
+            </div>
+            <div className="bar-item">
+              <div className="bar-labels"><span>Bahasa & Tatabahasa</span> <span>{data.pemarkahan?.bahasa || 0}/{maxBhs}</span></div>
+              <div className="bar-track"><div className="bar-fill purple" style={{width: `${((data.pemarkahan?.bahasa || 0)/maxBhs)*100}%`}}></div></div>
+            </div>
           </div>
         </div>
 
         {/* ESSAY VIEW */}
         <div className="white-card">
-          <h3 className="card-title">✍️ Teks Karangan Anda</h3>
+          <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
           <div className="essay-text">
             {data.karangan?.split('\n').map((p, i) => <p key={i}>{p}</p>)}
           </div>
         </div>
 
-        {/* 4-COLUMN TABLE */}
+        {/* 4-COLUMN TABLE - Matches Teacher PDF */}
         <div className="white-card">
           <h3 className="card-title">🔍 Analisis Kesalahan Bahasa</h3>
+          <p className="subtitle">Belajar dari kesilapan adalah kunci kejayaan!</p>
           <div className="table-wrapper">
             <table className="analysis-table">
               <thead>
                 <tr>
                   <th>Kategori</th>
-                  <th>Ayat Salah</th>
+                  <th>Ayat Asal</th>
                   <th>Pembetulan</th>
                   <th>Penjelasan</th>
                 </tr>
@@ -101,45 +115,71 @@ export default function LaporanAnalisis() {
           </div>
         </div>
 
-        {/* OVERALL FEEDBACK */}
+        {/* MOTIVATIONAL FEEDBACK */}
         <div className="white-card feedback-area">
-          <h3 className="card-title">💡 Ulasan Keseluruhan</h3>
-          <p>{data.ulasan?.keseluruhan || data.ulasan || "Tiada ulasan disediakan."}</p>
+          <h3 className="card-title">🌟 Pesanan Guru Si-Pintar</h3>
+          <div className="feedback-content">
+             <div className="teacher-icon">👨‍🏫</div>
+             <p>{data.ulasan?.keseluruhan || data.ulasan || "Hebat! Teruskan usaha anda untuk menjadi penulis yang lebih baik."}</p>
+          </div>
         </div>
       </main>
 
       <style jsx>{`
-        .report-container { background: #f0f2f5; min-height: 100vh; font-family: 'Plus Jakarta Sans', sans-serif; padding-bottom: 60px; }
-        .report-header { background: #1a1a2e; color: white; padding: 20px 0 60px; border-radius: 0 0 30px 30px; }
-        .inner-nav { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; }
-        .back-btn { background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-weight: 600; }
-        .logo { font-size: 1.2rem; font-weight: 800; color: #a29bfe; }
-        .hero-section { max-width: 1000px; margin: 20px auto 0; padding: 0 20px; }
-        .hero-section h1 { margin: 0; font-size: 1.8rem; color: #ffd93d; }
+        .report-container { background: #f4f7f6; min-height: 100vh; font-family: 'Plus Jakarta Sans', sans-serif; padding-bottom: 60px; }
+        .report-header { background: #003d40; color: white; padding: 30px 0 80px; border-radius: 0 0 50px 50px; text-align: center; }
+        .inner-nav { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .back-btn { background: rgba(255,255,255,0.15); border: none; color: white; padding: 10px 20px; border-radius: 12px; cursor: pointer; font-weight: 700; transition: 0.3s; }
+        .back-btn:hover { background: rgba(255,255,255,0.25); }
+        .logo { font-size: 1.4rem; font-weight: 900; color: #55E6C1; }
         
-        .report-content { max-width: 1000px; margin: -30px auto 0; padding: 0 20px; }
-        .grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
-        .stat-card { background: white; padding: 20px; border-radius: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .stat-card.highlight { background: #6c5ce7; color: white; }
-        .stat-card .label { display: block; font-size: 0.65rem; font-weight: 800; opacity: 0.7; margin-bottom: 5px; }
-        .stat-card .value { font-size: 1.4rem; font-weight: 900; }
+        .badge-level { display: inline-block; background: #ffd93d; color: #003d40; padding: 5px 15px; border-radius: 20px; font-weight: 900; font-size: 0.8rem; margin-bottom: 10px; }
+        .hero-section h1 { margin: 0; font-size: 2.2rem; }
+        .tajuk-misi { opacity: 0.8; font-size: 1.1rem; margin-top: 5px; }
 
-        .white-card { background: white; padding: 30px; border-radius: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
-        .card-title { margin: 0 0 20px; font-size: 1.1rem; color: #1a1a2e; font-weight: 800; }
-        .essay-text { line-height: 1.8; color: #2d3436; font-size: 1.05rem; }
+        .report-content { max-width: 1000px; margin: -50px auto 0; padding: 0 20px; }
         
-        .table-wrapper { overflow-x: auto; }
-        .analysis-table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        .analysis-table th { text-align: left; padding: 12px; border-bottom: 2px solid #f0f2f5; font-size: 0.8rem; color: #636e72; }
-        .analysis-table td { padding: 15px 12px; border-bottom: 1px solid #f0f2f5; font-size: 0.9rem; vertical-align: top; }
+        .score-main-card { background: white; border-radius: 30px; padding: 30px; display: flex; align-items: center; gap: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin-bottom: 30px; flex-wrap: wrap; }
+        .score-display { display: flex; align-items: baseline; justify-content: center; }
+        .big-score { font-size: 4rem; font-weight: 900; color: #003d40; }
+        .divider { font-size: 2rem; color: #ccc; margin: 0 5px; }
+        .max-score { font-size: 1.5rem; color: #666; font-weight: 700; }
+        .score-label { text-align: center; font-weight: 800; color: #666; text-transform: uppercase; letter-spacing: 1px; font-size: 0.7rem; }
         
-        .cat-tag { background: #f0f2f5; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.7rem; }
-        .text-err { color: #e63946; font-weight: 600; }
-        .text-fix { color: #10b981; font-weight: 700; }
-        .text-desc { color: #636e72; font-size: 0.85rem; }
+        .detailed-bars { flex-grow: 1; min-width: 250px; }
+        .bar-item { margin-bottom: 15px; }
+        .bar-labels { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.85rem; margin-bottom: 8px; color: #444; }
+        .bar-track { height: 12px; background: #eee; border-radius: 10px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 10px; transition: width 1s ease-out; }
+        .bar-fill.blue { background: linear-gradient(90deg, #74b9ff, #0984e3); }
+        .bar-fill.purple { background: linear-gradient(90deg, #a29bfe, #6c5ce7); }
 
-        .feedback-area { border-left: 6px solid #ffd93d; }
-        .loader { height: 100vh; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #1a1a2e; }
+        .white-card { background: white; padding: 35px; border-radius: 30px; box-shadow: 0 5px 20px rgba(0,0,0,0.03); margin-bottom: 30px; }
+        .card-title { margin: 0 0 15px; font-size: 1.2rem; color: #003d40; font-weight: 900; }
+        .subtitle { color: #888; font-size: 0.9rem; margin-top: -10px; margin-bottom: 20px; }
+        
+        .essay-text { line-height: 2; color: #2d3436; font-size: 1.1rem; white-space: pre-wrap; }
+        
+        .table-wrapper { overflow-x: auto; background: #fafafa; border-radius: 20px; padding: 10px; }
+        .analysis-table { width: 100%; border-collapse: collapse; min-width: 700px; }
+        .analysis-table th { text-align: left; padding: 15px; border-bottom: 2px solid #eee; font-size: 0.8rem; color: #999; text-transform: uppercase; }
+        .analysis-table td { padding: 18px 15px; border-bottom: 1px solid #f0f0f0; font-size: 0.95rem; vertical-align: top; }
+        
+        .cat-tag { background: #E3F2FD; color: #1976D2; padding: 5px 10px; border-radius: 8px; font-weight: 800; font-size: 0.7rem; }
+        .text-err { color: #d63031; font-weight: 600; text-decoration: line-through; }
+        .text-fix { color: #00b894; font-weight: 800; }
+        .text-desc { color: #636e72; font-size: 0.85rem; line-height: 1.5; }
+
+        .feedback-content { display: flex; gap: 20px; align-items: flex-start; }
+        .teacher-icon { font-size: 2.5rem; background: #f0f0f0; padding: 10px; border-radius: 20px; }
+        .feedback-area { border-bottom: 8px solid #ffd93d; }
+
+        .loader { height: 100vh; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; color: #003d40; background: #f4f7f6; }
+
+        @media (max-width: 768px) {
+          .score-main-card { flex-direction: column; text-align: center; }
+          .hero-section h1 { font-size: 1.6rem; }
+        }
       `}</style>
     </div>
   );
