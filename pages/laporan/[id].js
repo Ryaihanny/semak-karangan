@@ -102,15 +102,22 @@ export default function LaporanAnalisis() {
                 </tr>
               </thead>
               <tbody>
-                {data.kesalahanBahasa?.map((k, idx) => (
-                  <tr key={idx}>
-                    <td><span className="cat-tag">{k.kategori || 'Umum'}</span></td>
-                    <td className="text-err">{k.ayatSalah}</td>
-                    <td className="text-fix">{k.pembetulan}</td>
-                    <td className="text-desc">{k.penjelasan}</td>
-                  </tr>
-                ))}
-              </tbody>
+  {data.kesalahanBahasa?.map((k, idx) => (
+    <tr key={idx}>
+      {/* 1. Kategori */}
+      <td><span className="cat-tag">{k.kategori || 'Umum'}</span></td>
+      
+      {/* 2. Ayat Asal (Gunakan k.ayatSalah atau k.kesalahan) */}
+      <td className="text-err">{k.ayatSalah || k.kesalahan}</td>
+      
+      {/* 3. Pembetulan */}
+      <td className="text-fix">{k.pembetulan}</td>
+      
+      {/* 4. Penjelasan */}
+      <td className="text-desc">{k.penjelasan}</td>
+    </tr>
+  ))}
+</tbody>
             </table>
           </div>
         </div>
