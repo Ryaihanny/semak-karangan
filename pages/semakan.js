@@ -21,10 +21,8 @@ export default function SemakanPage() {
   const [coachSuggestion, setCoachSuggestion] = useState("");
   const [isCoaching, setIsCoaching] = useState(false);
   
-  // --- NEW: VOICE STATE ---
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // --- NEW: SOUND FUNCTION ---
   const speakSuggestion = (text) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -49,7 +47,6 @@ export default function SemakanPage() {
         body: JSON.stringify({ 
           currentDraft: essay, 
           level: taskData?.level || "Primary",
-          // ADDED: context for AI
           instructions: taskData?.instructions,
           taskTitle: taskData?.title 
         }),
@@ -69,7 +66,6 @@ export default function SemakanPage() {
     perasaan: { label: "🧠 Perasaan", items: ["gembira (happy) - gembira bukan kepalang", "gembira (happy) - senyuman lebar hingga ke telinga", "gementar (nervous) - jantung berdegup kencang seperti mahu luruh", "gementar (nervous) - peluh dingin mula membasahi dahi", "panik (panic) - keadaan menjadi kelam-bakut", "panik (panic) - terpinga-pinga seperti rusa masuk kampung", "sedih (sad) - air mata mula berlinangan", "sedih (sad) - hati hancur luluh bagai kaca terhempas ke batu"] }
   };
 
-  // --- ALL FIREBASE LOGIC UNTOUCHED ---
   useEffect(() => {
     const identifyAndLoad = async () => {
       const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
@@ -151,6 +147,7 @@ export default function SemakanPage() {
       </div>
 
       <div style={styles.mainLayout}>
+        {/* SIDEBAR: Picture & Toolbox (STAYED UNCHANGED) */}
         <div style={styles.sidebar}>
           <div style={styles.briefCard}>
             <h3 style={{marginTop: 0}}>📋 Arahan Cikgu:</h3>
@@ -176,6 +173,7 @@ export default function SemakanPage() {
           </div>
         </div>
 
+        {/* EDITOR AREA: Redesigned for side-by-side Coach AI */}
         <div style={styles.editorArea}>
           <div style={styles.inputHeader}>
             <span>✍️ Tulis di sini:</span>
@@ -186,32 +184,45 @@ export default function SemakanPage() {
             {isCoaching ? "🪄 Cikgu AI sedang meneliti..." : "👩‍🏫 Minta Bimbingan Cikgu AI"}
           </button>
 
-          <textarea value={essay} onChange={(e) => setEssay(e.target.value)} placeholder="Tulis di sini..." style={styles.textarea} />
+          <div style={styles.writingContainer}>
+            <textarea 
+              value={essay} 
+              onChange={(e) => setEssay(e.target.value)} 
+              placeholder="Tulis di sini..." 
+              style={styles.textarea} 
+            />
 
-          {/* UPDATED COACH OVERLAY WITH SOUND */}
-          {coachSuggestion && (
-            <div style={styles.coachOverlay}>
-              <div style={styles.coachContent}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                   <h3 style={{margin: 0, color: '#6C5CE7'}}>💡 Bimbingan Cikgu AI</h3>
+            {/* SIDE COACH PANEL: Appears next to textarea */}
+            {coachSuggestion && (
+              <div style={styles.sideCoachPanel}>
+                <div style={styles.sideCoachHeader}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <span>💡</span>
+                     <span>Bimbingan AI</span>
+                   </div>
                    <button 
                     onClick={() => speakSuggestion(coachSuggestion)} 
-                    style={{ background: '#E0E7FF', border: 'none', padding: '5px 10px', borderRadius: '10px', cursor: 'pointer', fontSize: '12px' }}
+                    style={styles.miniVoiceBtn}
                    >
-                     {isSpeaking ? "🔊 Membaca..." : "🔈 Dengar Suara"}
+                     {isSpeaking ? "🔊" : "🔈"}
                    </button>
                 </div>
-                <div style={{ whiteSpace: 'pre-line', marginBottom: '20px', fontSize: '15px', lineHeight: '1.6', color: '#333' }}>{coachSuggestion}</div>
-                <button onClick={() => { window.speechSynthesis.cancel(); setCoachSuggestion(""); }} style={styles.closeCoachBtn}>Faham, Terima Kasih! ✨</button>
+                <div style={styles.sideCoachBody}>
+                   {coachSuggestion}
+                </div>
+                <button onClick={() => { window.speechSynthesis.cancel(); setCoachSuggestion(""); }} style={styles.sideCloseBtn}>
+                  Tutup Panel
+                </button>
               </div>
-            </div>
-          )}
-
-          <div style={{ fontSize: '12px', color: '#666', margin: '10px 0', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between' }}>
-            <span>Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName}</span>
-            <span style={{ fontWeight: 'bold', color: '#6C5CE7' }}>💎 Kredit: {credits ?? '...'}</span>
+            )}
           </div>
 
+          <div style={styles.statusFooter}>
+            <span>Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName}</span>
+            <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
+          </div>
+
+          {/* HANTAR MISI BUTTONS (STAYED UNCHANGED) */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
             <button onClick={handleSemak} disabled={loading} style={{ ...styles.submitBtn, flex: 2 }}>{loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}</button>
@@ -222,7 +233,6 @@ export default function SemakanPage() {
   );
 }
 
-// STYLES ARE IDENTICAL TO YOURS WITH MINOR COACH UPDATES
 const styles = {
   container: { backgroundColor: '#F0F3F7', minHeight: '100vh', padding: '20px' },
   topNav: { display: 'flex', alignItems: 'center', marginBottom: '20px', maxWidth: '1200px', margin: '0 auto 20px auto' },
@@ -242,10 +252,20 @@ const styles = {
   editorArea: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
   inputHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' },
   wordCount: { color: '#6C5CE7' },
-  textarea: { width: '100%', height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none' },
+  
+  // NEW WRITING LAYOUT
+  writingContainer: { display: 'flex', gap: '15px', alignItems: 'flex-start', marginBottom: '10px' },
+  textarea: { flex: 1, height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none' },
+  
+  // NEW SIDE COACH PANEL STYLES
+  sideCoachPanel: { width: '280px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '420px' },
+  sideCoachHeader: { padding: '12px', background: '#6C5CE7', color: 'white', borderRadius: '12px 12px 0 0', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'space-between' },
+  miniVoiceBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '5px', color: 'white', cursor: 'pointer', padding: '2px 8px' },
+  sideCoachBody: { padding: '15px', fontSize: '14px', lineHeight: '1.7', overflowY: 'auto', color: '#334155', whiteSpace: 'pre-line', flex: 1 },
+  sideCloseBtn: { padding: '8px', border: 'none', background: 'transparent', color: '#94A3B8', fontSize: '11px', cursor: 'pointer', borderTop: '1px solid #E2E8F0' },
+
   submitBtn: { width: '100%', padding: '15px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' },
-  coachBtn: { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '12px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(108, 92, 231, 0.2)' },
-  coachOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-  coachContent: { backgroundColor: 'white', padding: '25px', borderRadius: '20px', maxWidth: '500px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', border: '4px solid #E0E7FF' },
-  closeCoachBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer' }
+  coachBtn: { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '12px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer' },
+  statusFooter: { fontSize: '12px', color: '#666', margin: '10px 0', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between' },
+  creditBadge: { fontWeight: 'bold', color: '#6C5CE7' }
 };
