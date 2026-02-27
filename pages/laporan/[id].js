@@ -102,21 +102,41 @@ export default function LaporanAnalisis() {
                 </tr>
               </thead>
               <tbody>
-  {data.kesalahanBahasa?.map((k, idx) => (
+  {/* Menggunakan Optional Chaining dan fallback ke array kosong */}
+  {(data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [])?.map((k, idx) => (
     <tr key={idx}>
-      {/* Kolum 1: Kategori */}
-      <td><span className="cat-tag">{k.kategori || 'Umum'}</span></td>
+      {/* Kolum 1: Kategori (Mencari pelbagai variasi kunci dari AI) */}
+      <td>
+        <span className="cat-tag">
+          {k.kategori || k.category || 'Umum'}
+        </span>
+      </td>
       
-      {/* Kolum 2: Ayat Asal (Gunakan k.ayatSalah) */}
-      <td className="text-err">{k.ayatSalah}</td>
+      {/* Kolum 2: Ayat Asal */}
+      <td className="text-err">
+        {k.ayatSalah || k.original || k.sentence || "—"}
+      </td>
       
-      {/* Kolum 3: Pembetulan (Gunakan k.pembetulan) */}
-      <td className="text-fix">{k.pembetulan}</td>
+      {/* Kolum 3: Pembetulan */}
+      <td className="text-fix">
+        {k.pembetulan || k.correction || "—"}
+      </td>
       
-      {/* Kolum 4: Penjelasan (Gunakan k.penjelasan) */}
-      <td className="text-desc">{k.penjelasan}</td>
+      {/* Kolum 4: Penjelasan */}
+      <td className="text-desc">
+        {k.penjelasan || k.explanation || "—"}
+      </td>
     </tr>
   ))}
+  
+  {/* Paparan jika data benar-benar tiada dalam Firestore */}
+  {(!data.kesalahanBahasa && !data.kesalahan_bahasa && !data.error_analysis) && (
+    <tr>
+      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+        Tiada kesalahan dikesan atau data sedang diproses.
+      </td>
+    </tr>
+  )}
 </tbody>
             </table>
           </div>

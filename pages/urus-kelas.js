@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { auth, db } from '../lib/firebase'; // Combined 'auth' and 'db' here
+import { auth, db } from '../lib/firebase'; 
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { 
   doc, 
@@ -11,7 +11,7 @@ import {
   where, 
   getDocs, 
   addDoc, 
-  deleteDoc // Only list 'deleteDoc' once
+  deleteDoc 
 } from 'firebase/firestore';
 
 export default function UrusKelasPage() {
@@ -26,7 +26,10 @@ export default function UrusKelasPage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) { router.replace('/login'); return; }
+      if (!currentUser) { 
+        router.replace('/login'); 
+        return; 
+      }
       const userDocSnap = await getDoc(doc(db, 'users', currentUser.uid));
       setUser({ uid: currentUser.uid, ...userDocSnap?.data() });
       setLoading(false);
@@ -44,55 +47,72 @@ export default function UrusKelasPage() {
       const assignQ = query(collection(db, 'assignments'), where('teacherId', '==', auth.currentUser.uid));
       const assignSnap = await getDocs(assignQ);
       setAssignments(assignSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+      console.error("Gagal memuatkan data:", err); 
+    }
   };
 
-  useEffect(() => { if (user?.uid) refreshData(); }, [user]);
+  useEffect(() => { 
+    if (user?.uid) refreshData(); 
+  }, [user]);
 
-const handleCreateClass = async () => {
-    if (!newClassName.trim() || !newClassLevel) { alert("Sila masukkan Nama Kelas dan pilih Tahap."); return; }
+  const handleCreateClass = async () => {
+    if (!newClassName.trim() || !newClassLevel) { 
+      alert("Sila masukkan Nama Kelas dan pilih Tahap."); 
+      return; 
+    }
     setIsCreatingClass(true);
     
-    // Kod rawak telah dibuang di sini
-    await addDoc(collection(db, 'classes'), {
-      className: newClassName, 
-      level: newClassLevel, 
-      teacherId: user.uid, 
-      // classCode: code, <-- Buang ini juga jika anda tidak mahu menyimpannya langsung
-      createdAt: new Date()
-    });
-    
-    setNewClassName(''); setNewClassLevel('');
-    refreshData(); setIsCreatingClass(false);
+    try {
+      await addDoc(collection(db, 'classes'), {
+        className: newClassName, 
+        level: newClassLevel, 
+        teacherId: user.uid, 
+        createdAt: new Date()
+      });
+      setNewClassName(''); 
+      setNewClassLevel('');
+      refreshData();
+    } catch (err) {
+      alert("Gagal membina kelas: " + err.message);
+    } finally {
+      setIsCreatingClass(false);
+    }
   };
 
-const handleDeleteClass = async (classId) => {
-  if (confirm("Adakah anda pasti mahu memadam kelas ini? Semua data tugasan juga akan terkesan.")) {
-    try {
-      // 1. Delete the class document
-      await deleteDoc(doc(db, 'classes', classId));
-      
-      // 2. Refresh your local state so the UI updates
-      setClasses(prev => prev.filter(c => c.id !== classId));
-      
-      alert("Kelas telah dipadamkan.");
-    } catch (error) {
-      console.error("Error deleting class:", error);
-      alert("Gagal memadam kelas.");
+  const handleDeleteClass = async (classId) => {
+    if (confirm("Adakah anda pasti mahu memadam kelas ini? Semua data tugasan juga akan terkesan.")) {
+      try {
+        await deleteDoc(doc(db, 'classes', classId));
+        setClasses(prev => prev.filter(c => c.id !== classId));
+        alert("Kelas telah dipadamkan.");
+      } catch (error) {
+        console.error("Error deleting class:", error);
+        alert("Gagal memadam kelas.");
+      }
     }
-  }
-};
+  };
 
   const handleCreateAssignment = async (classId, title, instructions, imageUrl) => {
-    if (!classId || !title) { alert("Maklumat tidak lengkap!"); return; }
+    if (!classId || !title) { 
+      alert("Maklumat tidak lengkap!"); 
+      return; 
+    }
     try {
       await addDoc(collection(db, 'assignments'), {
-        classId, teacherId: user.uid, title, instructions: instructions || "",
-        imageUrl: imageUrl || "", createdAt: new Date().toISOString(), status: 'active'
+        classId, 
+        teacherId: user.uid, 
+        title, 
+        instructions: instructions || "",
+        imageUrl: imageUrl || "", 
+        createdAt: new Date().toISOString(), 
+        status: 'active'
       });
       alert("Tugasan berjaya dihantar!");
       refreshData();
-    } catch (err) { alert("Gagal: " + err.message); }
+    } catch (err) { 
+      alert("Gagal: " + err.message); 
+    }
   };
 
   const handleEditAssignment = async (e, task) => {
@@ -102,12 +122,19 @@ const handleDeleteClass = async (classId) => {
     try {
       await updateDoc(doc(db, 'assignments', task.id), { title: newTitle });
       refreshData();
-    } catch (err) { alert("Gagal mengemaskini."); }
+    } catch (err) { 
+      alert("Gagal mengemaskini."); 
+    }
   };
 
   const handleDeleteAssignment = async (assignmentId) => {
     if (confirm("Adakah anda pasti mahu memadam tugasan ini?")) {
-      try { await deleteDoc(doc(db, 'assignments', assignmentId)); refreshData(); } catch (err) { console.error(err); }
+      try { 
+        await deleteDoc(doc(db, 'assignments', assignmentId)); 
+        refreshData(); 
+      } catch (err) { 
+        console.error(err); 
+      }
     }
   };
 
@@ -127,7 +154,7 @@ const handleDeleteClass = async (classId) => {
           <div className="nav-divider"></div>
           <div className="nav-header">PENGURUSAN</div>
           <div className="nav-link active">🏫 Urus Kelas</div>
- <div className="nav-link" onClick={() => router.push('/beli-kredit')}>💰 Beli Kredit</div>
+          <div className="nav-link" onClick={() => router.push('/beli-kredit')}>💰 Beli Kredit</div>
           <div className="nav-link" onClick={() => router.push('/profile')}>👤 Profil Guru</div>
           <div className="nav-divider"></div>
           <div className="nav-action-zone">
@@ -140,19 +167,33 @@ const handleDeleteClass = async (classId) => {
       <main className="main-viewport">
         <header className="viewport-header">
           <h1>Urus Kelas Pelajar</h1>
-          <div className="credit-badge">Baki Kredit: <b>{user?.credits}</b></div>
+          <div className="credit-badge">Baki Kredit: <b>{user?.credits || 0}</b></div>
         </header>
 
         <div className="fade-in">
           <div className="pro-card dark-mode-card">
             <h3>Bina Kelas Baru</h3>
             <div className="input-row-flex">
-              <input type="text" placeholder="Nama Kelas" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} />
-              <select value={newClassLevel} onChange={(e) => setNewClassLevel(e.target.value)} style={{ borderRadius: '8px', padding: '0 10px', border: 'none', background: 'white' }}>
+              <input 
+                type="text" 
+                placeholder="Nama Kelas" 
+                value={newClassName} 
+                onChange={(e) => setNewClassName(e.target.value)} 
+              />
+              <select 
+                value={newClassLevel} 
+                onChange={(e) => setNewClassLevel(e.target.value)} 
+                style={{ borderRadius: '8px', padding: '0 10px', border: 'none', background: 'white' }}
+              >
                 <option value="">Pilih Tahap</option>
-                <option value="P3">P3</option><option value="P4">P4</option><option value="P5">P5</option><option value="P6">P6</option>
+                <option value="P3">P3</option>
+                <option value="P4">P4</option>
+                <option value="P5">P5</option>
+                <option value="P6">P6</option>
               </select>
-              <button onClick={handleCreateClass} disabled={isCreatingClass}>{isCreatingClass ? 'Sedia...' : 'Bina Kelas'}</button>
+              <button onClick={handleCreateClass} disabled={isCreatingClass}>
+                {isCreatingClass ? 'Sedia...' : 'Bina Kelas'}
+              </button>
             </div>
           </div>
 
@@ -182,7 +223,11 @@ const handleDeleteClass = async (classId) => {
                 <button className="btn-add-task" onClick={async (e) => {
                     e.stopPropagation();
                     const title = prompt("Tajuk Tugasan:");
-                    if (title) await handleCreateAssignment(c.id, title, prompt("Arahan:"), prompt("URL Gambar:"));
+                    if (title) {
+                      const instructions = prompt("Arahan:");
+                      const img = prompt("URL Gambar (Jika ada):");
+                      await handleCreateAssignment(c.id, title, instructions, img);
+                    }
                 }}>+ Tugasan Baru</button>
               </div>
             ))}
@@ -191,7 +236,6 @@ const handleDeleteClass = async (classId) => {
       </main>
 
       <style jsx>{`
-        /* Copy 100% style asal anda ke sini */
         .dashboard-wrapper { display: flex; min-height: 100vh; background: #F2F6F6; font-family: 'Inter', sans-serif; color: #003D40; }
         .main-sidebar { width: 280px; background: #003D40; color: white; display: flex; flex-direction: column; padding: 2rem 1.5rem; position: sticky; top: 0; height: 100vh; }
         .sidebar-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 3rem; }
