@@ -57,12 +57,10 @@ export default function StudentDashboard() {
       const snapSub = await getDocs(qSub);
       const subData = snapSub.docs.map(d => {
         const data = d.data();
-        // Convert Firestore Timestamp to Date object for the sort function
         const ts = data.timestamp?.seconds ? new Date(data.timestamp.seconds * 1000) : new Date();
         return { id: d.id, ...data, sortDate: ts };
       });
 
-      // Sort using the converted date
       subData.sort((a, b) => b.sortDate - a.sortDate);
       setSubmissions(subData);
     } catch (error) { 
@@ -70,11 +68,10 @@ export default function StudentDashboard() {
     }
   };
 
-  // UPDATED: Matches your submit-karangan.js levels exactly
   const getLevelConfig = (level) => {
     const config = {
       P3: { max: 15, label: 'P3', color: '#FF7675', gradient: 'linear-gradient(135deg, #ff7675, #ef5753)' },
-      P4: { max: 15, label: 'P4', color: '#74B9FF', gradient: 'linear-gradient(135deg, #74b9ff, #0984e3)' },
+      P4: { max: 15, label: 'P4', color: '#74B9FF', gradient: 'linear-gradient(135deg, #74ff, #0984e3)' },
       P5: { max: 40, label: 'P5', color: '#55E6C1', gradient: 'linear-gradient(135deg, #55e6c1, #00b894)' },
       P6: { max: 40, label: 'P6', color: '#6C5CE7', gradient: 'linear-gradient(135deg, #6c5ce7, #a29bfe)' }
     };
@@ -86,7 +83,6 @@ export default function StudentDashboard() {
     let totalPct = 0;
     let completedCount = 0;
     submissions.forEach(sub => {
-      // Calculate based on saved max or dynamic config
       const currentMax = sub.pemarkahan?.max || getLevelConfig(sub.level).max;
       totalPct += ((sub.markah || sub.pemarkahan?.jumlah || 0) / currentMax) * 100;
       if (sub.status === 'murni_completed') completedCount++;
@@ -128,7 +124,28 @@ export default function StudentDashboard() {
         </div>
       </header>
 
-     <main className="container content">
+      <main className="container content">
+        {/* GAME & LEARNING HUB SECTION */}
+        <div className="game-hub">
+          <h3 className="section-title">🎯 Hub Permainan & Ulangkaji</h3>
+          <div className="game-cards-container">
+            <div className="game-link-card" onClick={() => router.push('/peribahasa/belajar')}>
+              <div className="game-icon">📖</div>
+              <div className="game-info">
+                <h4>Kamus Flashcard</h4>
+                <p>Ulangkaji peribahasa silibus {user?.level || 'CITA/CEKAP'}</p>
+              </div>
+            </div>
+            <div className="game-link-card highlight" onClick={() => router.push('/peribahasa/main')}>
+              <div className="game-icon">🎮</div>
+              <div className="game-info">
+                <h4>Main Padanan</h4>
+                <p>Uji minda dan kumpul markah tinggi!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <h3 className="section-title">📂 Tugasan Kelas Aktif</h3>
         <div className="mission-grid">
           {assignments.map(task => {
@@ -138,8 +155,6 @@ export default function StudentDashboard() {
             const progress = totalM > 0 ? Math.round((solvedM / totalM) * 100) : 0;
 
             const isDone = sub?.status === 'murni_completed';
-            const isInProgress = sub?.status === 'murni_in_progress';
-            
             const levelCfg = getLevelConfig(task.level || sub?.level || 'P6');
             const displayMax = sub?.pemarkahan?.max || levelCfg.max;
             const currentTotal = sub?.markah ?? sub?.pemarkahan?.jumlah ?? 0;
@@ -170,31 +185,24 @@ export default function StudentDashboard() {
                 ) : ( <div className="empty-sub"><p>Belum dihantar.</p></div> )}
                 
                 <button 
-  className={`action-btn ${sub ? 'secondary' : 'primary'}`} 
-  onClick={() => {
-    if (!sub) {
-      router.push(`/semakan?taskId=${task.id}`);
-    } else if (isDone) {
-      // Directs to the Report page if completed
-      router.push(`/laporan/${sub.id}`);
-    } else {
-      // Stays on Analysis page if still fixing
-      router.push(`/analisis/${sub.id}`);
-    }
-  }}
->
-  {!sub 
-    ? 'Mula Menulis ✨' 
-    : isDone 
-      ? 'Lihat Laporan' 
-      : 'Baiki Karangan ✍️'}
-</button>
-              </div> // <-- This was missing
-            ); // <-- This was missing
+                  className={`action-btn ${sub ? 'secondary' : 'primary'}`} 
+                  onClick={() => {
+                    if (!sub) {
+                      router.push(`/semakan?taskId=${task.id}`);
+                    } else if (isDone) {
+                      router.push(`/laporan/${sub.id}`);
+                    } else {
+                      router.push(`/analisis/${sub.id}`);
+                    }
+                  }}
+                >
+                  {!sub ? 'Mula Menulis ✨' : isDone ? 'Lihat Laporan' : 'Baiki Karangan ✍️'}
+                </button>
+              </div>
+            );
           })}
         </div>
         
-        {/* History section for submissions without active tasks */}
         {historySubmissions.length > 0 && (
           <div style={{ marginTop: '40px' }}>
             <h3 className="section-title">📜 Sejarah Penulisan Lain</h3>
@@ -217,18 +225,17 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                     <button 
-  className="action-btn secondary" 
-  onClick={() => {
-    // History is usually finished, so we send them to the report view
-    if (sub.status === 'murni_completed') {
-      router.push(`/laporan/${sub.id}`);
-    } else {
-      router.push(`/analisis/${sub.id}`);
-    }
-  }}
->
-  Lihat Laporan
-</button>
+                      className="action-btn secondary" 
+                      onClick={() => {
+                        if (sub.status === 'murni_completed') {
+                          router.push(`/laporan/${sub.id}`);
+                        } else {
+                          router.push(`/analisis/${sub.id}`);
+                        }
+                      }}
+                    >
+                      Lihat Laporan
+                    </button>
                   </div>
                 );
               })}
@@ -251,7 +258,24 @@ export default function StudentDashboard() {
         .stat-box { background: rgba(255,255,255,0.05); padding: 10px 20px; border-radius: 15px; text-align: center; min-width: 80px; }
         .stat-val { display: block; font-size: 1.5rem; font-weight: 800; }
         .stat-lab { font-size: 0.6rem; text-transform: uppercase; opacity: 0.7; }
+        
         .content { margin-top: -60px; }
+        
+        .game-hub { margin-bottom: 40px; }
+        .game-cards-container { display: flex; gap: 15px; flex-wrap: wrap; }
+        .game-link-card { 
+          flex: 1; min-width: 250px; background: white; padding: 20px; 
+          border-radius: 20px; display: flex; align-items: center; gap: 15px; 
+          cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+          border: 1px solid transparent;
+        }
+        .game-link-card:hover { transform: translateY(-5px); border-color: #a29bfe; }
+        .game-link-card.highlight { background: #6c5ce7; color: white; }
+        .game-link-card.highlight p { color: #e0e0e0; }
+        .game-icon { font-size: 2rem; }
+        .game-info h4 { margin: 0; font-size: 1rem; }
+        .game-info p { margin: 5px 0 0; font-size: 0.8rem; color: #636e72; }
+
         .section-title { color: #1a1a2e; margin-bottom: 20px; font-weight: 800; }
         .mission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         .card { background: white; border-radius: 25px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); display: flex; flex-direction: column; transition: transform 0.2s; }
