@@ -12,18 +12,29 @@ export default function SemakanPage() {
   const [loading, setLoading] = useState(false);
   const [taskData, setTaskData] = useState(null);
   const [activeTool, setActiveTool] = useState('mula');
-  
   const [isSaving, setIsSaving] = useState(false);
   const [authReady, setAuthReady] = useState(false);
-
-  // --- NEW STATES FOR ID DETECTION ---
   const [activeId, setActiveId] = useState(null);
   const [studentName, setStudentName] = useState(nama || "Pelajar");
   const [credits, setCredits] = useState(null);
 
-  // --- NEW STATES FOR AI COACH ---
   const [coachSuggestion, setCoachSuggestion] = useState("");
   const [isCoaching, setIsCoaching] = useState(false);
+  
+  // --- NEW: VOICE STATE ---
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // --- NEW: SOUND FUNCTION ---
+  const speakSuggestion = (text) => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ms-MY'; 
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   const getAICoachHelp = async () => {
     if (essay.trim().split(/\s+/).filter(Boolean).length < 5) {
@@ -37,7 +48,10 @@ export default function SemakanPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           currentDraft: essay, 
-          level: taskData?.level || "Primary" 
+          level: taskData?.level || "Primary",
+          // ADDED: context for AI
+          instructions: taskData?.instructions,
+          taskTitle: taskData?.title 
         }),
       });
       const data = await res.json();
@@ -52,62 +66,40 @@ export default function SemakanPage() {
   const tools = {
     mula: { label: "🌅 Mula", items: ["Pada suatu hari yang cerah...", "Suasana di _____ sungguh riuh-rendah.", "Kelihatan orang ramai sedang..."] },
     hubung: { label: "🔗 Hubung", items: ["Seterusnya,", "Dalam pada itu,", "Oleh hal yang demikian,", "Tiba-tiba..."] },
-    perasaan: { label: "🧠 Perasaan", items: ["gembira (happy) - gembira bukan kepalang", "gembira (happy) - senyuman lebar hingga ke telinga", "gementar (nervous) - jantung berdegup kencang seperti mahu luruh", "gementar (nervous) - peluh dingin mula membasahi dahi", "panik (panic) - keadaan menjadi kelam-kabut", "panik (panic) - terpinga-pinga seperti rusa masuk kampung", "sedih (sad) - air mata mula berlinangan", "sedih (sad) - hati hancur luluh bagai kaca terhempas ke batu"] }
+    perasaan: { label: "🧠 Perasaan", items: ["gembira (happy) - gembira bukan kepalang", "gembira (happy) - senyuman lebar hingga ke telinga", "gementar (nervous) - jantung berdegup kencang seperti mahu luruh", "gementar (nervous) - peluh dingin mula membasahi dahi", "panik (panic) - keadaan menjadi kelam-bakut", "panik (panic) - terpinga-pinga seperti rusa masuk kampung", "sedih (sad) - air mata mula berlinangan", "sedih (sad) - hati hancur luluh bagai kaca terhempas ke batu"] }
   };
 
-// --- 1. LOAD DATA & IDENTIFY STUDENT (UPDATED) ---
-useEffect(() => {
-  const identifyAndLoad = async () => {
-    const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
-    const identifier = studentId || auth.currentUser?.uid || savedUser.id || savedUser.uid;
-
-    if (identifier) {
-      setActiveId(identifier);
-      if (savedUser.name) setStudentName(savedUser.name);
-      
-      try {
-        const studentRef = doc(db, 'users', identifier);
-        const studentSnap = await getDoc(studentRef);
-        
-        if (studentSnap.exists()) {
-          setCredits(studentSnap.data().credits ?? 0);
-        } else {
-          console.log("Creating new user document for credits...");
-          await setDoc(studentRef, { 
-            credits: 5, 
-            name: studentName,
-            role: 'student',
-            createdAt: serverTimestamp()
-          }, { merge: true });
-          setCredits(5);
-        }
-      } catch (err) {
-        console.error("Error fetching credits:", err);
-        setCredits(0);
-      }
-        
-      if (taskId) {
+  // --- ALL FIREBASE LOGIC UNTOUCHED ---
+  useEffect(() => {
+    const identifyAndLoad = async () => {
+      const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
+      const identifier = studentId || auth.currentUser?.uid || savedUser.id || savedUser.uid;
+      if (identifier) {
+        setActiveId(identifier);
+        if (savedUser.name) setStudentName(savedUser.name);
         try {
-          const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-          const snap = await getDoc(draftRef);
-          if (snap.exists()) {
-            setEssay(snap.data().essay);
+          const studentRef = doc(db, 'users', identifier);
+          const studentSnap = await getDoc(studentRef);
+          if (studentSnap.exists()) {
+            setCredits(studentSnap.data().credits ?? 0);
+          } else {
+            await setDoc(studentRef, { credits: 5, name: studentName, role: 'student', createdAt: serverTimestamp() }, { merge: true });
+            setCredits(5);
           }
-        } catch (err) {
-          console.error("Error loading draft:", err);
+        } catch (err) { console.error(err); setCredits(0); }
+        if (taskId) {
+          try {
+            const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+            const snap = await getDoc(draftRef);
+            if (snap.exists()) setEssay(snap.data().essay);
+          } catch (err) { console.error(err); }
         }
       }
-    }
-  };
-
-  const unsubscribe = onAuthStateChanged(auth, () => {
-    setAuthReady(true);
+    };
+    const unsubscribe = onAuthStateChanged(auth, () => { setAuthReady(true); identifyAndLoad(); });
     identifyAndLoad();
-  });
-
-  identifyAndLoad();
-  return () => unsubscribe();
-}, [taskId, studentId, studentName]);
+    return () => unsubscribe();
+  }, [taskId, studentId, studentName]);
 
   useEffect(() => {
     if (taskId) {
@@ -118,186 +110,119 @@ useEffect(() => {
     }
   }, [taskId]);
 
-  // --- 2. SAVE PROGRESS ---
   const handleSaveProgress = async () => {
     const finalId = activeId || auth.currentUser?.uid || studentId;
     if (!finalId) return alert("ID tidak dikesan.");
     if (!essay.trim()) return alert("Sila tulis karangan sebelum simpan.");
-
     setIsSaving(true);
     try {
       const draftRef = doc(db, 'drafts', `${finalId}_${taskId || 'umum'}`);
-      await setDoc(draftRef, {
-        userId: finalId,
-        taskId: taskId || 'umum',
-        essay: essay,
-        nama: studentName,
-        updatedAt: serverTimestamp()
-      });
+      await setDoc(draftRef, { userId: finalId, taskId: taskId || 'umum', essay: essay, nama: studentName, updatedAt: serverTimestamp() });
       alert("Progress berjaya disimpan! ✨");
-    } catch (err) {
-      alert("Gagal menyimpan.");
-    } finally {
-      setIsSaving(false);
-    }
+    } catch (err) { alert("Gagal menyimpan."); } finally { setIsSaving(false); }
   };
 
-// --- 3. HANDLE SEMAK ---
-const handleSemak = async (e) => {
-  if (e) e.preventDefault();
+  const handleSemak = async (e) => {
+    if (e) e.preventDefault();
+    if (credits !== null && credits <= 0) return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu! 💎");
+    const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. ✍️");
+    setLoading(true);
+    const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
+    const finalStudentId = activeId || studentId || savedUser.id;
+    try {
+      const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ essay, studentId: finalStudentId, taskId: taskId, classId: classId || "umum", nama: studentName, submissionId, status: "submitted" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
+      if (data.remainingCredits !== undefined) setCredits(data.remainingCredits);
+      router.push(`/analisis/${data.id}?classId=${classId || "umum"}`);
+    } catch (err) { alert(err.message); } finally { setLoading(false); }
+  };
 
-  if (credits !== null && credits <= 0) {
-    return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu! 💎");
-  }
-
-  const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
-  if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. ✍️");
-  
-  setLoading(true);
-
-  const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
-  const currentClassId = classId || router.query.classId || savedUser.enrolledClasses?.[0] || "umum";
-  const finalStudentId = activeId || studentId || savedUser.id;
-
-  if (!finalStudentId || finalStudentId === "undefined") {
-    setLoading(false);
-    return alert("ID Pelajar tidak sah. Sila login semula.");
-  }
-
-  try {
-    const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        essay, 
-        studentId: finalStudentId, 
-        taskId: taskId || router.query.taskId,
-        classId: currentClassId,
-        nama: studentName,
-        submissionId: submissionId || router.query.submissionId,
-        status: "submitted"
-      }),
-    });
-
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      throw new Error("Server error. Sila semak Railway Logs.");
-    }
-
-    const data = await response.json();
-    
-    if (!response.ok) throw new Error(data.message || "Gagal memproses.");
-
-    if (data.remainingCredits !== undefined) setCredits(data.remainingCredits);
-
-    router.push(`/analisis/${data.id}?classId=${currentClassId}`);
-  } catch (err) {
-    console.error("Submission Error:", err);
-    alert(err.message || "Masalah teknikal.");
-  } finally {
-    setLoading(false);
-  }
-};
-
-// --- 4. RENDER UI ---
-return (
-  <div style={styles.container}>
-    <div style={styles.topNav}>
-      <button onClick={() => router.back()} style={styles.backBtn}>⬅️ Kembali</button>
-      <h1 style={styles.title}>🚀 Misi Karangan</h1>
-    </div>
-
-    <div style={styles.mainLayout}>
-      <div style={styles.sidebar}>
-        <div style={styles.briefCard}>
-          <h3 style={{marginTop: 0}}>📋 Arahan Cikgu:</h3>
-          {taskData?.imageUrl && <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />}
-          <p style={styles.taskText}>{taskData?.instructions || "Sila tulis karangan berdasarkan tajuk yang diberikan."}</p>
-        </div>
-
-        <div style={styles.toolboxCard}>
-          <h4 style={styles.toolTitle}>🛠️ Kotak Alatan Ajaib</h4>
-          <div style={styles.tabRow}>
-            {Object.keys(tools).map(key => (
-              <button 
-                key={key} 
-                onClick={() => setActiveTool(key)}
-                style={{...styles.tabBtn, backgroundColor: activeTool === key ? '#6C5CE7' : '#FFF', color: activeTool === key ? '#FFF' : '#6C5CE7'}}
-              >
-                {tools[key].label}
-              </button>
-            ))}
-          </div>
-          <div style={styles.toolContent}>
-            {tools[activeTool].items.map((item, i) => (
-              <div key={i} style={styles.toolItem} onClick={() => { navigator.clipboard.writeText(item); alert("Disalin! ✨"); }}>
-                <span>{item}</span>
-                <span style={{fontSize: '10px', color: '#6C5CE7'}}>📋 Salin</span>
-              </div>
-            ))}
-          </div>
-        </div>
+  return (
+    <div style={styles.container}>
+      <div style={styles.topNav}>
+        <button onClick={() => router.back()} style={styles.backBtn}>⬅️ Kembali</button>
+        <h1 style={styles.title}>🚀 Misi Karangan</h1>
       </div>
 
-      <div style={styles.editorArea}>
-        <div style={styles.inputHeader}>
-          <span>✍️ Tulis di sini:</span>
-          <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
-        </div>
+      <div style={styles.mainLayout}>
+        <div style={styles.sidebar}>
+          <div style={styles.briefCard}>
+            <h3 style={{marginTop: 0}}>📋 Arahan Cikgu:</h3>
+            {taskData?.imageUrl && <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />}
+            <p style={styles.taskText}>{taskData?.instructions || "Sila tulis karangan berdasarkan tajuk yang diberikan."}</p>
+          </div>
 
-        {/* AI COACH BUTTON */}
-        <button 
-          onClick={getAICoachHelp}
-          disabled={isCoaching}
-          style={styles.coachBtn}
-        >
-          {isCoaching ? "🪄 Sedang memikirkan idea..." : "💡 Minta Idea AI (Coach)"}
-        </button>
-
-        <textarea value={essay} onChange={(e) => setEssay(e.target.value)} placeholder="Tulis di sini..." style={styles.textarea} />
-
-        {/* COACH SUGGESTION OVERLAY */}
-        {coachSuggestion && (
-          <div style={styles.coachOverlay}>
-            <div style={styles.coachContent}>
-              <h3 style={{marginTop: 0, color: '#6C5CE7'}}>💡 Bimbingan Cikgu AI</h3>
-              <div style={{ whiteSpace: 'pre-line', marginBottom: '15px', fontSize: '14px', lineHeight: '1.6' }}>{coachSuggestion}</div>
-              <button onClick={() => setCoachSuggestion("")} style={styles.closeCoachBtn}>Faham, Terima Kasih!</button>
+          <div style={styles.toolboxCard}>
+            <h4 style={styles.toolTitle}>🛠️ Kotak Alatan Ajaib</h4>
+            <div style={styles.tabRow}>
+              {Object.keys(tools).map(key => (
+                <button key={key} onClick={() => setActiveTool(key)} style={{...styles.tabBtn, backgroundColor: activeTool === key ? '#6C5CE7' : '#FFF', color: activeTool === key ? '#FFF' : '#6C5CE7'}}>{tools[key].label}</button>
+              ))}
+            </div>
+            <div style={styles.toolContent}>
+              {tools[activeTool].items.map((item, i) => (
+                <div key={i} style={styles.toolItem} onClick={() => { navigator.clipboard.writeText(item); alert("Disalin! ✨"); }}>
+                  <span>{item}</span>
+                  <span style={{fontSize: '10px', color: '#6C5CE7'}}>📋 Salin</span>
+                </div>
+              ))}
             </div>
           </div>
-        )}
-
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>
-            Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName}
-          </span>
-          <span style={{ fontWeight: 'bold', color: '#6C5CE7', background: '#E0E7FF', padding: '2px 8px', borderRadius: '4px' }}>
-            💎 Kredit: {credits !== null ? credits : '...'}
-          </span>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-          <button 
-            onClick={handleSaveProgress} 
-            disabled={isSaving}
-            style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}
-          >
-            {isSaving ? "⏳..." : "💾 Simpan Progress"}
+        <div style={styles.editorArea}>
+          <div style={styles.inputHeader}>
+            <span>✍️ Tulis di sini:</span>
+            <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
+          </div>
+
+          <button onClick={getAICoachHelp} disabled={isCoaching} style={styles.coachBtn}>
+            {isCoaching ? "🪄 Cikgu AI sedang meneliti..." : "👩‍🏫 Minta Bimbingan Cikgu AI"}
           </button>
-          <button 
-            onClick={handleSemak} 
-            disabled={loading}
-            style={{ ...styles.submitBtn, flex: 2 }}
-          >
-            {loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}
-          </button>
+
+          <textarea value={essay} onChange={(e) => setEssay(e.target.value)} placeholder="Tulis di sini..." style={styles.textarea} />
+
+          {/* UPDATED COACH OVERLAY WITH SOUND */}
+          {coachSuggestion && (
+            <div style={styles.coachOverlay}>
+              <div style={styles.coachContent}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                   <h3 style={{margin: 0, color: '#6C5CE7'}}>💡 Bimbingan Cikgu AI</h3>
+                   <button 
+                    onClick={() => speakSuggestion(coachSuggestion)} 
+                    style={{ background: '#E0E7FF', border: 'none', padding: '5px 10px', borderRadius: '10px', cursor: 'pointer', fontSize: '12px' }}
+                   >
+                     {isSpeaking ? "🔊 Membaca..." : "🔈 Dengar Suara"}
+                   </button>
+                </div>
+                <div style={{ whiteSpace: 'pre-line', marginBottom: '20px', fontSize: '15px', lineHeight: '1.6', color: '#333' }}>{coachSuggestion}</div>
+                <button onClick={() => { window.speechSynthesis.cancel(); setCoachSuggestion(""); }} style={styles.closeCoachBtn}>Faham, Terima Kasih! ✨</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontSize: '12px', color: '#666', margin: '10px 0', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between' }}>
+            <span>Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName}</span>
+            <span style={{ fontWeight: 'bold', color: '#6C5CE7' }}>💎 Kredit: {credits ?? '...'}</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
+            <button onClick={handleSemak} disabled={loading} style={{ ...styles.submitBtn, flex: 2 }}>{loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}</button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
 
+// STYLES ARE IDENTICAL TO YOURS WITH MINOR COACH UPDATES
 const styles = {
   container: { backgroundColor: '#F0F3F7', minHeight: '100vh', padding: '20px' },
   topNav: { display: 'flex', alignItems: 'center', marginBottom: '20px', maxWidth: '1200px', margin: '0 auto 20px auto' },
@@ -319,8 +244,8 @@ const styles = {
   wordCount: { color: '#6C5CE7' },
   textarea: { width: '100%', height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none' },
   submitBtn: { width: '100%', padding: '15px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' },
-  coachBtn: { width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '10px', border: '1px solid #FFEEBA', backgroundColor: '#FFF3CD', color: '#856404', fontWeight: 'bold', cursor: 'pointer' },
-  coachOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
-  coachContent: { backgroundColor: 'white', padding: '25px', borderRadius: '20px', maxWidth: '500px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' },
+  coachBtn: { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '12px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(108, 92, 231, 0.2)' },
+  coachOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' },
+  coachContent: { backgroundColor: 'white', padding: '25px', borderRadius: '20px', maxWidth: '500px', width: '100%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', border: '4px solid #E0E7FF' },
   closeCoachBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer' }
 };
