@@ -175,10 +175,10 @@ export default function StudentDashboard() {
     if (!sub) {
       router.push(`/semakan?taskId=${task.id}`);
     } else if (isDone) {
-      // If completed, go to the final report (laporan)
+      // Directs to the Report page if completed
       router.push(`/laporan/${sub.id}`);
     } else {
-      // If still fixing errors, go to analysis
+      // Stays on Analysis page if still fixing
       router.push(`/analisis/${sub.id}`);
     }
   }}
@@ -186,9 +186,13 @@ export default function StudentDashboard() {
   {!sub 
     ? 'Mula Menulis ✨' 
     : isDone 
-      ? 'Lihat Laporan'  // Changed from "Lihat Analisis"
+      ? 'Lihat Laporan' 
       : 'Baiki Karangan ✍️'}
 </button>
+              </div> // <-- This was missing
+            ); // <-- This was missing
+          })}
+        </div>
         
         {/* History section for submissions without active tasks */}
         {historySubmissions.length > 0 && (
@@ -212,9 +216,19 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                     </div>
-                    <button className="action-btn secondary" onClick={() => router.push(`/analisis/${sub.id}`)}>
-                      Lihat Semula
-                    </button>
+                    <button 
+  className="action-btn secondary" 
+  onClick={() => {
+    // History is usually finished, so we send them to the report view
+    if (sub.status === 'murni_completed') {
+      router.push(`/laporan/${sub.id}`);
+    } else {
+      router.push(`/analisis/${sub.id}`);
+    }
+  }}
+>
+  Lihat Laporan
+</button>
                   </div>
                 );
               })}
