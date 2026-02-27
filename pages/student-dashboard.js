@@ -170,19 +170,25 @@ export default function StudentDashboard() {
                 ) : ( <div className="empty-sub"><p>Belum dihantar.</p></div> )}
                 
                 <button 
-                  className={`action-btn ${sub ? 'secondary' : 'primary'}`} 
-                  onClick={() => router.push(sub ? `/analisis/${sub.id}` : `/semakan?taskId=${task.id}`)}
-                >
-                  {!sub 
-                    ? 'Mula Menulis ✨' 
-                    : isDone 
-                      ? 'Lihat Analisis' 
-                      : 'Baiki Karangan ✍️'}
-                </button>
-              </div> // <-- This was missing
-            ); // <-- This was missing
-          })}
-        </div>
+  className={`action-btn ${sub ? 'secondary' : 'primary'}`} 
+  onClick={() => {
+    if (!sub) {
+      router.push(`/semakan?taskId=${task.id}`);
+    } else if (isDone) {
+      // If completed, go to the final report (laporan)
+      router.push(`/laporan/${sub.id}`);
+    } else {
+      // If still fixing errors, go to analysis
+      router.push(`/analisis/${sub.id}`);
+    }
+  }}
+>
+  {!sub 
+    ? 'Mula Menulis ✨' 
+    : isDone 
+      ? 'Lihat Laporan'  // Changed from "Lihat Analisis"
+      : 'Baiki Karangan ✍️'}
+</button>
         
         {/* History section for submissions without active tasks */}
         {historySubmissions.length > 0 && (
@@ -206,19 +212,9 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                     </div>
-                    <button 
-  className="action-btn secondary" 
-  onClick={() => {
-    // History is usually completed, so we send them to the report view
-    if (sub.status === 'murni_completed') {
-      router.push(`/laporan/${sub.id}`);
-    } else {
-      router.push(`/analisis/${sub.id}`);
-    }
-  }}
->
-  Lihat Semula
-</button>
+                    <button className="action-btn secondary" onClick={() => router.push(`/analisis/${sub.id}`)}>
+                      Lihat Semula
+                    </button>
                   </div>
                 );
               })}
