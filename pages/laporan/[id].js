@@ -80,12 +80,32 @@ export default function LaporanAnalisis() {
         </div>
 
         {/* ESSAY VIEW */}
-        <div className="white-card">
-          <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
-          <div className="essay-text">
-            {data.text?.split('\n').map((p, i) => <p key={i}>{p}</p>)}
-          </div>
-        </div>
+{/* ESSAY VIEW - With Dynamic Underlining */}
+<div className="white-card">
+  <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
+  <div className="essay-text">
+    {data.text?.split('\n').map((paragraph, pIdx) => {
+      let highlightedParagraph = paragraph;
+      
+      // Ambil senarai kesalahan (cuba pelbagai variasi kunci data)
+      const errors = data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [];
+      
+      errors.forEach((err) => {
+        const wrongPhrase = err.ayatSalah || err.original || err.sentence;
+        if (wrongPhrase && highlightedParagraph.includes(wrongPhrase)) {
+          // Gantikan teks salah dengan tag <u> yang berwarna merah
+          highlightedParagraph = highlightedParagraph.split(wrongPhrase).join(
+            `<u style="text-decoration-color: #d63031; text-decoration-thickness: 2px; cursor: help;" title="${err.penjelasan || 'Sila semak analisis di bawah'}">${wrongPhrase}</u>`
+          );
+        }
+      });
+
+      return (
+        <p key={pIdx} dangerouslySetInnerHTML={{ __html: highlightedParagraph }} />
+      );
+    })}
+  </div>
+</div>
 
         {/* 4-COLUMN TABLE - Matches Teacher PDF */}
         <div className="white-card">
@@ -101,25 +121,24 @@ export default function LaporanAnalisis() {
                   <th>Penjelasan</th>
                 </tr>
               </thead>
-              <tbody>
-  {/* Menggunakan Optional Chaining dan fallback ke array kosong */}
+<tbody>
   {(data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [])?.map((k, idx) => (
     <tr key={idx}>
-      {/* Kolum 1: Kategori (Mencari pelbagai variasi kunci dari AI) */}
+      {/* Kolum 1: Kategori */}
       <td>
         <span className="cat-tag">
           {k.kategori || k.category || 'Umum'}
         </span>
       </td>
       
-      {/* Kolum 2: Ayat Asal */}
+      {/* Kolum 2: Ayat Asal (Teks Merah & Potong) */}
       <td className="text-err">
-        {k.ayatSalah || k.original || k.sentence || "—"}
+        {k.ayatSalah || k.original || k.sentence || k.kesalahan || "—"}
       </td>
       
-      {/* Kolum 3: Pembetulan */}
+      {/* Kolum 3: Pembetulan (Teks Hijau) */}
       <td className="text-fix">
-        {k.pembetulan || k.correction || "—"}
+        {k.pembetulan || k.correction || k.pembetulanPenjelasan || "—"}
       </td>
       
       {/* Kolum 4: Penjelasan */}
@@ -128,15 +147,6 @@ export default function LaporanAnalisis() {
       </td>
     </tr>
   ))}
-  
-  {/* Paparan jika data benar-benar tiada dalam Firestore */}
-  {(!data.kesalahanBahasa && !data.kesalahan_bahasa && !data.error_analysis) && (
-    <tr>
-      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-        Tiada kesalahan dikesan atau data sedang diproses.
-      </td>
-    </tr>
-  )}
 </tbody>
             </table>
           </div>
