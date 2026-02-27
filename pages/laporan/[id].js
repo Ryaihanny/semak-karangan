@@ -83,7 +83,7 @@ export default function LaporanAnalisis() {
         <div className="white-card">
           <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
           <div className="essay-text">
-            {data.karangan?.split('\n').map((p, i) => <p key={i}>{p}</p>)}
+            {data.text?.split('\n').map((p, i) => <p key={i}>{p}</p>)}
           </div>
         </div>
 
@@ -104,16 +104,16 @@ export default function LaporanAnalisis() {
               <tbody>
   {data.kesalahanBahasa?.map((k, idx) => (
     <tr key={idx}>
-      {/* 1. Kategori */}
+      {/* Kolum 1: Kategori */}
       <td><span className="cat-tag">{k.kategori || 'Umum'}</span></td>
       
-      {/* 2. Ayat Asal (Gunakan k.ayatSalah atau k.kesalahan) */}
-      <td className="text-err">{k.ayatSalah || k.kesalahan}</td>
+      {/* Kolum 2: Ayat Asal (Gunakan k.ayatSalah) */}
+      <td className="text-err">{k.ayatSalah}</td>
       
-      {/* 3. Pembetulan */}
+      {/* Kolum 3: Pembetulan (Gunakan k.pembetulan) */}
       <td className="text-fix">{k.pembetulan}</td>
       
-      {/* 4. Penjelasan */}
+      {/* Kolum 4: Penjelasan (Gunakan k.penjelasan) */}
       <td className="text-desc">{k.penjelasan}</td>
     </tr>
   ))}
