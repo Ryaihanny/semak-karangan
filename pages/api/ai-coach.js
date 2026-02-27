@@ -37,9 +37,13 @@ const prompt = `
       "${currentDraft}"
 
       YOUR TASK (Respond in Malay):
-      1. ✨ **Saranan 'Tunjukkan, Bukan Beritahu' (Show, Don't Tell)**: Ambil satu ayat biasa murid dan jadikan ia lebih menarik. Pastikan ayat itu mengalir (flow) secara semula jadi.
-      2. 📚 **Frasa Menarik**: Cadangkan 2 kosa kata atau peribahasa yang "hebat" untuk tahap sekolah rendah di Singapura.
-      3. 🚀 **Misi Seterusnya**: Berikan satu soalan pendek untuk bantu murid kembangkan plot cerita mereka.
+      1. ✨ **Fokus Bahagian Terbaharu**: Berikan perhatian kepada ayat-ayat terakhir yang ditulis oleh murid. Jangan beri saranan untuk bahagian awal yang sudah nampak bagus.
+      2. ✨ **Saranan 'Tunjukkan, Bukan Beritahu'**: Pilih satu ayat daripada bahagian *terbaharu* draf mereka dan jadikan ia lebih menarik.
+      3. 📚 **Frasa Menarik**: Cadangkan 2 kosa kata atau peribahasa yang sesuai untuk menyambung perenggan seterusnya.
+      4. 🚀 **Misi Seterusnya**: Berikan satu soalan pendek untuk membantu murid memikirkan perkembangan cerita yang bakal menyusul.
+
+      PENTING: Jangan ulangi tip yang sudah jelas dalam draf. Fokus kepada apa yang murid sedang tulis sekarang.
+      Start with: "Bagus, kamu sudah menyambung cerita!" or "Teruskan usaha!".
 
       Start with: "Bagus usaha kamu!" or "Wah, menarik idea ini!".
     `;
