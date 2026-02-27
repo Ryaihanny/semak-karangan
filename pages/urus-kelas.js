@@ -49,13 +49,19 @@ export default function UrusKelasPage() {
 
   useEffect(() => { if (user?.uid) refreshData(); }, [user]);
 
-  const handleCreateClass = async () => {
+const handleCreateClass = async () => {
     if (!newClassName.trim() || !newClassLevel) { alert("Sila masukkan Nama Kelas dan pilih Tahap."); return; }
     setIsCreatingClass(true);
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    
+    // Kod rawak telah dibuang di sini
     await addDoc(collection(db, 'classes'), {
-      className: newClassName, level: newClassLevel, teacherId: user.uid, classCode: code, createdAt: new Date()
+      className: newClassName, 
+      level: newClassLevel, 
+      teacherId: user.uid, 
+      // classCode: code, <-- Buang ini juga jika anda tidak mahu menyimpannya langsung
+      createdAt: new Date()
     });
+    
     setNewClassName(''); setNewClassLevel('');
     refreshData(); setIsCreatingClass(false);
   };
@@ -161,8 +167,6 @@ const handleDeleteClass = async (classId) => {
                   <button className="btn-delete-class" onClick={(e) => { e.stopPropagation(); handleDeleteClass(c.id); }}>🗑️</button>
                 </div>
 
-                <div className="access-code" onClick={() => router.push(`/Class/${c.id}`)} style={{ cursor: 'pointer' }}><code>{c.classCode}</code></div>
-
                 <div className="task-list-mini">
                   {assignments.filter(a => a.classId === c.id).map(task => (
                     <div key={task.id} className="task-item-row">
@@ -214,8 +218,6 @@ const handleDeleteClass = async (classId) => {
         .class-grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
         .class-card h4 { margin: 0; }
         .class-label { font-size: 0.65rem; font-weight: 800; color: #48A6A7; }
-        .access-code { background: #F4F7F7; padding: 10px; border-radius: 8px; margin-top: 10px; text-align: center; color: #003D40; }
-        .access-code code { font-size: 1.2rem; font-weight: 800; }
         .btn-add-task { width: 100%; margin-top: 15px; padding: 8px; background: transparent; border: 1px dashed #48A6A7; color: #48A6A7; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
         .task-list-mini { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
         .task-item-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 0.85rem; }
