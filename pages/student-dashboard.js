@@ -206,9 +206,19 @@ export default function StudentDashboard() {
                         </div>
                       </div>
                     </div>
-                    <button className="action-btn secondary" onClick={() => router.push(`/analisis/${sub.id}`)}>
-                      Lihat Semula
-                    </button>
+                    <button 
+  className="action-btn secondary" 
+  onClick={() => {
+    // History is usually completed, so we send them to the report view
+    if (sub.status === 'murni_completed') {
+      router.push(`/laporan/${sub.id}`);
+    } else {
+      router.push(`/analisis/${sub.id}`);
+    }
+  }}
+>
+  Lihat Semula
+</button>
                   </div>
                 );
               })}
