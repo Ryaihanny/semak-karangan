@@ -37,7 +37,6 @@ export default function LaporanAnalisis() {
   const totalMax = isJunior ? 15 : 40;
   
   const totalScore = data.markah || data.pemarkahan?.jumlah || 0;
-  const percentage = Math.round((totalScore / totalMax) * 100);
 
   return (
     <div className="report-container">
@@ -56,7 +55,6 @@ export default function LaporanAnalisis() {
       </header>
 
       <main className="report-content">
-        {/* PROGRESS SCORE SECTION */}
         <div className="score-main-card">
           <div className="circular-progress">
             <div className="score-display">
@@ -79,40 +77,31 @@ export default function LaporanAnalisis() {
           </div>
         </div>
 
-        {/* ESSAY VIEW */}
-{/* ESSAY VIEW - With Dynamic Underlining */}
-<div className="white-card">
-  <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
- {/* ESSAY VIEW - With Dynamic Underlining & Multi-field Support */}
-<div className="white-card">
-  <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
-  <div className="essay-text">
-    {/* Menggunakan data.text ATAU data.karangan sebagai fallback */}
-    {(data.text || data.karangan || data.karanganAsal || "Teks tidak ditemui.")
-      .split('\n')
-      .map((paragraph, pIdx) => {
-        let highlightedParagraph = paragraph;
-        
-        // Ambil senarai kesalahan (cuba pelbagai variasi kunci data)
-        const errors = data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [];
-        
-        errors.forEach((err) => {
-          const wrongPhrase = err.ayatSalah || err.original || err.sentence || err.kesalahan;
-          if (wrongPhrase && highlightedParagraph.includes(wrongPhrase)) {
-            highlightedParagraph = highlightedParagraph.split(wrongPhrase).join(
-              `<u style="text-decoration-color: #d63031; text-decoration-thickness: 2px; cursor: help;" title="${err.penjelasan || 'Sila semak analisis di bawah'}">${wrongPhrase}</u>`
-            );
-          }
-        });
+        {/* ESSAY VIEW - Clean & Flexible */}
+        <div className="white-card">
+          <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
+          <div className="essay-text">
+            {(data.text || data.karangan || data.karanganAsal || "Teks tidak ditemui.")
+              .split('\n')
+              .map((paragraph, pIdx) => {
+                let highlightedParagraph = paragraph;
+                const errors = data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [];
+                
+                errors.forEach((err) => {
+                  const wrongPhrase = err.ayatSalah || err.original || err.sentence || err.kesalahan;
+                  if (wrongPhrase && highlightedParagraph.includes(wrongPhrase)) {
+                    highlightedParagraph = highlightedParagraph.split(wrongPhrase).join(
+                      `<u style="text-decoration-color: #d63031; text-decoration-thickness: 2px; cursor: help;" title="${err.penjelasan || 'Sila semak analisis di bawah'}">${wrongPhrase}</u>`
+                    );
+                  }
+                });
 
-        return (
-          <p key={pIdx} dangerouslySetInnerHTML={{ __html: highlightedParagraph }} />
-        );
-    })}
-  </div>
-</div>
+                return <p key={pIdx} dangerouslySetInnerHTML={{ __html: highlightedParagraph }} />;
+              })}
+          </div>
+        </div>
 
-        {/* 4-COLUMN TABLE - Matches Teacher PDF */}
+        {/* ANALYSIS TABLE */}
         <div className="white-card">
           <h3 className="card-title">🔍 Analisis Kesalahan Bahasa</h3>
           <p className="subtitle">Belajar dari kesilapan adalah kunci kejayaan!</p>
@@ -126,53 +115,28 @@ export default function LaporanAnalisis() {
                   <th>Penjelasan</th>
                 </tr>
               </thead>
-<tbody>
-  {/* Mencari semua variasi nama array kesalahan dari AI */}
-  {(data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [])?.map((k, idx) => (
-    <tr key={idx}>
-      {/* Kolum 1: Kategori */}
-      <td>
-        <span className="cat-tag">
-          {k.kategori || k.category || 'Umum'}
-        </span>
-      </td>
-      
-      {/* Kolum 2: Ayat Asal */}
-      <td className="text-err">
-        {k.ayatSalah || k.original || k.sentence || k.kesalahan || "—"}
-      </td>
-      
-      {/* Kolum 3: Pembetulan */}
-      <td className="text-fix">
-        {k.pembetulan || k.correction || k.pembetulanPenjelasan || "—"}
-      </td>
-      
-      {/* Kolum 4: Penjelasan */}
-      <td className="text-desc">
-        {k.penjelasan || k.explanation || "—"}
-      </td>
-    </tr>
-  ))}
-  
-  {/* Paparan jika data benar-benar tiada */}
-  {(!data.kesalahanBahasa && !data.kesalahan_bahasa && !data.error_analysis) && (
-    <tr>
-      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
-        Tiada kesalahan dikesan atau data sedang diproses.
-      </td>
-    </tr>
-  )}
-</tbody>
+              <tbody>
+                {(data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [])?.map((k, idx) => (
+                  <tr key={idx}>
+                    <td><span className="cat-tag">{k.kategori || k.category || 'Umum'}</span></td>
+                    <td className="text-err">{k.ayatSalah || k.original || k.sentence || k.kesalahan || "—"}</td>
+                    <td className="text-fix">{k.pembetulan || k.correction || k.pembetulanPenjelasan || "—"}</td>
+                    <td className="text-desc">{k.penjelasan || k.explanation || "—"}</td>
+                  </tr>
+                ))}
+                {(!data.kesalahanBahasa && !data.kesalahan_bahasa && !data.error_analysis) && (
+                  <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>Tiada kesalahan dikesan.</td></tr>
+                )}
+              </tbody>
             </table>
           </div>
         </div>
 
-        {/* MOTIVATIONAL FEEDBACK */}
         <div className="white-card feedback-area">
           <h3 className="card-title">🌟 Pesanan Guru Si-Pintar</h3>
           <div className="feedback-content">
              <div className="teacher-icon">👨‍🏫</div>
-             <p>{data.ulasan?.keseluruhan || data.ulasan || "Hebat! Teruskan usaha anda untuk menjadi penulis yang lebih baik."}</p>
+             <p>{data.ulasan?.keseluruhan || data.ulasan || "Hebat! Teruskan usaha anda."}</p>
           </div>
         </div>
       </main>
@@ -184,20 +148,16 @@ export default function LaporanAnalisis() {
         .back-btn { background: rgba(255,255,255,0.15); border: none; color: white; padding: 10px 20px; border-radius: 12px; cursor: pointer; font-weight: 700; transition: 0.3s; }
         .back-btn:hover { background: rgba(255,255,255,0.25); }
         .logo { font-size: 1.4rem; font-weight: 900; color: #55E6C1; }
-        
         .badge-level { display: inline-block; background: #ffd93d; color: #003d40; padding: 5px 15px; border-radius: 20px; font-weight: 900; font-size: 0.8rem; margin-bottom: 10px; }
         .hero-section h1 { margin: 0; font-size: 2.2rem; }
         .tajuk-misi { opacity: 0.8; font-size: 1.1rem; margin-top: 5px; }
-
         .report-content { max-width: 1000px; margin: -50px auto 0; padding: 0 20px; }
-        
         .score-main-card { background: white; border-radius: 30px; padding: 30px; display: flex; align-items: center; gap: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin-bottom: 30px; flex-wrap: wrap; }
         .score-display { display: flex; align-items: baseline; justify-content: center; }
         .big-score { font-size: 4rem; font-weight: 900; color: #003d40; }
         .divider { font-size: 2rem; color: #ccc; margin: 0 5px; }
         .max-score { font-size: 1.5rem; color: #666; font-weight: 700; }
         .score-label { text-align: center; font-weight: 800; color: #666; text-transform: uppercase; letter-spacing: 1px; font-size: 0.7rem; }
-        
         .detailed-bars { flex-grow: 1; min-width: 250px; }
         .bar-item { margin-bottom: 15px; }
         .bar-labels { display: flex; justify-content: space-between; font-weight: 700; font-size: 0.85rem; margin-bottom: 8px; color: #444; }
@@ -205,29 +165,22 @@ export default function LaporanAnalisis() {
         .bar-fill { height: 100%; border-radius: 10px; transition: width 1s ease-out; }
         .bar-fill.blue { background: linear-gradient(90deg, #74b9ff, #0984e3); }
         .bar-fill.purple { background: linear-gradient(90deg, #a29bfe, #6c5ce7); }
-
         .white-card { background: white; padding: 35px; border-radius: 30px; box-shadow: 0 5px 20px rgba(0,0,0,0.03); margin-bottom: 30px; }
         .card-title { margin: 0 0 15px; font-size: 1.2rem; color: #003d40; font-weight: 900; }
         .subtitle { color: #888; font-size: 0.9rem; margin-top: -10px; margin-bottom: 20px; }
-        
         .essay-text { line-height: 2; color: #2d3436; font-size: 1.1rem; white-space: pre-wrap; }
-        
         .table-wrapper { overflow-x: auto; background: #fafafa; border-radius: 20px; padding: 10px; }
         .analysis-table { width: 100%; border-collapse: collapse; min-width: 700px; }
         .analysis-table th { text-align: left; padding: 15px; border-bottom: 2px solid #eee; font-size: 0.8rem; color: #999; text-transform: uppercase; }
         .analysis-table td { padding: 18px 15px; border-bottom: 1px solid #f0f0f0; font-size: 0.95rem; vertical-align: top; }
-        
         .cat-tag { background: #E3F2FD; color: #1976D2; padding: 5px 10px; border-radius: 8px; font-weight: 800; font-size: 0.7rem; }
         .text-err { color: #d63031; font-weight: 600; text-decoration: line-through; }
         .text-fix { color: #00b894; font-weight: 800; }
         .text-desc { color: #636e72; font-size: 0.85rem; line-height: 1.5; }
-
         .feedback-content { display: flex; gap: 20px; align-items: flex-start; }
         .teacher-icon { font-size: 2.5rem; background: #f0f0f0; padding: 10px; border-radius: 20px; }
         .feedback-area { border-bottom: 8px solid #ffd93d; }
-
         .loader { height: 100vh; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; color: #003d40; background: #f4f7f6; }
-
         @media (max-width: 768px) {
           .score-main-card { flex-direction: column; text-align: center; }
           .hero-section h1 { font-size: 1.6rem; }
