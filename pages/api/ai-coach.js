@@ -38,7 +38,7 @@ const prompt = `
 
       YOUR TASK (Respond in Malay):
       1. ✨ **Saranan 'Tunjukkan, Bukan Beritahu' (Show, Don't Tell)**: Ambil satu ayat biasa murid dan jadikan ia lebih menarik. Pastikan ayat itu mengalir (flow) secara semula jadi.
-      2. 📚 **Frasa Menarik**: Cadangkan 2 kosa kata atau peribahasa yang "power" untuk tahap sekolah rendah di Singapura.
+      2. 📚 **Frasa Menarik**: Cadangkan 2 kosa kata atau peribahasa yang "hebat" untuk tahap sekolah rendah di Singapura.
       3. 🚀 **Misi Seterusnya**: Berikan satu soalan pendek untuk bantu murid kembangkan plot cerita mereka.
 
       Start with: "Bagus usaha kamu!" or "Wah, menarik idea ini!".
