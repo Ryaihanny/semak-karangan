@@ -83,26 +83,31 @@ export default function LaporanAnalisis() {
 {/* ESSAY VIEW - With Dynamic Underlining */}
 <div className="white-card">
   <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
+ {/* ESSAY VIEW - With Dynamic Underlining & Multi-field Support */}
+<div className="white-card">
+  <h3 className="card-title">✍️ Hasil Penulisan Anda</h3>
   <div className="essay-text">
-    {data.text?.split('\n').map((paragraph, pIdx) => {
-      let highlightedParagraph = paragraph;
-      
-      // Ambil senarai kesalahan (cuba pelbagai variasi kunci data)
-      const errors = data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [];
-      
-      errors.forEach((err) => {
-        const wrongPhrase = err.ayatSalah || err.original || err.sentence;
-        if (wrongPhrase && highlightedParagraph.includes(wrongPhrase)) {
-          // Gantikan teks salah dengan tag <u> yang berwarna merah
-          highlightedParagraph = highlightedParagraph.split(wrongPhrase).join(
-            `<u style="text-decoration-color: #d63031; text-decoration-thickness: 2px; cursor: help;" title="${err.penjelasan || 'Sila semak analisis di bawah'}">${wrongPhrase}</u>`
-          );
-        }
-      });
+    {/* Menggunakan data.text ATAU data.karangan sebagai fallback */}
+    {(data.text || data.karangan || data.karanganAsal || "Teks tidak ditemui.")
+      .split('\n')
+      .map((paragraph, pIdx) => {
+        let highlightedParagraph = paragraph;
+        
+        // Ambil senarai kesalahan (cuba pelbagai variasi kunci data)
+        const errors = data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [];
+        
+        errors.forEach((err) => {
+          const wrongPhrase = err.ayatSalah || err.original || err.sentence || err.kesalahan;
+          if (wrongPhrase && highlightedParagraph.includes(wrongPhrase)) {
+            highlightedParagraph = highlightedParagraph.split(wrongPhrase).join(
+              `<u style="text-decoration-color: #d63031; text-decoration-thickness: 2px; cursor: help;" title="${err.penjelasan || 'Sila semak analisis di bawah'}">${wrongPhrase}</u>`
+            );
+          }
+        });
 
-      return (
-        <p key={pIdx} dangerouslySetInnerHTML={{ __html: highlightedParagraph }} />
-      );
+        return (
+          <p key={pIdx} dangerouslySetInnerHTML={{ __html: highlightedParagraph }} />
+        );
     })}
   </div>
 </div>
@@ -122,6 +127,7 @@ export default function LaporanAnalisis() {
                 </tr>
               </thead>
 <tbody>
+  {/* Mencari semua variasi nama array kesalahan dari AI */}
   {(data.kesalahanBahasa || data.kesalahan_bahasa || data.error_analysis || [])?.map((k, idx) => (
     <tr key={idx}>
       {/* Kolum 1: Kategori */}
@@ -131,12 +137,12 @@ export default function LaporanAnalisis() {
         </span>
       </td>
       
-      {/* Kolum 2: Ayat Asal (Teks Merah & Potong) */}
+      {/* Kolum 2: Ayat Asal */}
       <td className="text-err">
         {k.ayatSalah || k.original || k.sentence || k.kesalahan || "—"}
       </td>
       
-      {/* Kolum 3: Pembetulan (Teks Hijau) */}
+      {/* Kolum 3: Pembetulan */}
       <td className="text-fix">
         {k.pembetulan || k.correction || k.pembetulanPenjelasan || "—"}
       </td>
@@ -147,6 +153,15 @@ export default function LaporanAnalisis() {
       </td>
     </tr>
   ))}
+  
+  {/* Paparan jika data benar-benar tiada */}
+  {(!data.kesalahanBahasa && !data.kesalahan_bahasa && !data.error_analysis) && (
+    <tr>
+      <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+        Tiada kesalahan dikesan atau data sedang diproses.
+      </td>
+    </tr>
+  )}
 </tbody>
             </table>
           </div>
