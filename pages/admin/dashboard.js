@@ -40,7 +40,7 @@ export default function AdminMasterDashboard() {
   // -- SELECTION & SEARCH --
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState([]);
-const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
+  const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
 
   // -- NEW FILTER STATE FOR KEPUTUSAN --
   const [selectedTahap, setSelectedTahap] = useState('Semua Tahap');
@@ -82,16 +82,45 @@ const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
 
   // 2. ACTIONS
   const handleBulkCreditUpdate = async () => {
-    const amount = prompt(`Tambah kredit untuk ${selectedUserIds.length} pengguna:`, "10");
-    if (!amount || isNaN(amount)) return;
+    const amountStr = prompt(`Tambah kredit untuk ${selectedUserIds.length} pengguna:`, "10");
+    if (!amountStr || isNaN(amountStr)) return;
+    
+    const amountPerPerson = parseInt(amountStr);
+    const totalNeeded = amountPerPerson * selectedUserIds.length;
+
+    // Check if current Admin has enough credits
+    if ((user.credits || 0) < totalNeeded) {
+        alert(`Kredit anda tidak mencukupi! Perlu: ${totalNeeded}, Baki anda: ${user.credits}`);
+        return;
+    }
+
     const batch = writeBatch(db);
+    
+    // Deduct from Admin
+    const adminRef = doc(db, 'users', user.uid);
+    batch.update(adminRef, { credits: (user.credits - totalNeeded) });
+
+    // Add to Users
     selectedUserIds.forEach(uId => {
       const currentU = allUsers.find(u => u.id === uId);
-      batch.update(doc(db, 'users', uId), { credits: (currentU.credits || 0) + parseInt(amount) });
+      batch.update(doc(db, 'users', uId), { credits: (currentU.credits || 0) + amountPerPerson });
     });
+
     await batch.commit();
+    alert(`Berjaya! ${totalNeeded} kredit telah ditolak dari akaun anda.`);
+    
     setSelectedUserIds([]);
     loadSystemData();
+    // Re-fetch current user data to update local credit UI
+    const updatedAdmin = await getDoc(adminRef);
+    setUser({ uid: user.uid, ...updatedAdmin.data() });
+  };
+
+  const handleMakeAdmin = async (uId) => {
+    if (confirm("Jadikan pengguna ini sebagai ADMIN? Tindakan ini tidak boleh diundur.")) {
+        await updateDoc(doc(db, 'users', uId), { role: 'admin' });
+        loadSystemData();
+    }
   };
 
   const handleDeleteAssignment = async (id) => {
@@ -101,7 +130,7 @@ const [selectedAssignmentIds, setSelectedAssignmentIds] = useState([]);
     }
   };
 
-const handleBulkDeleteAssignments = async () => {
+  const handleBulkDeleteAssignments = async () => {
   if (confirm(`Padam ${selectedAssignmentIds.length} tugasan terpilih secara kekal?`)) {
     const batch = writeBatch(db);
     selectedAssignmentIds.forEach(id => {
@@ -345,7 +374,7 @@ const generatePDF = (items) => {
             {isAdminMode ? 'Master Control' : activeTab === 'rekod_murid' ? 'Keputusan Karangan' : 'Analisis Prestasi'}
           </h1>
           <div style={{display: 'flex', gap: '20px', alignItems: 'center'}}>
-            {!isAdminMode && <div className="credit-badge">Baki Kredit: <b>{user?.credits}</b></div>}
+            <div className="credit-badge">Baki Kredit: <b>{user?.credits}</b></div>
             <div className="global-search-container">
               <input type="text" placeholder="Cari..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
@@ -382,7 +411,10 @@ const generatePDF = (items) => {
                         <td><small>{u.email}</small></td>
                         <td><span className={`tag ${u.role}`}>{u.role}</span></td>
                         <td><span className="credit-pill">{u.credits || 0}</span></td>
-                        <td style={{textAlign:'right'}}>
+                        <td style={{textAlign:'right', display:'flex', gap:'5px', justifyContent:'flex-end'}}>
+                          {u.role !== 'admin' && (
+                            <button className="btn-action" style={{background: '#00695C'}} onClick={() => handleMakeAdmin(u.id)}>Admin</button>
+                          )}
                           <button className="btn-action" onClick={() => sendPasswordResetEmail(auth, u.email)}>Reset</button>
                         </td>
                       </tr>
@@ -417,7 +449,7 @@ const generatePDF = (items) => {
           )}
 
           {/* TAB: ASSIGNMENTS */}
-         
+          
 {isAdminMode && activeTab === 'assignments' && (
   <>
     {/* Bulk Action Bar for Assignments */}
