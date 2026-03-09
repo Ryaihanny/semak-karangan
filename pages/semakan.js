@@ -23,6 +23,11 @@ export default function SemakanPage() {
   
   const [isSpeaking, setIsSpeaking] = useState(false);
 
+const [isKamusVisible, setIsKamusVisible] = useState(false);
+  const [kamusQuery, setKamusQuery] = useState("");
+  const [kamusHasil, setKamusHasil] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
+
   const speakSuggestion = (text) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -31,6 +36,25 @@ export default function SemakanPage() {
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
       window.speechSynthesis.speak(utterance);
+    }
+  };
+
+// FUNGSI CARI KAMUS (Wajib ada!)
+  const handleKamusSearch = async () => {
+    if (!kamusQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const res = await fetch('/api/kamus-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ perkataan: kamusQuery }),
+      });
+      const data = await res.json();
+      setKamusHasil(data.maksud);
+    } catch (err) {
+      setKamusHasil("Maaf, kamus tidak dapat diakses.");
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -229,6 +253,41 @@ export default function SemakanPage() {
           </div>
         </div>
       </div>
+
+{/* Tombol Terapung untuk Buka Kamus */}
+      <button 
+        onClick={() => setIsKamusVisible(!isKamusVisible)} 
+        style={styles.floatingToggle}
+      >
+        {isKamusVisible ? "✖" : "📖 Kamus"}
+      </button>
+
+      {/* Box Kamus Terapung */}
+      {isKamusVisible && (
+        <div style={styles.floatingKamus}>
+          <div style={styles.kamusHeader}>📖 Kamus Pintar</div>
+          <div style={{ padding: '12px' }}>
+            <input 
+              value={kamusQuery} 
+              onChange={(e) => setKamusQuery(e.target.value)}
+              placeholder="Cari English/Malay..."
+              style={styles.kamusInput}
+              onKeyDown={(e) => e.key === 'Enter' && handleKamusSearch()}
+            />
+            <button onClick={handleKamusSearch} style={styles.searchBtn}>
+              {isSearching ? "Mencari..." : "Cari Maklumat"}
+            </button>
+          </div>
+          
+          <div style={styles.kamusBody}>
+            {kamusHasil ? (
+              <div style={{ fontSize: '13px', whiteSpace: 'pre-line' }}>{kamusHasil}</div>
+            ) : (
+              <p style={{fontSize: '11px', color: '#94A3B8', textAlign: 'center'}}>Taip perkataan dan tekan Cari.</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -267,5 +326,35 @@ const styles = {
   submitBtn: { width: '100%', padding: '15px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' },
   coachBtn: { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '12px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer' },
   statusFooter: { fontSize: '12px', color: '#666', margin: '10px 0', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between' },
-  creditBadge: { fontWeight: 'bold', color: '#6C5CE7' }
+  creditBadge: { fontWeight: 'bold', color: '#6C5CE7' },
+floatingToggle: {
+    position: 'fixed', bottom: '20px', right: '20px',
+    width: '80px', height: '80px', borderRadius: '40px',
+    backgroundColor: '#6C5CE7', color: 'white', border: 'none',
+    boxShadow: '0 4px 15px rgba(108, 92, 231, 0.4)',
+    cursor: 'pointer', fontWeight: 'bold', zIndex: 3000
+  },
+  floatingKamus: {
+    position: 'fixed', bottom: '110px', right: '20px',
+    width: '300px', backgroundColor: 'white', borderRadius: '15px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+    border: '2px solid #E2E8F0', zIndex: 3000, overflow: 'hidden'
+  },
+  kamusHeader: { 
+    padding: '12px', background: '#6C5CE7', color: 'white', 
+    fontWeight: 'bold', fontSize: '14px', textAlign: 'center' 
+  },
+  kamusInput: { 
+    width: '100%', padding: '10px', borderRadius: '8px', 
+    border: '1px solid #CBD5E1', marginBottom: '8px', boxSizing: 'border-box' 
+  },
+  searchBtn: { 
+    width: '100%', padding: '8px', background: '#6C5CE7', 
+    color: 'white', border: 'none', borderRadius: '8px', 
+    cursor: 'pointer', fontWeight: 'bold' 
+  },
+  kamusBody: { 
+    padding: '15px', maxHeight: '250px', overflowY: 'auto', 
+    borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' 
+  }
 };
