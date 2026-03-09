@@ -28,6 +28,12 @@ const [isKamusVisible, setIsKamusVisible] = useState(false);
   const [kamusHasil, setKamusHasil] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
+// SKOP States
+  const [isSkopVisible, setIsSkopVisible] = useState(false);
+  const [skopOptions, setSkopOptions] = useState({ S: [], K: [], O: [], P: [] });
+  const [skopSelection, setSkopSelection] = useState({ S: '', K: '', O: '', P: '' });
+  const [isLoadingSkop, setIsLoadingSkop] = useState(false);
+
   const speakSuggestion = (text) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -129,6 +135,30 @@ const [isKamusVisible, setIsKamusVisible] = useState(false);
         .catch(err => console.error("Gagal muat turun tugasan:", err));
     }
   }, [taskId]);
+
+useEffect(() => {
+    const fetchSkopIdeas = async () => {
+      if (!taskData) return;
+      setIsLoadingSkop(true);
+      try {
+        const res = await fetch('/api/get-skop-ideas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            title: taskData.title, 
+            instructions: taskData.instructions 
+          }),
+        });
+        const data = await res.json();
+        if (data.options) setSkopOptions(data.options);
+      } catch (err) {
+        console.error("Gagal ambil idea SKOP");
+      } finally {
+        setIsLoadingSkop(false);
+      }
+    };
+    fetchSkopIdeas();
+  }, [taskData]);
 
   const handleSaveProgress = async () => {
     const finalId = activeId || auth.currentUser?.uid || studentId;
@@ -254,6 +284,62 @@ const [isKamusVisible, setIsKamusVisible] = useState(false);
         </div>
       </div>
 
+{/* Tombol Terapung SKOP */}
+      <button 
+        onClick={() => setIsSkopVisible(!isSkopVisible)} 
+        style={{...styles.floatingToggle, right: '110px', backgroundColor: '#FF7675'}}
+      >
+        {isSkopVisible ? "✖" : "🛠️ SKOP"}
+      </button>
+
+      {/* Box SKOP Terapung */}
+      {isSkopVisible && (
+        <div style={{...styles.floatingKamus, right: '110px', width: '340px'}}>
+          <div style={{...styles.kamusHeader, background: '#FF7675'}}>🛠️ Pembina Ayat SKOP</div>
+          <div style={{ padding: '15px' }}>
+            {isLoadingSkop ? (
+              <p style={{textAlign:'center', fontSize:'12px'}}>Menyediakan idea SKOP...</p>
+            ) : (
+              <>
+                <div style={styles.skopDisplay}>
+                  <span style={{color: '#FF7675'}}>{skopSelection.S || 'S'}</span> + 
+                  <span style={{color: '#00B894'}}>{skopSelection.K || ' K'}</span> + 
+                  <span style={{color: '#0984E3'}}>{skopSelection.O || ' O'}</span> + 
+                  <span style={{color: '#6C5CE7'}}>{skopSelection.P || ' P'}</span>
+                </div>
+
+                <div style={styles.skopGrid}>
+                   {['S', 'K', 'O', 'P'].map((type) => (
+                     <div key={type}>
+                       <p style={styles.skopLabel}>{type === 'S' ? 'S (Siapa)' : type === 'K' ? 'K (Kerja)' : type === 'O' ? 'O (Apa)' : 'P (Di mana/Kenapa)'}</p>
+                       <select 
+                        value={skopSelection[type]}
+                        onChange={(e) => setSkopSelection({...skopSelection, [type]: e.target.value})} 
+                        style={styles.skopSelect}
+                       >
+                          <option value="">-Pilih-</option>
+                          {skopOptions[type]?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                       </select>
+                     </div>
+                   ))}
+                </div>
+
+                <button 
+                  onClick={() => {
+                    const fullSentence = `${skopSelection.S} ${skopSelection.K} ${skopSelection.O} ${skopSelection.P}`.trim();
+                    if(fullSentence) setEssay(prev => prev + " " + fullSentence + ".");
+                    setSkopSelection({ S: '', K: '', O: '', P: '' });
+                  }}
+                  style={styles.insertSkopBtn}
+                >
+                  Masukkan Ayat ✨
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
 {/* Tombol Terapung untuk Buka Kamus */}
       <button 
         onClick={() => setIsKamusVisible(!isKamusVisible)} 
@@ -356,5 +442,16 @@ floatingToggle: {
   kamusBody: { 
     padding: '15px', maxHeight: '250px', overflowY: 'auto', 
     borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' 
+  },
+skopDisplay: {
+    backgroundColor: '#F8FAFC', padding: '10px', borderRadius: '10px', border: '2px solid #E2E8F0',
+    marginBottom: '15px', fontSize: '13px', fontWeight: 'bold', textAlign: 'center', minHeight: '40px'
+  },
+  skopGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' },
+  skopLabel: { fontSize: '10px', fontWeight: 'bold', margin: '0 0 5px 0', color: '#636E72' },
+  skopSelect: { width: '100%', padding: '5px', borderRadius: '5px', border: '1px solid #CBD5E1', fontSize: '11px' },
+  insertSkopBtn: {
+    width: '100%', padding: '10px', backgroundColor: '#FF7675', color: 'white', 
+    border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer'
   }
 };
