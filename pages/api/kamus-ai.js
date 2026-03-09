@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
     const prompt = `
       You are a concise Dictionary for Singapore Primary School students learning Malay.
-      User input: "${perkataan}"
+      User input (word or phrase): "${perkataan}"
       
       If the word is valid, provide:
       - Maksud: [Simple Malay definition]
