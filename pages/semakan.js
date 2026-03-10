@@ -133,31 +133,41 @@ export default function SemakanPage() {
     }
   }, [taskId]);
 
-  useEffect(() => {
-    const fetchSkopIdeas = async () => {
-      if (!taskData) return;
-      setIsLoadingSkop(true);
-      try {
-        const res = await fetch('/api/get-skop-ideas', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            title: taskData.title, 
-            instructions: taskData.instructions,
-            imageUrl: taskData.imageUrl // AI memproses gambar di sini
-currentEssay: essay //
-          }),
-        });
-        const data = await res.json();
-        if (data.options) setSkopOptions(data.options);
-      } catch (err) {
-        console.error("Gagal ambil idea SKOP");
-      } finally {
-        setIsLoadingSkop(false);
+// Gantikan useEffect fetchSkopIdeas anda dengan yang ini:
+useEffect(() => {
+  const fetchSkopIdeas = async () => {
+    // 1. Pastikan taskData sudah ada tajuk
+    if (!taskData || !taskData.title) return;
+
+    setIsLoadingSkop(true);
+    try {
+      const res = await fetch('/api/get-skop-ideas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title: taskData.title, 
+          instructions: taskData.instructions,
+          imageUrl: taskData.imageUrl,
+          currentEssay: essay // Menghantar teks terkini
+        }),
+      });
+
+      if (!res.ok) throw new Error("Server error");
+      
+      const data = await res.json();
+      if (data.options) {
+        setSkopOptions(data.options);
       }
-    };
-    fetchSkopIdeas();
-  }, [taskData]);
+    } catch (err) {
+      console.error("Gagal ambil idea SKOP:", err);
+    } finally {
+      setIsLoadingSkop(false);
+    }
+  };
+
+  fetchSkopIdeas();
+  // Jalankan semula jika taskData baru sampai
+}, [taskData?.title]);
 
   const handleSaveProgress = async () => {
     const finalId = activeId || auth.currentUser?.uid || studentId;
