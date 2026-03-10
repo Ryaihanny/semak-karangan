@@ -20,15 +20,14 @@ export default function SemakanPage() {
 
   const [coachSuggestion, setCoachSuggestion] = useState("");
   const [isCoaching, setIsCoaching] = useState(false);
-  
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-const [isKamusVisible, setIsKamusVisible] = useState(false);
+  const [isKamusVisible, setIsKamusVisible] = useState(false);
   const [kamusQuery, setKamusQuery] = useState("");
   const [kamusHasil, setKamusHasil] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
-// SKOP States
+  // SKOP States
   const [isSkopVisible, setIsSkopVisible] = useState(false);
   const [skopOptions, setSkopOptions] = useState({ S: [], K: [], O: [], P: [] });
   const [skopSelection, setSkopSelection] = useState({ S: '', K: '', O: '', P: '' });
@@ -45,7 +44,6 @@ const [isKamusVisible, setIsKamusVisible] = useState(false);
     }
   };
 
-// FUNGSI CARI KAMUS (Wajib ada!)
   const handleKamusSearch = async () => {
     if (!kamusQuery.trim()) return;
     setIsSearching(true);
@@ -68,7 +66,6 @@ const [isKamusVisible, setIsKamusVisible] = useState(false);
     if (essay.trim().split(/\s+/).filter(Boolean).length < 5) {
       return alert("Tulis sekurang-kurangnya 5 patah perkataan untuk dibantu! ✍️");
     }
-    
     setIsCoaching(true);
     try {
       const res = await fetch('/api/ai-coach', {
@@ -136,7 +133,7 @@ const [isKamusVisible, setIsKamusVisible] = useState(false);
     }
   }, [taskId]);
 
-useEffect(() => {
+  useEffect(() => {
     const fetchSkopIdeas = async () => {
       if (!taskData) return;
       setIsLoadingSkop(true);
@@ -146,7 +143,8 @@ useEffect(() => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             title: taskData.title, 
-            instructions: taskData.instructions 
+            instructions: taskData.instructions,
+            imageUrl: taskData.imageUrl // AI memproses gambar di sini
           }),
         });
         const data = await res.json();
@@ -201,7 +199,6 @@ useEffect(() => {
       </div>
 
       <div style={styles.mainLayout}>
-        {/* SIDEBAR: Picture & Toolbox (STAYED UNCHANGED) */}
         <div style={styles.sidebar}>
           <div style={styles.briefCard}>
             <h3 style={{marginTop: 0}}>📋 Arahan Cikgu:</h3>
@@ -227,7 +224,6 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* EDITOR AREA: Redesigned for side-by-side Coach AI */}
         <div style={styles.editorArea}>
           <div style={styles.inputHeader}>
             <span>✍️ Tulis di sini:</span>
@@ -246,7 +242,6 @@ useEffect(() => {
               style={styles.textarea} 
             />
 
-            {/* SIDE COACH PANEL: Appears next to textarea */}
             {coachSuggestion && (
               <div style={styles.sideCoachPanel}>
                 <div style={styles.sideCoachHeader}>
@@ -254,16 +249,11 @@ useEffect(() => {
                      <span>💡</span>
                      <span>Bimbingan AI</span>
                    </div>
-                   <button 
-                    onClick={() => speakSuggestion(coachSuggestion)} 
-                    style={styles.miniVoiceBtn}
-                   >
+                   <button onClick={() => speakSuggestion(coachSuggestion)} style={styles.miniVoiceBtn}>
                      {isSpeaking ? "🔊" : "🔈"}
                    </button>
                 </div>
-                <div style={styles.sideCoachBody}>
-                   {coachSuggestion}
-                </div>
+                <div style={styles.sideCoachBody}>{coachSuggestion}</div>
                 <button onClick={() => { window.speechSynthesis.cancel(); setCoachSuggestion(""); }} style={styles.sideCloseBtn}>
                   Tutup Panel
                 </button>
@@ -276,7 +266,6 @@ useEffect(() => {
             <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
           </div>
 
-          {/* HANTAR MISI BUTTONS (STAYED UNCHANGED) */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
             <button onClick={handleSemak} disabled={loading} style={{ ...styles.submitBtn, flex: 2 }}>{loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}</button>
@@ -284,7 +273,7 @@ useEffect(() => {
         </div>
       </div>
 
-{/* Tombol Terapung SKOP */}
+      {/* SKOP FLOATING BOX - Horizontal Version */}
       <button 
         onClick={() => setIsSkopVisible(!isSkopVisible)} 
         style={{...styles.floatingToggle, right: '110px', backgroundColor: '#FF7675'}}
@@ -292,33 +281,32 @@ useEffect(() => {
         {isSkopVisible ? "✖" : "🛠️ SKOP"}
       </button>
 
-      {/* Box SKOP Terapung */}
       {isSkopVisible && (
-        <div style={{...styles.floatingKamus, right: '110px', width: '340px'}}>
-          <div style={{...styles.kamusHeader, background: '#FF7675'}}>🛠️ Pembina Ayat SKOP</div>
+        <div style={{...styles.floatingKamus, right: '110px', width: '400px'}}>
+          <div style={{...styles.kamusHeader, background: '#FF7675'}}>🛠️ Pembina Ayat SKOP (Ikut Gambar)</div>
           <div style={{ padding: '15px' }}>
             {isLoadingSkop ? (
-              <p style={{textAlign:'center', fontSize:'12px'}}>Menyediakan idea SKOP...</p>
+              <p style={{textAlign:'center', fontSize:'12px'}}>AI sedang meneliti gambar...</p>
             ) : (
               <>
                 <div style={styles.skopDisplay}>
                   <span style={{color: '#FF7675'}}>{skopSelection.S || 'S'}</span> + 
-                  <span style={{color: '#00B894'}}>{skopSelection.K || ' K'}</span> + 
-                  <span style={{color: '#0984E3'}}>{skopSelection.O || ' O'}</span> + 
-                  <span style={{color: '#6C5CE7'}}>{skopSelection.P || ' P'}</span>
+                  <span style={{color: '#00B894'}}> {skopSelection.K || 'K'}</span> + 
+                  <span style={{color: '#0984E3'}}> {skopSelection.O || 'O'}</span> + 
+                  <span style={{color: '#6C5CE7'}}> {skopSelection.P || 'P'}</span>
                 </div>
 
-                <div style={styles.skopGrid}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
                    {['S', 'K', 'O', 'P'].map((type) => (
-                     <div key={type}>
-                       <p style={styles.skopLabel}>{type === 'S' ? 'S (Siapa)' : type === 'K' ? 'K (Kerja)' : type === 'O' ? 'O (Apa)' : 'P (Di mana/Kenapa)'}</p>
+                     <div key={type} style={{ flex: 1 }}>
+                       <p style={styles.skopLabel}>{type}</p>
                        <select 
                         value={skopSelection[type]}
                         onChange={(e) => setSkopSelection({...skopSelection, [type]: e.target.value})} 
                         style={styles.skopSelect}
                        >
-                          <option value="">-Pilih-</option>
-                          {skopOptions[type]?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                         <option value="">-</option>
+                         {skopOptions[type]?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                        </select>
                      </div>
                    ))}
@@ -327,7 +315,7 @@ useEffect(() => {
                 <button 
                   onClick={() => {
                     const fullSentence = `${skopSelection.S} ${skopSelection.K} ${skopSelection.O} ${skopSelection.P}`.trim();
-                    if(fullSentence) setEssay(prev => prev + " " + fullSentence + ".");
+                    if(fullSentence) setEssay(prev => prev + " " + fullSentence + ". ");
                     setSkopSelection({ S: '', K: '', O: '', P: '' });
                   }}
                   style={styles.insertSkopBtn}
@@ -340,15 +328,11 @@ useEffect(() => {
         </div>
       )}
 
-{/* Tombol Terapung untuk Buka Kamus */}
-      <button 
-        onClick={() => setIsKamusVisible(!isKamusVisible)} 
-        style={styles.floatingToggle}
-      >
+      {/* KAMUS FLOATING BOX */}
+      <button onClick={() => setIsKamusVisible(!isKamusVisible)} style={styles.floatingToggle}>
         {isKamusVisible ? "✖" : "📖 Kamus"}
       </button>
 
-      {/* Box Kamus Terapung */}
       {isKamusVisible && (
         <div style={styles.floatingKamus}>
           <div style={styles.kamusHeader}>📖 Kamus Pintar</div>
@@ -364,7 +348,6 @@ useEffect(() => {
               {isSearching ? "Mencari..." : "Cari Maklumat"}
             </button>
           </div>
-          
           <div style={styles.kamusBody}>
             {kamusHasil ? (
               <div style={{ fontSize: '13px', whiteSpace: 'pre-line' }}>{kamusHasil}</div>
@@ -397,61 +380,25 @@ const styles = {
   editorArea: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
   inputHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' },
   wordCount: { color: '#6C5CE7' },
-  
-  // NEW WRITING LAYOUT
   writingContainer: { display: 'flex', gap: '15px', alignItems: 'flex-start', marginBottom: '10px' },
   textarea: { flex: 1, height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none' },
-  
-  // NEW SIDE COACH PANEL STYLES
   sideCoachPanel: { width: '280px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '420px' },
   sideCoachHeader: { padding: '12px', background: '#6C5CE7', color: 'white', borderRadius: '12px 12px 0 0', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'space-between' },
   miniVoiceBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '5px', color: 'white', cursor: 'pointer', padding: '2px 8px' },
   sideCoachBody: { padding: '15px', fontSize: '14px', lineHeight: '1.7', overflowY: 'auto', color: '#334155', whiteSpace: 'pre-line', flex: 1 },
   sideCloseBtn: { padding: '8px', border: 'none', background: 'transparent', color: '#94A3B8', fontSize: '11px', cursor: 'pointer', borderTop: '1px solid #E2E8F0' },
-
   submitBtn: { width: '100%', padding: '15px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' },
   coachBtn: { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '12px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer' },
   statusFooter: { fontSize: '12px', color: '#666', margin: '10px 0', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between' },
   creditBadge: { fontWeight: 'bold', color: '#6C5CE7' },
-floatingToggle: {
-    position: 'fixed', bottom: '20px', right: '20px',
-    width: '80px', height: '80px', borderRadius: '40px',
-    backgroundColor: '#6C5CE7', color: 'white', border: 'none',
-    boxShadow: '0 4px 15px rgba(108, 92, 231, 0.4)',
-    cursor: 'pointer', fontWeight: 'bold', zIndex: 3000
-  },
-  floatingKamus: {
-    position: 'fixed', bottom: '110px', right: '20px',
-    width: '300px', backgroundColor: 'white', borderRadius: '15px',
-    boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-    border: '2px solid #E2E8F0', zIndex: 3000, overflow: 'hidden'
-  },
-  kamusHeader: { 
-    padding: '12px', background: '#6C5CE7', color: 'white', 
-    fontWeight: 'bold', fontSize: '14px', textAlign: 'center' 
-  },
-  kamusInput: { 
-    width: '100%', padding: '10px', borderRadius: '8px', 
-    border: '1px solid #CBD5E1', marginBottom: '8px', boxSizing: 'border-box' 
-  },
-  searchBtn: { 
-    width: '100%', padding: '8px', background: '#6C5CE7', 
-    color: 'white', border: 'none', borderRadius: '8px', 
-    cursor: 'pointer', fontWeight: 'bold' 
-  },
-  kamusBody: { 
-    padding: '15px', maxHeight: '250px', overflowY: 'auto', 
-    borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' 
-  },
-skopDisplay: {
-    backgroundColor: '#F8FAFC', padding: '10px', borderRadius: '10px', border: '2px solid #E2E8F0',
-    marginBottom: '15px', fontSize: '13px', fontWeight: 'bold', textAlign: 'center', minHeight: '40px'
-  },
-  skopGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' },
-  skopLabel: { fontSize: '10px', fontWeight: 'bold', margin: '0 0 5px 0', color: '#636E72' },
-  skopSelect: { width: '100%', padding: '5px', borderRadius: '5px', border: '1px solid #CBD5E1', fontSize: '11px' },
-  insertSkopBtn: {
-    width: '100%', padding: '10px', backgroundColor: '#FF7675', color: 'white', 
-    border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer'
-  }
+  floatingToggle: { position: 'fixed', bottom: '20px', right: '20px', width: '80px', height: '80px', borderRadius: '40px', backgroundColor: '#6C5CE7', color: 'white', border: 'none', boxShadow: '0 4px 15px rgba(108, 92, 231, 0.4)', cursor: 'pointer', fontWeight: 'bold', zIndex: 3000 },
+  floatingKamus: { position: 'fixed', bottom: '110px', right: '20px', width: '300px', backgroundColor: 'white', borderRadius: '15px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '2px solid #E2E8F0', zIndex: 3000, overflow: 'hidden' },
+  kamusHeader: { padding: '12px', background: '#6C5CE7', color: 'white', fontWeight: 'bold', fontSize: '14px', textAlign: 'center' },
+  kamusInput: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginBottom: '8px', boxSizing: 'border-box' },
+  searchBtn: { width: '100%', padding: '8px', background: '#6C5CE7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+  kamusBody: { padding: '15px', maxHeight: '250px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
+  skopDisplay: { backgroundColor: '#F8FAFC', padding: '10px', borderRadius: '10px', border: '2px solid #E2E8F0', marginBottom: '15px', fontSize: '13px', fontWeight: 'bold', textAlign: 'center', minHeight: '40px' },
+  skopLabel: { fontSize: '10px', fontWeight: 'bold', margin: '0 0 5px 0', color: '#636E72', textAlign: 'center' },
+  skopSelect: { width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #CBD5E1', fontSize: '12px' },
+  insertSkopBtn: { width: '100%', padding: '10px', backgroundColor: '#FF7675', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }
 };
