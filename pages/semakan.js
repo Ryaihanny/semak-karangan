@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { auth, db } from '@/lib/firebase';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp, onSnapshot, updateDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export default function SemakanPage() {
@@ -26,6 +26,11 @@ export default function SemakanPage() {
   const [kamusQuery, setKamusQuery] = useState("");
   const [kamusHasil, setKamusHasil] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Tambahan untuk Feedback & Broadcast
+  const [feedback, setFeedback] = useState("");
+  const [isBroadcasted, setIsBroadcasted] = useState(false);
+  const isTeacherMode = router.query.mode === 'teacher';
 
   const speakSuggestion = (text) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -82,6 +87,13 @@ export default function SemakanPage() {
     }
   };
 
+  // Fungsi Cikgu Hantar Feedback
+  const handleSendFeedback = async () => {
+    const draftRef = doc(db, 'drafts', `${activeId}_${taskId}`);
+    await updateDoc(draftRef, { feedbackGuru: feedback });
+    alert("Feedback telah dihantar kepada murid! 📢");
+  };
+
   const tools = {
     mula: { label: "🌅 Mula", items: ["Pada suatu hari yang cerah...", "Suasana di _____ sungguh riuh-rendah.", "Kelihatan orang ramai sedang..."] },
     hubung: { label: "🔗 Hubung", items: ["Seterusnya,", "Dalam pada itu,", "Oleh hal yang demikian,", "Tiba-tiba..."] },
@@ -118,6 +130,30 @@ export default function SemakanPage() {
     identifyAndLoad();
     return () => unsubscribe();
   }, [taskId, studentId, studentName]);
+
+  // 1 & 2: Listen untuk Feedback & Data Real-time
+  useEffect(() => {
+    if (!activeId || !taskId) return;
+    const draftRef = doc(db, 'drafts', `${activeId}_${taskId}`);
+    const unsub = onSnapshot(draftRef, (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.feedbackGuru) setFeedback(data.feedbackGuru);
+      }
+    });
+    return () => unsub();
+  }, [activeId, taskId]);
+
+  // 3: Listen untuk Broadcast (Flash Screen)
+  useEffect(() => {
+    if (!classId) return;
+    const broadcastRef = doc(db, 'classes', classId, 'broadcast', 'activeSession');
+    const unsubBroadcast = onSnapshot(broadcastRef, (snap) => {
+      const data = snap.data();
+      setIsBroadcasted(data?.targetStudentId === activeId);
+    });
+    return () => unsubBroadcast();
+  }, [classId, activeId]);
 
   useEffect(() => {
     if (taskId) {
@@ -163,6 +199,7 @@ export default function SemakanPage() {
 
   return (
     <div style={styles.container}>
+      {/* ... [Sistem nav/layout sedia ada] ... */}
       <div style={styles.topNav}>
         <button onClick={() => router.back()} style={styles.backBtn}>⬅️ Kembali</button>
         <h1 style={styles.title}>🚀 Misi Karangan</h1>
@@ -199,6 +236,27 @@ export default function SemakanPage() {
             <span>✍️ Tulis di sini:</span>
             <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
           </div>
+
+          {/* Feedback Section */}
+          {feedback && (
+            <div style={styles.feedbackBanner}>
+              <strong>💡 Maklum Balas Cikgu:</strong>
+              <p>{feedback}</p>
+            </div>
+          )}
+
+          {/* Teacher Controls */}
+          {isTeacherMode && (
+            <div style={styles.teacherControlPanel}>
+              <textarea 
+                value={feedback} 
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Tulis maklum balas untuk murid..."
+                style={styles.textarea}
+              />
+              <button onClick={handleSendFeedback} style={styles.submitBtn}>Hantar Maklum Balas</button>
+            </div>
+          )}
 
           <button onClick={getAICoachHelp} disabled={isCoaching} style={styles.coachBtn}>
             {isCoaching ? "🪄 Cikgu AI sedang meneliti..." : "👩‍🏫 Minta Bimbingan Cikgu AI"}
@@ -243,10 +301,21 @@ export default function SemakanPage() {
         </div>
       </div>
 
+      {/* Broadcast Overlay */}
+      {isBroadcasted && (
+        <div style={styles.broadcastOverlay}>
+          <div style={styles.broadcastBox}>
+            <h1>📣 SIARAN LANGSUNG</h1>
+            <p>Anda sedang melihat karangan rakan anda!</p>
+          </div>
+        </div>
+      )}
+
       <button onClick={() => setIsKamusVisible(!isKamusVisible)} style={styles.floatingToggle}>
         {isKamusVisible ? "✖" : "📖 Kamus"}
       </button>
 
+      {/* ... [Sistem kamus sedia ada] ... */}
       {isKamusVisible && (
         <div style={styles.floatingKamus}>
           <div style={styles.kamusHeader}>📖 Kamus Pintar</div>
@@ -276,6 +345,7 @@ export default function SemakanPage() {
 }
 
 const styles = {
+  // ... [Existing Styles]
   container: { backgroundColor: '#F0F3F7', minHeight: '100vh', padding: '20px' },
   topNav: { display: 'flex', alignItems: 'center', marginBottom: '20px', maxWidth: '1200px', margin: '0 auto 20px auto' },
   backBtn: { padding: '8px 15px', borderRadius: '10px', border: 'none', cursor: 'pointer', marginRight: '20px', fontWeight: 'bold', background: '#fff' },
@@ -310,5 +380,10 @@ const styles = {
   kamusHeader: { padding: '12px', background: '#6C5CE7', color: 'white', fontWeight: 'bold', fontSize: '14px', textAlign: 'center' },
   kamusInput: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginBottom: '8px', boxSizing: 'border-box' },
   searchBtn: { width: '100%', padding: '8px', background: '#6C5CE7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
-  kamusBody: { padding: '15px', maxHeight: '250px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' }
+  kamusBody: { padding: '15px', maxHeight: '250px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
+  // New Styles
+  feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
+  teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' },
+  broadcastOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' },
+  broadcastBox: { padding: '40px', background: '#6C5CE7', borderRadius: '20px', textAlign: 'center' }
 };

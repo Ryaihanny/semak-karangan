@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import Head from 'next/head';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -84,7 +84,19 @@ export default function AssignmentTracker() {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-// --- generatePDF Diperkasakan (Sama seperti Dashboard) ---
+  const handleFlash = async (studentId) => {
+    try {
+      const broadcastRef = doc(db, 'classes', classId, 'broadcast', 'activeSession');
+      await setDoc(broadcastRef, { 
+        targetStudentId: studentId, 
+        updatedAt: serverTimestamp() 
+      });
+      alert("Skrin murid telah diflash! ⚡");
+    } catch (e) {
+      alert("Gagal menghantar isyarat flash.");
+    }
+  };
+
   const generatePDF = () => {
     const selectedStudents = studentStatuses.filter(s => s.checked && s.result);
     if (selectedStudents.length === 0) return alert("Sila pilih pelajar yang mempunyai hasil karangan.");
@@ -122,7 +134,6 @@ export default function AssignmentTracker() {
         ulasan: student.result?.ulasan || "Tiada ulasan."
       };
 
-      // --- HEADER ---
       doc.setFillColor(0, 61, 64);
       doc.rect(0, 0, 210, 40, 'F');
       doc.setTextColor(255, 255, 255);
@@ -169,7 +180,6 @@ export default function AssignmentTracker() {
       });
 
       y = doc.lastAutoTable.finalY + 12;
-
       doc.setTextColor(0, 61, 64);
       doc.setFont("times", "bold");
       doc.text("TEKS KARANGAN:", margin, y);
@@ -180,12 +190,9 @@ export default function AssignmentTracker() {
 
       const rawKarangan = cleanText(item.karangan);
       const lines = doc.splitTextToSize(rawKarangan, usableWidth);
-      
       lines.forEach((line) => {
         if (y > 275) { doc.addPage(); y = 20; }
         doc.text(line, margin, y);
-        
-        // Garisan bawah untuk kesalahan
         if (item.kesalahanBahasa) {
           item.kesalahanBahasa.forEach((error) => {
             const phrase = error.ayatSalah;
@@ -201,15 +208,12 @@ export default function AssignmentTracker() {
         y += 7;
       });
 
-      // --- ANALISIS KESALAHAN BAHASA ---
       if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
         y += 5;
         if (y > 230) { doc.addPage(); y = 20; }
-        
         doc.setTextColor(200, 0, 0);
         doc.setFont("times", "bold");
         doc.text("ANALISIS KESALAHAN BAHASA:", margin, y);
-        
         autoTable(doc, {
           startY: y + 2,
           head: [['Kategori', 'Kesalahan Asal', 'Ayat Betul (Penuh)', 'Penjelasan']],
@@ -222,18 +226,11 @@ export default function AssignmentTracker() {
           theme: 'grid',
           styles: { font: 'times', fontSize: 8, cellPadding: 3 },
           headStyles: { fillColor: [200, 0, 0], textColor: [255, 255, 255] },
-          columnStyles: { 
-            0: { cellWidth: 25 }, 
-            1: { cellWidth: 45 }, 
-            2: { cellWidth: 55, textColor: [0, 100, 0] }, 
-            3: { cellWidth: 45 } 
-          }
+          columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 45 }, 2: { cellWidth: 55, textColor: [0, 100, 0] }, 3: { cellWidth: 45 } }
         });
-        
         y = doc.lastAutoTable.finalY + 10;
       }
 
-      // --- ULASAN KESELURUHAN ---
       if (y > 240) { doc.addPage(); y = 20; }
       doc.setFillColor(245, 250, 250);
       doc.rect(margin, y, usableWidth, 25, 'F');
@@ -243,21 +240,14 @@ export default function AssignmentTracker() {
       doc.setFont("times", "normal");
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(10);
-      
-      const ulasanSummary = typeof item.ulasan === 'object' 
-        ? cleanText(item.ulasan?.keseluruhan || "") 
-        : cleanText(item.ulasan);
-        
+      const ulasanSummary = typeof item.ulasan === 'object' ? cleanText(item.ulasan?.keseluruhan || "") : cleanText(item.ulasan);
       const wrappedUlasan = doc.splitTextToSize(ulasanSummary, usableWidth - 6);
       doc.text(wrappedUlasan, margin + 3, y + 15);
-
       doc.setFontSize(8);
       doc.setTextColor(150);
       doc.text("Keputusan ini dijana secara digital berasaskan sistem SI-PINTAR.", 105, 290, { align: "center" });
     });
-
-    const batchFileName = `Koleksi_Laporan_${classNameDisplay.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-    doc.save(batchFileName);
+    doc.save(`Koleksi_Laporan_${classNameDisplay.replace(/[^a-z0-9]/gi, '_')}.pdf`);
   };
 
   if (loading) return <div style={{padding:'50px', textAlign:'center'}}>Memuat naik data...</div>;
@@ -268,27 +258,18 @@ export default function AssignmentTracker() {
         <title>Pantauan Tugasan | {assignment?.title}</title>
       </Head>
 
-<header className="tracker-header">
+      <header className="tracker-header">
         <div className="inner">
-          
-          {/* Group 1: Back button and Titles (Aligned Left) */}
           <div className="header-left">
-            <button className="btn-back" onClick={() => router.push(`/Class/${classId}`)}>
-              ← Kembali ke Kelas
-            </button>
+            <button className="btn-back" onClick={() => router.push(`/Class/${classId}`)}>← Kembali ke Kelas</button>
             <div className="header-info" style={{marginTop: '10px'}}>
                <span className="class-label">{classNameDisplay}</span>
                <h1>{assignment?.title}</h1>
             </div>
           </div>
-
-          {/* Group 2: The Print Button (Aligned Right because it's in .inner) */}
-          <button className="btn-main" onClick={generatePDF}>
-            📥 Cetak Laporan PDF ({studentStatuses.filter(s => s.checked).length})
-          </button>
-
-        </div> {/* This closes .inner */}
-      </header> {/* This closes .tracker-header */}
+          <button className="btn-main" onClick={generatePDF}>📥 Cetak Laporan PDF ({studentStatuses.filter(s => s.checked).length})</button>
+        </div>
+      </header>
 
       <main className="tracker-content">
         <div className="stats-bar">
@@ -306,12 +287,7 @@ export default function AssignmentTracker() {
           <table>
             <thead>
               <tr>
-                <th width="40">
-                  <input 
-                    type="checkbox" 
-                    onChange={(e) => setStudentStatuses(prev => prev.map(s => ({...s, checked: s.submissionId ? e.target.checked : false})))} 
-                  />
-                </th>
+                <th width="40"><input type="checkbox" onChange={(e) => setStudentStatuses(prev => prev.map(s => ({...s, checked: s.submissionId ? e.target.checked : false})))} /></th>
                 <th>Nama Pelajar</th>
                 <th>Status & Progres Misi</th>
                 <th>Markah (Isi/Bhs/Jml)</th>
@@ -321,16 +297,7 @@ export default function AssignmentTracker() {
             <tbody>
               {studentStatuses.map((s, idx) => (
                 <tr key={s.id} className={s.status === 'Selesai' ? 'row-done' : ''}>
-                  <td>
-                    <input 
-                      type="checkbox" 
-                      checked={s.checked} 
-                      disabled={!s.submissionId} 
-                      onChange={(e) => {
-                        const u = [...studentStatuses]; u[idx].checked = e.target.checked; setStudentStatuses(u);
-                      }} 
-                    />
-                  </td>
+                  <td><input type="checkbox" checked={s.checked} disabled={!s.submissionId} onChange={(e) => { const u = [...studentStatuses]; u[idx].checked = e.target.checked; setStudentStatuses(u); }} /></td>
                   <td>
                     <div className="name-cell">
                       <span className="student-name">{s.nama || s.name}</span>
@@ -340,14 +307,10 @@ export default function AssignmentTracker() {
                   <td>
                     <div className="status-progress-cell">
                       <div className="tag-row">
-                        <span className={`status-tag ${s.status === 'Selesai' ? 'done' : s.status === 'Sedang Baiki' ? 'work' : 'none'}`}>
-                          {s.status}
-                        </span>
+                        <span className={`status-tag ${s.status === 'Selesai' ? 'done' : s.status === 'Sedang Baiki' ? 'work' : 'none'}`}>{s.status}</span>
                         <span className="pct-text">{s.progress}%</span>
                       </div>
-                      <div className="mini-progress-bg">
-                        <div className="mini-progress-fill" style={{ width: `${s.progress}%` }}></div>
-                      </div>
+                      <div className="mini-progress-bg"><div className="mini-progress-fill" style={{ width: `${s.progress}%` }}></div></div>
                     </div>
                   </td>
                   <td>
@@ -357,20 +320,18 @@ export default function AssignmentTracker() {
                          <div className="mark-sub">Bhs <b>{s.markahBahasa}</b>/{s.maxBahasa}</div>
                          <div className="mark-total">Jml <b>{s.score}</b>/{s.maxTotal}</div>
                       </div>
-                    ) : (
-                      <span className="no-data">—</span>
-                    )}
+                    ) : <span className="no-data">—</span>}
                   </td>
                   <td align="right">
-  {s.submissionId && (
-    <button 
-      className="btn-detail" 
-      onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}
-    >
-      Lihat Analisis
-    </button>
-  )}
-</td>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      {s.submissionId && (
+                        <>
+                          <button className="btn-detail" onClick={() => handleFlash(s.id)} title="Flash skrin murid ini">⚡ Flash</button>
+                          <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
+                        </>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
