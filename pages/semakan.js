@@ -145,6 +145,7 @@ export default function SemakanPage() {
             title: taskData.title, 
             instructions: taskData.instructions,
             imageUrl: taskData.imageUrl // AI memproses gambar di sini
+currentEssay: essay //
           }),
         });
         const data = await res.json();
