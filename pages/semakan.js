@@ -361,4 +361,5 @@ const styles = {
   kamusBody: { padding: '15px', maxHeight: '250px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
   // New Styles
   feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
-  teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' },
+  teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' }
+};
