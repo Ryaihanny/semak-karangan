@@ -249,7 +249,7 @@ const styles = {
   finishBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#10B981', color: '#FFF', fontWeight: 'bold', cursor: 'pointer' },
   gradeBadge: { display: 'inline-block', padding: '10px 15px', backgroundColor: '#EEF2FF', color: '#4338CA', borderRadius: '12px', fontWeight: 'bold', marginBottom: '15px' },
   teacherComment: { fontSize: '15px', color: '#475569', lineHeight: '1.6', backgroundColor: '#FFFBEB', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #F6E05E' },
-  loader: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', color: '#4338CA', fontWeight: 'bold' }
+  loader: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', color: '#4338CA', fontWeight: 'bold' },
 rewriteBtn: { 
   display: 'block', 
   width: '100%', 

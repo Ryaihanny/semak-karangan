@@ -148,7 +148,7 @@ if (taskId) {
     const unsubscribe = onAuthStateChanged(auth, () => { setAuthReady(true); identifyAndLoad(); });
     identifyAndLoad();
     return () => unsubscribe();
-  }, [taskId, studentId, studentName, overwrite]);
+}, [taskId, studentId, studentName, overwrite]);
 
   // 1 & 2: Listen untuk Feedback & Data Real-time
   useEffect(() => {
@@ -454,5 +454,4 @@ loadingBarFill: {
     height: '100%',
     backgroundColor: '#6366F1',
     width: '50%', 
-  }
 };
