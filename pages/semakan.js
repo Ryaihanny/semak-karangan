@@ -208,36 +208,51 @@ useEffect(() => {
     } catch (err) { alert("Gagal menyimpan."); } finally { setIsSaving(false); }
   };
 
-  const handleSemak = async (e) => {
+const handleSemak = async (e) => {
     if (e) e.preventDefault();
     if (credits !== null && credits <= 0) return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu! 💎");
     const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
     if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. ✍️");
+    
     setLoading(true);
-const isOverwrite = router.query.overwrite === 'true';
+    const isOverwrite = router.query.overwrite === 'true';
     const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
-    const finalStudentId = activeId || studentId || savedUser.id;
+    
+    // Gunakan ID yang aktif atau ID dari localStorage (Dokumen dalam 'students')
+    const finalStudentId = activeId || studentId || savedUser.id || savedUser.uid;
+
     try {
       const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({ 
-  essay, 
-  studentId: finalStudentId, 
-  taskId: taskId, 
-  classId: classId || "umum", 
-  nama: studentName, 
-  studentLevel: studentLevel, // ADD THIS LINE: Get level from taskData
-  submissionId, 
-  status: "submitted",
-  isOverwrite: isOverwrite 
-}),
-    });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          essay, 
+          studentId: finalStudentId, 
+          taskId: taskId, 
+          classId: classId || "umum", 
+          nama: studentName, 
+          studentLevel: studentLevel, 
+          submissionId, 
+          status: "submitted",
+          isOverwrite: isOverwrite 
+        }),
+      });
+
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
-      if (data.remainingCredits !== undefined) setCredits(data.remainingCredits);
+      
+      // Kemas kini kredit di skrin serta-merta selepas berjaya
+      if (data.remainingCredits !== undefined) {
+        setCredits(data.remainingCredits);
+        localStorage.setItem("studentUser", JSON.stringify({ ...savedUser, credits: data.remainingCredits }));
+      }
+
       router.push(`/analisis/${data.id}?classId=${classId || "umum"}`);
-    } catch (err) { alert(err.message); } finally { setLoading(false); }
+    } catch (err) { 
+      alert(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
