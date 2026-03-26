@@ -173,7 +173,7 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
       router.push(`/semakan?taskId=${task.id}`);
     } else if (isDone) {
       // Work is fully completed (Murni finished), just view report
-      router.push(`/laporan/${sub.id}`);
+      router.push(`/analisis/${sub.id}`);
     } else {
       // Work exists but is not finished. 
       // Ask if they want to continue or start over.

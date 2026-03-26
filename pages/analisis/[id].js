@@ -127,9 +127,11 @@ const handleExitOnly = () => {
   const isLastStep = currentStep >= missions.length - 1;
 
   // UPDATED MARKAH LOGIC
-  const isP5P6 = data?.level === 'P5' || data?.level === 'P6';
-  const totalMax = isP5P6 ? 40 : 15;
-  const breakdownLabel = isP5P6 ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8";
+  const studentLevel = data?.level?.toString().toUpperCase() || "P4";
+const isHighLevel = studentLevel === 'P5' || studentLevel === 'P6' || studentLevel === '5' || studentLevel === '6';
+
+const totalMax = isHighLevel ? 40 : 15;
+const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8";
 
   return (
     <div style={styles.container}>
