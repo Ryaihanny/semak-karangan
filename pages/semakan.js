@@ -118,7 +118,7 @@ useEffect(() => {
 
       try {
         // 3. FETCH FRESH DATA FROM FIRESTORE IN BACKGROUND
-        const studentRef = doc(db, 'users', identifier);
+        const studentRef = doc(db, 'students', identifier);
         const studentSnap = await getDoc(studentRef);
         
         if (studentSnap.exists()) {
