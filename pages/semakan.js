@@ -100,65 +100,78 @@ const [studentLevel, setStudentLevel] = useState(null);
   };
 
 useEffect(() => {
-   const identifyAndLoad = async () => {
-  const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
-  const identifier = studentId || auth.currentUser?.uid || savedUser.id || savedUser.uid;
+  const identifyAndLoad = async () => {
+    // 1. GET DATA FROM LOCALSTORAGE IMMEDIATELY (FASTEST)
+    const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
+    
+    // Determine the ID from URL first, then LocalStorage, then Auth
+    const identifier = studentId || savedUser.id || savedUser.uid || auth.currentUser?.uid;
 
-  if (identifier) {
-    setActiveId(identifier);
-    if (savedUser.name) setStudentName(savedUser.name);
-
-    try {
-      const studentRef = doc(db, 'users', identifier);
-      const studentSnap = await getDoc(studentRef);
+    if (identifier) {
+      setActiveId(identifier);
+      if (savedUser.name) setStudentName(savedUser.name);
       
-      if (studentSnap.exists()) {
-        const userData = studentSnap.data();
-        setCredits(userData.credits ?? 0);
-        // FIX: Set the student level here
-        setStudentLevel(userData.level); 
-      } else {
-        await setDoc(studentRef, { 
-          credits: 5, 
-          name: studentName, 
-          role: 'student', 
-          createdAt: serverTimestamp() 
-        }, { merge: true });
-        setCredits(5);
+      // 2. PRE-SET LEVEL FROM LOCALSTORAGE (Instant button unlock)
+      if (savedUser.level) {
+        setStudentLevel(savedUser.level);
       }
-    } catch (err) {
-      console.error(err);
-      setCredits(0);
-    }
 
-    if (taskId) {
       try {
-        const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
-        if (isOverwrite) {
-          setEssay(""); 
-          const { overwrite: _, ...cleanQuery } = router.query;
-          router.replace({ query: cleanQuery }, undefined, { shallow: true });
+        // 3. FETCH FRESH DATA FROM FIRESTORE IN BACKGROUND
+        const studentRef = doc(db, 'users', identifier);
+        const studentSnap = await getDoc(studentRef);
+        
+        if (studentSnap.exists()) {
+          const userData = studentSnap.data();
+          setCredits(userData.credits ?? 0);
+          setStudentLevel(userData.level); // Overwrite with fresh DB data
+          
+          // Update LocalStorage so it stays fresh for next time
+          localStorage.setItem("studentUser", JSON.stringify({ ...savedUser, ...userData }));
         } else {
-          const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-          const snap = await getDoc(draftRef);
-          if (snap.exists()) {
-            setEssay(snap.data().essay);
-          }
+          // If user doesn't exist, create them
+          await setDoc(studentRef, { 
+            credits: 5, 
+            name: studentName, 
+            role: 'student', 
+            createdAt: serverTimestamp() 
+          }, { merge: true });
+          setCredits(5);
         }
       } catch (err) {
-        console.error("Error loading draft:", err);
+        console.error("Database fetch error:", err);
+      }
+
+      // 4. LOAD DRAFT (This part stays the same)
+      if (taskId) {
+        try {
+          const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
+          if (isOverwrite) {
+            setEssay(""); 
+            const { overwrite: _, ...cleanQuery } = router.query;
+            router.replace({ query: cleanQuery }, undefined, { shallow: true });
+          } else {
+            const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+            const snap = await getDoc(draftRef);
+            if (snap.exists()) {
+              setEssay(snap.data().essay);
+            }
+          }
+        } catch (err) {
+          console.error("Error loading draft:", err);
+        }
       }
     }
-  }
-};
-    const unsubscribe = onAuthStateChanged(auth, () => {
-      setAuthReady(true);
-      identifyAndLoad();
-    });
+  };
 
-    identifyAndLoad();
-    return () => unsubscribe();
-  }, [taskId, studentId, studentName, overwrite, router.query.overwrite]); // Added router.query.overwrite for safety
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    setAuthReady(true);
+    if (user) identifyAndLoad(); // Re-run when auth is confirmed
+  });
+
+  identifyAndLoad(); // Run immediately on mount
+  return () => unsubscribe();
+}, [taskId, studentId, studentName, overwrite, router.query.overwrite]); // Added router.query.overwrite for safety
 
 
   // 1 & 2: Listen untuk Feedback & Data Real-time
