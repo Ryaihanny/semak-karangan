@@ -98,13 +98,15 @@ export default function SemakanPage() {
     perasaan: { label: "🧠 Perasaan", items: ["gembira (happy) - gembira bukan kepalang", "gembira (happy) - senyuman lebar hingga ke telinga", "gementar (nervous) - jantung berdegup kencang seperti mahu luruh", "gementar (nervous) - peluh dingin mula membasahi dahi", "panik (panic) - keadaan menjadi kelam-bakut", "panik (panic) - terpinga-pinga seperti rusa masuk kampung", "sedih (sad) - air mata mula berlinangan", "sedih (sad) - hati hancur luluh bagai kaca terhempas ke batu"] }
   };
 
-  useEffect(() => {
+useEffect(() => {
     const identifyAndLoad = async () => {
       const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
       const identifier = studentId || auth.currentUser?.uid || savedUser.id || savedUser.uid;
+
       if (identifier) {
         setActiveId(identifier);
         if (savedUser.name) setStudentName(savedUser.name);
+
         try {
           const studentRef = doc(db, 'users', identifier);
           const studentSnap = await getDoc(studentRef);
@@ -114,41 +116,42 @@ export default function SemakanPage() {
             await setDoc(studentRef, { credits: 5, name: studentName, role: 'student', createdAt: serverTimestamp() }, { merge: true });
             setCredits(5);
           }
-        } catch (err) { console.error(err); setCredits(0); }
+        } catch (err) {
+          console.error(err);
+          setCredits(0);
+        }
+
         if (taskId) {
-// Inside semakan.js -> identifyAndLoad
-if (taskId) {
-  try {
-    // Check for overwrite in both destructured and router.query sources
-    const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true'); 
-    
-    if (isOverwrite) {
-      setEssay(""); // Force clear the editor
-      console.log("Overwrite mode: Starting fresh.");
-      
-      // Optional: Clean the URL so a manual refresh doesn't clear the work again
-      const { overwrite: _, ...cleanQuery } = router.query;
-      router.replace({ query: cleanQuery }, undefined, { shallow: true });
-      
-    } else {
-      // Normal mode: Load existing draft from Firestore
-      const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-      const snap = await getDoc(draftRef);
-      if (snap.exists()) {
-        setEssay(snap.data().essay);
-      }
-    }
-  } catch (err) { 
-    console.error("Error loading draft:", err); 
-  }
-}
+          try {
+            const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
+            if (isOverwrite) {
+              setEssay(""); 
+              console.log("Overwrite mode: Starting fresh.");
+              const { overwrite: _, ...cleanQuery } = router.query;
+              router.replace({ query: cleanQuery }, undefined, { shallow: true });
+            } else {
+              const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+              const snap = await getDoc(draftRef);
+              if (snap.exists()) {
+                setEssay(snap.data().essay);
+              }
+            }
+          } catch (err) {
+            console.error("Error loading draft:", err);
+          }
+        }
       }
     };
 
-    const unsubscribe = onAuthStateChanged(auth, () => { setAuthReady(true); identifyAndLoad(); });
+    const unsubscribe = onAuthStateChanged(auth, () => {
+      setAuthReady(true);
+      identifyAndLoad();
+    });
+
     identifyAndLoad();
     return () => unsubscribe();
-}, [taskId, studentId, studentName, overwrite]);
+  }, [taskId, studentId, studentName, overwrite, router.query.overwrite]); // Added router.query.overwrite for safety
+
 
   // 1 & 2: Listen untuk Feedback & Data Real-time
   useEffect(() => {
