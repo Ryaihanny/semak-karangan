@@ -135,7 +135,8 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
             const progress = totalM > 0 ? Math.round((solvedM / totalM) * 100) : 0;
 
             const isDone = sub?.status === 'murni_completed';
-            const levelCfg = getLevelConfig(task.level || sub?.level || 'P6');
+            const activeLevel = user?.level || task.level || 'P4';
+  const levelCfg = getLevelConfig(activeLevel);
             const displayMax = sub?.pemarkahan?.max || levelCfg.max;
             const currentTotal = sub?.markah ?? sub?.pemarkahan?.jumlah ?? 0;
 
