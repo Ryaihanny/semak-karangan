@@ -9,7 +9,7 @@ const LEVEL_SETTINGS = {
 };
 
 async function deductCredits(userId, amount) {
-  const userRef = db.collection('users').doc(userId);
+  const userRef = db.collection('students').doc(userId); // <--- Changed to students
   return db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) return 0;
@@ -49,9 +49,9 @@ export default async function handler(req, res) {
     let userSnap, taskSnap;
     try {
       [userSnap, taskSnap] = await Promise.all([
-        db.collection('users').doc(studentId).get(),
-        (taskId && taskId !== 'umum') ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
-      ]);
+  db.collection('students').doc(studentId).get(), // <--- Changed to students
+  (taskId && taskId !== 'umum') ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
+]);
     } catch (dbErr) {
       console.error("Firestore Fetch Error:", dbErr);
       throw new Error("Gagal menyambung ke pangkalan data.");
