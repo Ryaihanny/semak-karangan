@@ -80,6 +80,20 @@ useEffect(() => {
     }
   };
 
+const handleRewrite = () => {
+  if (window.confirm("Adakah anda pasti? Semua progress pembetulan semasa akan hilang dan anda akan bermula dengan kertas kosong.")) {
+    router.push({
+      pathname: '/semakan',
+      query: { 
+        taskId: data?.taskId, 
+        classId: classId || data?.classId,
+        studentId: data?.studentId,
+        overwrite: 'true' // This tells semakan.js to clear the essay
+      }
+    });
+  }
+};
+
 // --- UPDATED EXIT LOGIC ---
 const handleExitOnly = () => {
   const targetClass = classId || data?.classId;
@@ -140,6 +154,7 @@ const handleExitOnly = () => {
           <div style={styles.panelHeader}>📜 RUJUKAN & ULASAN</div>
           <div style={styles.scrollArea}>
             
+
             {/* Detailed Grade Badge */}
             <div style={styles.gradeBadge}>
               <div style={{ fontSize: '20px', marginBottom: '8px' }}>
@@ -150,6 +165,10 @@ const handleExitOnly = () => {
                 <span>✍️ Bahasa: <b>{data?.pemarkahan?.bahasa || 0}</b></span>
               </div>
             </div>
+
+<button onClick={handleRewrite} style={styles.rewriteBtn}>
+  🔄 Tulis Semula (Mula Baru)
+</button>
 
             <div style={styles.teacherComment}>
                <div style={{ marginBottom: '8px', color: '#92400E', fontWeight: '800', fontSize: '13px' }}>💬 ULASAN CIKGU AI:</div>
@@ -225,4 +244,16 @@ const styles = {
   gradeBadge: { display: 'inline-block', padding: '10px 15px', backgroundColor: '#EEF2FF', color: '#4338CA', borderRadius: '12px', fontWeight: 'bold', marginBottom: '15px' },
   teacherComment: { fontSize: '15px', color: '#475569', lineHeight: '1.6', backgroundColor: '#FFFBEB', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #F6E05E' },
   loader: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', color: '#4338CA', fontWeight: 'bold' }
-};
+rewriteBtn: { 
+  display: 'block', 
+  width: '100%', 
+  padding: '10px', 
+  marginTop: '10px', 
+  borderRadius: '10px', 
+  border: '2px solid #6366F1', 
+  backgroundColor: 'transparent', 
+  color: '#4338CA', 
+  fontWeight: 'bold', 
+  cursor: 'pointer',
+  marginBottom: '15px'
+},

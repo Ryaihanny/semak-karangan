@@ -116,22 +116,32 @@ export default function SemakanPage() {
           }
         } catch (err) { console.error(err); setCredits(0); }
         if (taskId) {
-    try {
-      const isOverwrite = router.query.overwrite === 'true'; // Check the flag
+// Inside semakan.js -> identifyAndLoad
+if (taskId) {
+  try {
+    // Check for overwrite in both destructured and router.query sources
+    const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true'); 
+    
+    if (isOverwrite) {
+      setEssay(""); // Force clear the editor
+      console.log("Overwrite mode: Starting fresh.");
       
-      if (isOverwrite) {
-        setEssay(""); // Force clear the editor
-        console.log("Overwrite mode: Starting fresh.");
-      } else {
-        // Normal mode: Load existing draft
-        const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-        const snap = await getDoc(draftRef);
-        if (snap.exists()) setEssay(snap.data().essay);
+      // Optional: Clean the URL so a manual refresh doesn't clear the work again
+      const { overwrite: _, ...cleanQuery } = router.query;
+      router.replace({ query: cleanQuery }, undefined, { shallow: true });
+      
+    } else {
+      // Normal mode: Load existing draft from Firestore
+      const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+      const snap = await getDoc(draftRef);
+      if (snap.exists()) {
+        setEssay(snap.data().essay);
       }
-    } catch (err) { 
-            console.error(err); 
-          }
-        }
+    }
+  } catch (err) { 
+    console.error("Error loading draft:", err); 
+  }
+}
       }
     };
 
@@ -339,6 +349,29 @@ const isOverwrite = router.query.overwrite === 'true';
           </div>
         </div>
       )}
+{/* LOADING OVERLAY */}
+{loading && (
+  <div style={styles.overlay}>
+    <div style={styles.loaderBox}>
+      <div style={styles.spinner}></div>
+      <h2 style={{ color: '#4338CA', marginBottom: '10px' }}>Cikgu AI sedang menyemak... ⚡</h2>
+      <p style={{ color: '#64748B' }}>Sila tunggu sebentar, kami sedang meneliti setiap perkataan anda.</p>
+      <div style={styles.loadingBarContainer}>
+        <div style={styles.loadingBarFill}></div>
+      </div>
+    </div>
+  </div>
+)}
+<style jsx global>{`
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  @keyframes pulse {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+  }
+`}</style>
     </div>
   );
 }
@@ -383,4 +416,43 @@ const styles = {
   // New Styles
   feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
   teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' }
+},
+overlay: {
+  position: 'fixed',
+  top: 0, left: 0, right: 0, bottom: 0,
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  display: 'flex', justifyContent: 'center', alignItems: 'center',
+  zIndex: 9999,
+  backdropFilter: 'blur(5px)'
+},
+loaderBox: {
+  textAlign: 'center',
+  padding: '40px',
+  backgroundColor: '#fff',
+  borderRadius: '24px',
+  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+  maxWidth: '400px'
+},
+spinner: {
+  width: '50px',
+  height: '50px',
+  border: '5px solid #E2E8F0',
+  borderTop: '5px solid #6366F1',
+  borderRadius: '50%',
+  margin: '0 auto 20px auto',
+  animation: 'spin 1s linear infinite',
+},
+loadingBarContainer: {
+  width: '100%',
+  height: '6px',
+  backgroundColor: '#E2E8F0',
+  borderRadius: '10px',
+  marginTop: '20px',
+  overflow: 'hidden'
+},
+loadingBarFill: {
+    height: '100%',
+    backgroundColor: '#6366F1',
+    width: '50%', 
+  }
 };

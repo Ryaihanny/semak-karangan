@@ -102,29 +102,36 @@ export default async function handler(req, res) {
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     };
 
-    // 5. SAVE & DEDUCT
-    const resultsRef = db.collection('karanganResults');
-    let docId;
-    const { isOverwrite } = req.body;
+// 5. SAVE & DEDUCT
+const resultsRef = db.collection('karanganResults');
+let docId = submissionId && submissionId !== "undefined" ? submissionId : null;
+
+const { isOverwrite } = req.body;
+
 if (isOverwrite) {
-const existing = await resultsRef
+  // Reset rewrite progress for the new version
+  finalPayload.lastRewrite = ""; 
+  finalPayload.solvedMissions = [];
+  finalPayload.status = "completed"; // Reset from 'murni_completed' to fresh 'completed'
+
+  const existing = await resultsRef
     .where('studentId', '==', studentId)
     .where('taskId', '==', taskId || 'umum')
     .limit(1)
     .get();
 
-if (!existing.empty) {
+  if (!existing.empty) {
     docId = existing.docs[0].id;
-    await resultsRef.doc(docId).set(finalPayload); // Overwrite the old data
+    await resultsRef.doc(docId).set(finalPayload); 
   } else {
     const newDoc = await resultsRef.add(finalPayload);
     docId = newDoc.id;
   }
-
-  } else if (submissionId && submissionId !== "undefined") {
-  await resultsRef.doc(submissionId).set(finalPayload, { merge: true });
-  docId = submissionId;
+} else if (docId) {
+  // Normal update/merge
+  await resultsRef.doc(docId).set(finalPayload, { merge: true });
 } else {
+  // Brand new submission
   const newDoc = await resultsRef.add(finalPayload);
   docId = newDoc.id;
 }
