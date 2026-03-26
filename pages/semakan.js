@@ -6,8 +6,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 
 export default function SemakanPage() {
   const router = useRouter();
-  const { taskId, classId, studentId, nama, submissionId } = router.query;
-
+  const { taskId, classId, studentId, nama, submissionId, overwrite } = router.query;
   const [essay, setEssay] = useState("");
   const [loading, setLoading] = useState(false);
   const [taskData, setTaskData] = useState(null);
@@ -135,8 +134,8 @@ export default function SemakanPage() {
 
     const unsubscribe = onAuthStateChanged(auth, () => { setAuthReady(true); identifyAndLoad(); });
     identifyAndLoad();
-    return () => unsubscribe();
-  }, [taskId, studentId, studentName, router.query]); // Added router.query
+    rreturn () => unsubscribe();
+  }, [taskId, studentId, studentName, overwrite]);
 
   // 1 & 2: Listen untuk Feedback & Data Real-time
   useEffect(() => {
