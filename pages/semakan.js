@@ -418,43 +418,44 @@ const styles = {
   kamusBody: { padding: '15px', maxHeight: '250px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
   // New Styles
   feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
-  teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' }
-},
-overlay: {
-  position: 'fixed',
-  top: 0, left: 0, right: 0, bottom: 0,
-  backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  display: 'flex', justifyContent: 'center', alignItems: 'center',
-  zIndex: 9999,
-  backdropFilter: 'blur(5px)'
-},
-loaderBox: {
-  textAlign: 'center',
-  padding: '40px',
-  backgroundColor: '#fff',
-  borderRadius: '24px',
-  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-  maxWidth: '400px'
-},
-spinner: {
-  width: '50px',
-  height: '50px',
-  border: '5px solid #E2E8F0',
-  borderTop: '5px solid #6366F1',
-  borderRadius: '50%',
-  margin: '0 auto 20px auto',
-  animation: 'spin 1s linear infinite',
-},
-loadingBarContainer: {
-  width: '100%',
-  height: '6px',
-  backgroundColor: '#E2E8F0',
-  borderRadius: '10px',
-  marginTop: '20px',
-  overflow: 'hidden'
-},
-loadingBarFill: {
+  teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' },
+  overlay: {
+    position: 'fixed',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    display: 'flex', justifyContent: 'center', alignItems: 'center',
+    zIndex: 9999,
+    backdropFilter: 'blur(5px)'
+  },
+  loaderBox: {
+    textAlign: 'center',
+    padding: '40px',
+    backgroundColor: '#fff',
+    borderRadius: '24px',
+    boxSizing: 'border-box',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+    maxWidth: '400px'
+  },
+  spinner: {
+    width: '50px',
+    height: '50px',
+    border: '5px solid #E2E8F0',
+    borderTop: '5px solid #6366F1',
+    borderRadius: '50%',
+    margin: '0 auto 20px auto',
+    animation: 'spin 1s linear infinite'
+  },
+  loadingBarContainer: {
+    width: '100%',
+    height: '6px',
+    backgroundColor: '#E2E8F0',
+    borderRadius: '10px',
+    marginTop: '20px',
+    overflow: 'hidden'
+  },
+  loadingBarFill: {
     height: '100%',
     backgroundColor: '#6366F1',
-    width: '50%', 
+    width: '50%'
+  }
 };
