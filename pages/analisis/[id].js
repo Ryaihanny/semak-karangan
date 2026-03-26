@@ -139,6 +139,12 @@ const handleExitOnly = () => {
             {isSaving ? "⏳ Menyimpan..." : (mode === 'teacher' ? "🏠 Simpan & Kembali" : "🏠 Simpan & Dashboard")}
           </button>
           <button onClick={handleExitOnly} style={styles.exitBtn}>🚪 Keluar</button>
+<button onClick={() => {
+    // Navigate to semakan with the overwrite flag
+    router.push(`/semakan?taskId=${data.taskId}&studentId=${data.studentId}&overwrite=true`);
+}}>
+  🔄 Tulis Semula
+</button>
         </div>
         <div style={styles.progressContainer}>
           <div style={styles.progressText}>Misi Pembetulan: {currentStep + 1} / {missions.length}</div>
@@ -254,6 +260,7 @@ rewriteBtn: {
   backgroundColor: 'transparent', 
   color: '#4338CA', 
   fontWeight: 'bold', 
-  cursor: 'pointer',
-  marginBottom: '15px'
-},
+    cursor: 'pointer',
+    marginBottom: '15px'
+  } 
+};
