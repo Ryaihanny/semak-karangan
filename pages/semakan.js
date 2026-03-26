@@ -117,18 +117,26 @@ export default function SemakanPage() {
           }
         } catch (err) { console.error(err); setCredits(0); }
         if (taskId) {
-          try {
-            const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-            const snap = await getDoc(draftRef);
-            if (snap.exists()) setEssay(snap.data().essay);
-          } catch (err) { console.error(err); }
-        }
+    try {
+      const isOverwrite = router.query.overwrite === 'true'; // Check the flag
+      
+      if (isOverwrite) {
+        setEssay(""); // Force clear the editor
+        console.log("Overwrite mode: Starting fresh.");
+      } else {
+        // Normal mode: Load existing draft
+        const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+        const snap = await getDoc(draftRef);
+        if (snap.exists()) setEssay(snap.data().essay);
       }
-    };
+    } catch (err) { console.error(err); }
+  }
+};
+
     const unsubscribe = onAuthStateChanged(auth, () => { setAuthReady(true); identifyAndLoad(); });
     identifyAndLoad();
     return () => unsubscribe();
-  }, [taskId, studentId, studentName]);
+  }, [taskId, studentId, studentName, router.query]); // Added router.query
 
   // 1 & 2: Listen untuk Feedback & Data Real-time
   useEffect(() => {
@@ -170,14 +178,24 @@ export default function SemakanPage() {
     const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
     if (wordCount < 10) return alert("Ops! Karangan anda terlalu pendek. ✍️");
     setLoading(true);
+const isOverwrite = router.query.overwrite === 'true';
     const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
     const finalStudentId = activeId || studentId || savedUser.id;
     try {
       const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ essay, studentId: finalStudentId, taskId: taskId, classId: classId || "umum", nama: studentName, submissionId, status: "submitted" }),
-      });
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        essay, 
+        studentId: finalStudentId, 
+        taskId: taskId, 
+        classId: classId || "umum", 
+        nama: studentName, 
+        submissionId, 
+        status: "submitted",
+        isOverwrite: isOverwrite // Pass this flag to your API
+      }),
+    });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
       if (data.remainingCredits !== undefined) setCredits(data.remainingCredits);

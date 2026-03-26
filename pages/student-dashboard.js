@@ -166,19 +166,38 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
                 ) : ( <div className="empty-sub"><p>Belum dihantar.</p></div> )}
                 
                 <button 
-                  className={`action-btn ${sub ? 'secondary' : 'primary'}`} 
-                  onClick={() => {
-                    if (!sub) {
-                      router.push(`/semakan?taskId=${task.id}`);
-                    } else if (isDone) {
-                      router.push(`/laporan/${sub.id}`);
-                    } else {
-                      router.push(`/analisis/${sub.id}`);
-                    }
-                  }}
-                >
-                  {!sub ? 'Mula Menulis ✨' : isDone ? 'Lihat Laporan' : 'Baiki Karangan ✍️'}
-                </button>
+  className={`action-btn ${sub ? 'secondary' : 'primary'}`} 
+  onClick={() => {
+    if (!sub) {
+      // No submission yet, start fresh
+      router.push(`/semakan?taskId=${task.id}`);
+    } else if (isDone) {
+      // Work is fully completed (Murni finished), just view report
+      router.push(`/laporan/${sub.id}`);
+    } else {
+      // Work exists but is not finished. 
+      // Ask if they want to continue or start over.
+      const choice = confirm(
+        "Anda sudah menghantar draf.\n\n" +
+        "Klik 'OK' untuk teruskan BAIKI karangan sedia ada.\n" +
+        "Klik 'Cancel' jika anda mahu PADAM & TULIS SEMULA karangan baru."
+      );
+      
+      if (choice) {
+        // User wants to keep working on the current one
+        router.push(`/analisis/${sub.id}`);
+      } else {
+        // User wants to overwrite/start over
+        const doubleCheck = confirm("ADAKAH ANDA PASTI? Karangan lama anda akan digantikan dengan yang baru.");
+        if (doubleCheck) {
+          router.push(`/semakan?taskId=${task.id}&overwrite=true`);
+        }
+      }
+    }
+  }}
+>
+  {!sub ? 'Mula Menulis ✨' : isDone ? 'Lihat Laporan' : 'Baiki / Tulis Semula ✍️'}
+</button>
               </div>
             );
           })}
