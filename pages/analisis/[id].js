@@ -133,20 +133,21 @@ const handleExitOnly = () => {
 
   return (
     <div style={styles.container}>
-      <nav style={styles.nav}>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => saveProgress(true)} style={styles.backBtn} disabled={isSaving}>
-            {isSaving ? "⏳ Menyimpan..." : (mode === 'teacher' ? "🏠 Simpan & Kembali" : "🏠 Simpan & Dashboard")}
-          </button>
-          <button onClick={handleExitOnly} style={styles.exitBtn}>🚪 Keluar</button>
-<button onClick={() => {
-    // Navigate to semakan with the overwrite flag
-    router.push(`/semakan?taskId=${data.taskId}&studentId=${data.studentId}&overwrite=true`);
-}}>
-  🔄 Tulis Semula
-</button>
-        </div>
-        <div style={styles.progressContainer}>
+ <nav style={styles.nav}>
+  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+    <button onClick={() => saveProgress(true)} style={styles.backBtn} disabled={isSaving}>
+      {isSaving ? "⏳ Menyimpan..." : (mode === 'teacher' ? "🏠 Simpan & Kembali" : "🏠 Simpan & Dashboard")}
+    </button>
+    
+    <button onClick={handleExitOnly} style={styles.exitBtn}>🚪 Keluar</button>
+    
+    <button onClick={handleRewrite} style={{...styles.exitBtn, backgroundColor: '#FEF2F2', color: '#EF4444', borderColor: '#FECACA'}}>
+      🔄 Tulis Semula
+    </button>
+  </div>
+  {/* Ensure there is NO stray button here before the progressContainer starts */}
+  <div style={styles.progressContainer}>
+
           <div style={styles.progressText}>Misi Pembetulan: {currentStep + 1} / {missions.length}</div>
           <div style={styles.progressBar}>
             <div style={{...styles.progressFill, width: `${((currentStep + 1)/missions.length)*100}%`}} />
@@ -249,8 +250,8 @@ const styles = {
   finishBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#10B981', color: '#FFF', fontWeight: 'bold', cursor: 'pointer' },
   gradeBadge: { display: 'inline-block', padding: '10px 15px', backgroundColor: '#EEF2FF', color: '#4338CA', borderRadius: '12px', fontWeight: 'bold', marginBottom: '15px' },
   teacherComment: { fontSize: '15px', color: '#475569', lineHeight: '1.6', backgroundColor: '#FFFBEB', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #F6E05E' },
-  loader: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', color: '#4338CA', fontWeight: 'bold' },
-rewriteBtn: { 
+  loader: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', color: '#4338CA', fontWeight: 'bold' }, 
+rewriteBtn: {
   display: 'block', 
   width: '100%', 
   padding: '10px', 
