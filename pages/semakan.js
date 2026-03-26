@@ -128,13 +128,16 @@ export default function SemakanPage() {
         const snap = await getDoc(draftRef);
         if (snap.exists()) setEssay(snap.data().essay);
       }
-    } catch (err) { console.error(err); }
-  }
-};
+    } catch (err) { 
+            console.error(err); 
+          }
+        }
+      }
+    };
 
     const unsubscribe = onAuthStateChanged(auth, () => { setAuthReady(true); identifyAndLoad(); });
     identifyAndLoad();
-    rreturn () => unsubscribe();
+    return () => unsubscribe();
   }, [taskId, studentId, studentName, overwrite]);
 
   // 1 & 2: Listen untuk Feedback & Data Real-time
