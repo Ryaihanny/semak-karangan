@@ -187,16 +187,17 @@ const isOverwrite = router.query.overwrite === 'true';
       const response = await fetch('https://semak-karangan-production.up.railway.app/api/submit-karangan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        essay, 
-        studentId: finalStudentId, 
-        taskId: taskId, 
-        classId: classId || "umum", 
-        nama: studentName, 
-        submissionId, 
-        status: "submitted",
-        isOverwrite: isOverwrite // Pass this flag to your API
-      }),
+     body: JSON.stringify({ 
+  essay, 
+  studentId: finalStudentId, 
+  taskId: taskId, 
+  classId: classId || "umum", 
+  nama: studentName, 
+  studentLevel: taskData?.level || "P4", // ADD THIS LINE: Get level from taskData
+  submissionId, 
+  status: "submitted",
+  isOverwrite: isOverwrite 
+}),
     });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);

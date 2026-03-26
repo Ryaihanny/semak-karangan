@@ -105,15 +105,29 @@ export default async function handler(req, res) {
     // 5. SAVE & DEDUCT
     const resultsRef = db.collection('karanganResults');
     let docId;
-    
-    if (submissionId && submissionId !== "undefined") {
-      await resultsRef.doc(submissionId).set(finalPayload, { merge: true });
-      docId = submissionId;
-    } else {
-      const newDoc = await resultsRef.add(finalPayload);
-      docId = newDoc.id;
-    }
+    const { isOverwrite } = req.body;
+if (isOverwrite) {
+const existing = await resultsRef
+    .where('studentId', '==', studentId)
+    .where('taskId', '==', taskId || 'umum')
+    .limit(1)
+    .get();
 
+if (!existing.empty) {
+    docId = existing.docs[0].id;
+    await resultsRef.doc(docId).set(finalPayload); // Overwrite the old data
+  } else {
+    const newDoc = await resultsRef.add(finalPayload);
+    docId = newDoc.id;
+  }
+
+  } else if (submissionId && submissionId !== "undefined") {
+  await resultsRef.doc(submissionId).set(finalPayload, { merge: true });
+  docId = submissionId;
+} else {
+  const newDoc = await resultsRef.add(finalPayload);
+  docId = newDoc.id;
+}
     // Try to deduct credits but don't crash if it fails (optional safety)
     let remaining = 0;
     try {
