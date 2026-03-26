@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import Head from 'next/head';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -82,19 +82,6 @@ export default function AssignmentTracker() {
 
       setStudentStatuses(statusMap);
     } catch (e) { console.error(e); } finally { setLoading(false); }
-  };
-
-  const handleFlash = async (studentId) => {
-    try {
-      const broadcastRef = doc(db, 'classes', classId, 'broadcast', 'activeSession');
-      await setDoc(broadcastRef, { 
-        targetStudentId: studentId, 
-        updatedAt: serverTimestamp() 
-      });
-      alert("Skrin murid telah diflash! ⚡");
-    } catch (e) {
-      alert("Gagal menghantar isyarat flash.");
-    }
   };
 
   const generatePDF = () => {
@@ -326,7 +313,7 @@ export default function AssignmentTracker() {
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       {s.submissionId && (
                         <>
-                          <button className="btn-detail" onClick={() => handleFlash(s.id)} title="Flash skrin murid ini">⚡ Flash</button>
+                         
                           <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
                         </>
                       )}

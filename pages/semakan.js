@@ -29,7 +29,6 @@ export default function SemakanPage() {
 
   // Tambahan untuk Feedback & Broadcast
   const [feedback, setFeedback] = useState("");
-  const [isBroadcasted, setIsBroadcasted] = useState(false);
   const isTeacherMode = router.query.mode === 'teacher';
 
   const speakSuggestion = (text) => {
@@ -143,17 +142,6 @@ export default function SemakanPage() {
     });
     return () => unsub();
   }, [activeId, taskId]);
-
-  // 3: Listen untuk Broadcast (Flash Screen)
-  useEffect(() => {
-    if (!classId) return;
-    const broadcastRef = doc(db, 'classes', classId, 'broadcast', 'activeSession');
-    const unsubBroadcast = onSnapshot(broadcastRef, (snap) => {
-      const data = snap.data();
-      setIsBroadcasted(data?.targetStudentId === activeId);
-    });
-    return () => unsubBroadcast();
-  }, [classId, activeId]);
 
   useEffect(() => {
     if (taskId) {
@@ -301,16 +289,6 @@ export default function SemakanPage() {
         </div>
       </div>
 
-      {/* Broadcast Overlay */}
-      {isBroadcasted && (
-        <div style={styles.broadcastOverlay}>
-          <div style={styles.broadcastBox}>
-            <h1>📣 SIARAN LANGSUNG</h1>
-            <p>Anda sedang melihat karangan rakan anda!</p>
-          </div>
-        </div>
-      )}
-
       <button onClick={() => setIsKamusVisible(!isKamusVisible)} style={styles.floatingToggle}>
         {isKamusVisible ? "✖" : "📖 Kamus"}
       </button>
@@ -384,6 +362,3 @@ const styles = {
   // New Styles
   feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
   teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' },
-  broadcastOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' },
-  broadcastBox: { padding: '40px', background: '#6C5CE7', borderRadius: '20px', textAlign: 'center' }
-};

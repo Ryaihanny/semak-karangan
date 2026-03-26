@@ -27,6 +27,7 @@ export default function StudentDashboard() {
         if (studentSnap.exists()) {
           const freshData = studentSnap.data();
           setUser({ id: studentSnap.id, ...freshData });
+localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...freshData }));
           await fetchStudentData(studentSnap.id, freshData.enrolledClasses || []);
         }
       } catch (err) {
