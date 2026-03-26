@@ -16,6 +16,7 @@ export default function SemakanPage() {
   const [activeId, setActiveId] = useState(null);
   const [studentName, setStudentName] = useState(nama || "Pelajar");
   const [credits, setCredits] = useState(null);
+const [studentLevel, setStudentLevel] = useState(null);
 
   const [coachSuggestion, setCoachSuggestion] = useState("");
   const [isCoaching, setIsCoaching] = useState(false);
@@ -109,9 +110,12 @@ useEffect(() => {
 
         try {
           const studentRef = doc(db, 'users', identifier);
-          const studentSnap = await getDoc(studentRef);
-          if (studentSnap.exists()) {
-            setCredits(studentSnap.data().credits ?? 0);
+const studentSnap = await getDoc(studentRef);
+if (studentSnap.exists()) {
+  const userData = studentSnap.data();
+  setCredits(userData.credits ?? 0);
+  setStudentLevel(userData.level); 
+}
           } else {
             await setDoc(studentRef, { credits: 5, name: studentName, role: 'student', createdAt: serverTimestamp() }, { merge: true });
             setCredits(5);
@@ -206,7 +210,7 @@ const isOverwrite = router.query.overwrite === 'true';
   taskId: taskId, 
   classId: classId || "umum", 
   nama: studentName, 
-  studentLevel: taskData?.level || "P4", // ADD THIS LINE: Get level from taskData
+  studentLevel: studentLevel, // ADD THIS LINE: Get level from taskData
   submissionId, 
   status: "submitted",
   isOverwrite: isOverwrite 
