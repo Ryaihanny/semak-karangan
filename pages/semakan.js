@@ -100,53 +100,57 @@ const [studentLevel, setStudentLevel] = useState(null);
   };
 
 useEffect(() => {
-    const identifyAndLoad = async () => {
-      const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
-      const identifier = studentId || auth.currentUser?.uid || savedUser.id || savedUser.uid;
+   const identifyAndLoad = async () => {
+  const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
+  const identifier = studentId || auth.currentUser?.uid || savedUser.id || savedUser.uid;
 
-      if (identifier) {
-        setActiveId(identifier);
-        if (savedUser.name) setStudentName(savedUser.name);
+  if (identifier) {
+    setActiveId(identifier);
+    if (savedUser.name) setStudentName(savedUser.name);
 
-        try {
-          const studentRef = doc(db, 'users', identifier);
-const studentSnap = await getDoc(studentRef);
-if (studentSnap.exists()) {
-  const userData = studentSnap.data();
-  setCredits(userData.credits ?? 0);
-  setStudentLevel(userData.level); 
-}
-          } else {
-            await setDoc(studentRef, { credits: 5, name: studentName, role: 'student', createdAt: serverTimestamp() }, { merge: true });
-            setCredits(5);
-          }
-        } catch (err) {
-          console.error(err);
-          setCredits(0);
-        }
-
-        if (taskId) {
-          try {
-            const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
-            if (isOverwrite) {
-              setEssay(""); 
-              console.log("Overwrite mode: Starting fresh.");
-              const { overwrite: _, ...cleanQuery } = router.query;
-              router.replace({ query: cleanQuery }, undefined, { shallow: true });
-            } else {
-              const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-              const snap = await getDoc(draftRef);
-              if (snap.exists()) {
-                setEssay(snap.data().essay);
-              }
-            }
-          } catch (err) {
-            console.error("Error loading draft:", err);
-          }
-        }
+    try {
+      const studentRef = doc(db, 'users', identifier);
+      const studentSnap = await getDoc(studentRef);
+      
+      if (studentSnap.exists()) {
+        const userData = studentSnap.data();
+        setCredits(userData.credits ?? 0);
+        // FIX: Set the student level here
+        setStudentLevel(userData.level); 
+      } else {
+        await setDoc(studentRef, { 
+          credits: 5, 
+          name: studentName, 
+          role: 'student', 
+          createdAt: serverTimestamp() 
+        }, { merge: true });
+        setCredits(5);
       }
-    };
+    } catch (err) {
+      console.error(err);
+      setCredits(0);
+    }
 
+    if (taskId) {
+      try {
+        const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
+        if (isOverwrite) {
+          setEssay(""); 
+          const { overwrite: _, ...cleanQuery } = router.query;
+          router.replace({ query: cleanQuery }, undefined, { shallow: true });
+        } else {
+          const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+          const snap = await getDoc(draftRef);
+          if (snap.exists()) {
+            setEssay(snap.data().essay);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading draft:", err);
+      }
+    }
+  }
+};
     const unsubscribe = onAuthStateChanged(auth, () => {
       setAuthReady(true);
       identifyAndLoad();
