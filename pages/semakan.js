@@ -72,7 +72,7 @@ const [studentLevel, setStudentLevel] = useState(null);
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           currentDraft: essay, 
-          level: taskData?.level || "Primary",
+          level: studentLevel,
           instructions: taskData?.instructions,
           taskTitle: taskData?.title 
         }),
@@ -320,13 +320,28 @@ const isOverwrite = router.query.overwrite === 'true';
           </div>
 
           <div style={styles.statusFooter}>
-            <span>Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName}</span>
-            <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
-          </div>
-
+  <span>
+    Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName} | 
+    <span style={{ color: '#6C5CE7', fontWeight: 'bold', marginLeft: '5px' }}>
+      Tahap: {studentLevel || "Memuat..."}
+    </span>
+  </span>
+  <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
+</div>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
-            <button onClick={handleSemak} disabled={loading} style={{ ...styles.submitBtn, flex: 2 }}>{loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}</button>
+           <button 
+  onClick={handleSemak} 
+  disabled={loading || !studentLevel} // Button is disabled if studentLevel is null
+  style={{ 
+    ...styles.submitBtn, 
+    flex: 2, 
+    opacity: !studentLevel ? 0.6 : 1, // Dims the button if level is missing
+    cursor: !studentLevel ? 'not-allowed' : 'pointer' 
+  }}
+>
+  {loading ? "⚡ Memproses..." : !studentLevel ? "⏳ Memuatkan Tahap..." : "Hantar Misi! ✨"}
+</button>
           </div>
         </div>
       </div>
