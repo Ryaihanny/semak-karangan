@@ -221,7 +221,7 @@ export default function StudentDashboard() {
                     </div>
                     <div className="report-score">
                        <span className="score-pill">{sub.markah ?? sub.pemarkahan?.jumlah ?? 0} / {sub.pemarkahan?.max || levelCfg.max}</span>
-                       <button className="view-btn" onClick={() => router.push(`/analisis/${sub.id}`)}>Buka Laporan</button>
+                       <button className="view-btn" onClick={() => router.push(`/laporan/${sub.id}`)}>Buka Laporan</button>
                     </div>
                   </div>
                 );
