@@ -21,7 +21,9 @@ export default function AssignmentTracker() {
     markah: true,
     karangan: true,
     analisis: true,
-    ulasan: true
+    ulasanBahasa: true,
+    ulasanIsi: true,
+    ulasanKeseluruhan: true
   });
 
   useEffect(() => {
@@ -126,7 +128,9 @@ export default function AssignmentTracker() {
         markahKeseluruhan: student.score || 0,
         karangan: student.result?.karangan || student.result?.karanganAsal || "",
         kesalahanBahasa: student.result?.kesalahanBahasa || [],
-        ulasan: student.result?.ulasan || "Tiada ulasan."
+        ulasanBahasa: student.result?.ulasanBahasa || "",
+        ulasanIsi: student.result?.ulasanIsi || "",
+        ulasanKeseluruhan: student.result?.ulasanKeseluruhan || student.result?.ulasan?.keseluruhan || student.result?.ulasan || "Tiada ulasan."
       };
 
       doc.setFillColor(0, 61, 64);
@@ -236,30 +240,48 @@ export default function AssignmentTracker() {
         y = doc.lastAutoTable.finalY + 10;
       }
 
-// --- CONDITIONAL: ULASAN ---
-if (pdfOptions.ulasan) {
-  if (y > 240) { doc.addPage(); y = 20; }
-  doc.setFillColor(245, 250, 250);
-  doc.rect(margin, y, usableWidth, 25, 'F');
-  doc.setTextColor(0, 61, 64);
-  doc.setFont("times", "bold");
-  doc.text("ULASAN KESELURUHAN:", margin + 3, y + 8);
-  doc.setFont("times", "normal");
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
+      // --- CONDITIONAL: ULASAN BAHASA ---
+      if (pdfOptions.ulasanBahasa && item.ulasanBahasa) {
+        if (y > 250) { doc.addPage(); y = 20; }
+        doc.setTextColor(0, 61, 64);
+        doc.setFont("times", "bold");
+        doc.text("ULASAN BAHASA:", margin, y);
+        y += 6;
+        doc.setFont("times", "normal");
+        doc.setTextColor(0, 0, 0);
+        const wrapped = doc.splitTextToSize(cleanText(item.ulasanBahasa), usableWidth);
+        doc.text(wrapped, margin, y);
+        y += (wrapped.length * 6) + 5;
+      }
 
-  // PEMBETULAN DI SINI:
-  // Kita semak semua kemungkinan nama field: ulasanKeseluruhan, ulasan.keseluruhan, atau ulasan
-  const ulasanSummary = cleanText(
-    student.result?.ulasanKeseluruhan || 
-    student.result?.ulasan?.keseluruhan || 
-    student.result?.ulasan || 
-    "Tiada ulasan."
-  );
+      // --- CONDITIONAL: ULASAN ISI ---
+      if (pdfOptions.ulasanIsi && item.ulasanIsi) {
+        if (y > 250) { doc.addPage(); y = 20; }
+        doc.setTextColor(0, 61, 64);
+        doc.setFont("times", "bold");
+        doc.text("ULASAN ISI:", margin, y);
+        y += 6;
+        doc.setFont("times", "normal");
+        doc.setTextColor(0, 0, 0);
+        const wrapped = doc.splitTextToSize(cleanText(item.ulasanIsi), usableWidth);
+        doc.text(wrapped, margin, y);
+        y += (wrapped.length * 6) + 5;
+      }
 
-  const wrappedUlasan = doc.splitTextToSize(ulasanSummary, usableWidth - 6);
-  doc.text(wrappedUlasan, margin + 3, y + 15);
-}
+      // --- CONDITIONAL: ULASAN KESELURUHAN ---
+      if (pdfOptions.ulasanKeseluruhan) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        doc.setFillColor(245, 250, 250);
+        doc.rect(margin, y, usableWidth, 30, 'F');
+        doc.setTextColor(0, 61, 64);
+        doc.setFont("times", "bold");
+        doc.text("KESIMPULAN GURU SI-PINTAR:", margin + 3, y + 8);
+        doc.setFont("times", "normal");
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        const wrappedUlasan = doc.splitTextToSize(cleanText(item.ulasanKeseluruhan), usableWidth - 6);
+        doc.text(wrappedUlasan, margin + 3, y + 15);
+      }
 
       doc.setFontSize(8);
       doc.setTextColor(150);
@@ -267,6 +289,17 @@ if (pdfOptions.ulasan) {
     });
     doc.save(`Koleksi_Laporan_${classNameDisplay.replace(/[^a-z0-9]/gi, '_')}.pdf`);
     setIsModalOpen(false);
+  };
+
+  const handleSelectAllOptions = (checked) => {
+    setPdfOptions({
+      markah: checked,
+      karangan: checked,
+      analisis: checked,
+      ulasanBahasa: checked,
+      ulasanIsi: checked,
+      ulasanKeseluruhan: checked
+    });
   };
 
   if (loading) return <div style={{padding:'50px', textAlign:'center'}}>Memuat naik data...</div>;
@@ -367,7 +400,18 @@ if (pdfOptions.ulasan) {
               <button className="close-x" onClick={() => setIsModalOpen(false)}>×</button>
             </div>
             <div className="modal-body">
-              <p>Pilih bahagian yang ingin dimasukkan:</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <p style={{ margin: 0 }}>Pilih bahagian yang ingin dimasukkan:</p>
+                <label style={{ fontSize: '0.85rem', color: '#48A6A7', cursor: 'pointer', fontWeight: 700 }}>
+                  <input 
+                    type="checkbox" 
+                    style={{ marginRight: '5px' }}
+                    checked={Object.values(pdfOptions).every(v => v === true)}
+                    onChange={(e) => handleSelectAllOptions(e.target.checked)} 
+                  />
+                  Pilih Semua
+                </label>
+              </div>
               <div className="options-list">
                 <label className="option-item">
                   <input type="checkbox" checked={pdfOptions.markah} onChange={e => setPdfOptions({...pdfOptions, markah: e.target.checked})} />
@@ -382,8 +426,16 @@ if (pdfOptions.ulasan) {
                   <div className="option-info"><strong>3) Analisis Kesalahan</strong><span>Jadual pembetulan ayat.</span></div>
                 </label>
                 <label className="option-item">
-                  <input type="checkbox" checked={pdfOptions.ulasan} onChange={e => setPdfOptions({...pdfOptions, ulasan: e.target.checked})} />
-                  <div className="option-info"><strong>4) Ulasan Keseluruhan</strong><span>Komen akhir daripada AI.</span></div>
+                  <input type="checkbox" checked={pdfOptions.ulasanBahasa} onChange={e => setPdfOptions({...pdfOptions, ulasanBahasa: e.target.checked})} />
+                  <div className="option-info"><strong>4) Ulasan Bahasa</strong><span>Komen khusus kualiti bahasa.</span></div>
+                </label>
+                <label className="option-item">
+                  <input type="checkbox" checked={pdfOptions.ulasanIsi} onChange={e => setPdfOptions({...pdfOptions, ulasanIsi: e.target.checked})} />
+                  <div className="option-info"><strong>5) Ulasan Isi</strong><span>Komen khusus huraian idea.</span></div>
+                </label>
+                <label className="option-item">
+                  <input type="checkbox" checked={pdfOptions.ulasanKeseluruhan} onChange={e => setPdfOptions({...pdfOptions, ulasanKeseluruhan: e.target.checked})} />
+                  <div className="option-info"><strong>6) Kesimpulan Akhir</strong><span>Rumusan menyeluruh guru AI.</span></div>
                 </label>
               </div>
             </div>

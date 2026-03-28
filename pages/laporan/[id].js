@@ -103,7 +103,7 @@ export default function LaporanAnalisis() {
         return (
           <p key={pIdx} style={{ marginBottom: '15px' }} dangerouslySetInnerHTML={{ __html: highlightedParagraph }} />
         );
-    })}
+      })}
   </div>
 </div>
 
@@ -155,9 +155,31 @@ export default function LaporanAnalisis() {
 
         <div className="white-card feedback-area">
           <h3 className="card-title">🌟 Pesanan Guru Si-Pintar</h3>
-          <div className="feedback-content">
-             <div className="teacher-icon">👨‍🏫</div>
-             <p>{data.ulasan?.keseluruhan || data.ulasan || "Hebat! Teruskan usaha anda."}</p>
+          <div className="feedback-content-wrapper">
+            {/* Ulasan Bahasa */}
+            {data.ulasanBahasa && (
+              <div className="feedback-sub-section">
+                <div className="feedback-label">🗣️ Analisis Bahasa</div>
+                <p className="feedback-text">{data.ulasanBahasa}</p>
+              </div>
+            )}
+
+            {/* Ulasan Isi */}
+            {data.ulasanIsi && (
+              <div className="feedback-sub-section">
+                <div className="feedback-label">💡 Analisis Isi</div>
+                <p className="feedback-text">{data.ulasanIsi}</p>
+              </div>
+            )}
+
+            {/* Ulasan Keseluruhan */}
+            <div className="feedback-main-box">
+              <div className="teacher-icon">👨‍🏫</div>
+              <div className="main-ulasan-text">
+                <div className="feedback-label">📝 Kesimpulan Keseluruhan</div>
+                <p>{data.ulasanKeseluruhan || data.ulasan?.keseluruhan || data.ulasan || "Hebat! Teruskan usaha anda."}</p>
+              </div>
+            </div>
           </div>
         </div>
       </main>
@@ -198,7 +220,13 @@ export default function LaporanAnalisis() {
         .text-err { color: #d63031; font-weight: 600; text-decoration: line-through; }
         .text-fix { color: #00b894; font-weight: 800; }
         .text-desc { color: #636e72; font-size: 0.85rem; line-height: 1.5; }
-        .feedback-content { display: flex; gap: 20px; align-items: flex-start; }
+        .feedback-content-wrapper { display: flex; flex-direction: column; gap: 20px; }
+        .feedback-sub-section { background: #f8fafb; padding: 15px 20px; border-radius: 15px; border-left: 4px solid #48a6a7; }
+        .feedback-label { font-size: 0.75rem; font-weight: 900; text-transform: uppercase; color: #003d40; margin-bottom: 5px; letter-spacing: 0.5px; opacity: 0.7; }
+        .feedback-text { font-size: 0.95rem; line-height: 1.6; color: #444; margin: 0; }
+        .feedback-main-box { display: flex; gap: 20px; align-items: flex-start; background: #fff9e6; padding: 20px; border-radius: 20px; border: 1px dashed #ffd93d; }
+        .main-ulasan-text { flex: 1; }
+        .main-ulasan-text p { margin: 0; font-size: 1.05rem; font-weight: 600; line-height: 1.6; color: #003d40; }
         .teacher-icon { font-size: 2.5rem; background: #f0f0f0; padding: 10px; border-radius: 20px; }
         .feedback-area { border-bottom: 8px solid #ffd93d; }
         .loader { height: 100vh; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.2rem; color: #003d40; background: #f4f7f6; }
