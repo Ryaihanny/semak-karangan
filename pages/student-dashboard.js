@@ -27,7 +27,7 @@ export default function StudentDashboard() {
         if (studentSnap.exists()) {
           const freshData = studentSnap.data();
           setUser({ id: studentSnap.id, ...freshData });
-localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...freshData }));
+          localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...freshData }));
           await fetchStudentData(studentSnap.id, freshData.enrolledClasses || []);
         }
       } catch (err) {
@@ -91,9 +91,18 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
     return { avg: (totalPct / submissions.length).toFixed(0), completed: completedCount };
   }, [submissions]);
 
-  const historySubmissions = useMemo(() => {
-    return submissions.filter(sub => !assignments.some(task => task.id === sub.taskId));
-  }, [submissions, assignments]);
+  // Logic to show ONLY the latest report for each task (handles overwrites)
+  const latestReports = useMemo(() => {
+    const taskMap = new Map();
+    // Since submissions are already sorted by sortDate descending, 
+    // the first one we find for a taskId is the latest.
+    submissions.forEach(sub => {
+      if (!taskMap.has(sub.taskId)) {
+        taskMap.set(sub.taskId, sub);
+      }
+    });
+    return Array.from(taskMap.values());
+  }, [submissions]);
 
   const handleLogout = () => {
     if (confirm("Adakah anda mahu log keluar?")) {
@@ -136,7 +145,7 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
 
             const isDone = sub?.status === 'murni_completed';
             const activeLevel = user?.level || task.level || 'P4';
-  const levelCfg = getLevelConfig(activeLevel);
+            const levelCfg = getLevelConfig(activeLevel);
             const displayMax = sub?.pemarkahan?.max || levelCfg.max;
             const currentTotal = sub?.markah ?? sub?.pemarkahan?.jumlah ?? 0;
 
@@ -166,76 +175,54 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
                 ) : ( <div className="empty-sub"><p>Belum dihantar.</p></div> )}
                 
                 <button 
-  className={`action-btn ${sub ? 'secondary' : 'primary'}`} 
-  onClick={() => {
-    if (!sub) {
-      // No submission yet, start fresh
-      router.push(`/semakan?taskId=${task.id}`);
-    } else if (isDone) {
-      // Work is fully completed (Murni finished), just view report
-      router.push(`/analisis/${sub.id}`);
-    } else {
-      // Work exists but is not finished. 
-      // Ask if they want to continue or start over.
-      const choice = confirm(
-        "Anda sudah menghantar draf.\n\n" +
-        "Klik 'OK' untuk teruskan BAIKI karangan sedia ada.\n" +
-        "Klik 'Cancel' jika anda mahu PADAM & TULIS SEMULA karangan baru."
-      );
-      
-      if (choice) {
-        // User wants to keep working on the current one
-        router.push(`/analisis/${sub.id}`);
-      } else {
-        // User wants to overwrite/start over
-        const doubleCheck = confirm("ADAKAH ANDA PASTI? Karangan lama anda akan digantikan dengan yang baru.");
-        if (doubleCheck) {
-          router.push(`/semakan?taskId=${task.id}&overwrite=true`);
-        }
-      }
-    }
-  }}
->
-  {!sub ? 'Mula Menulis ✨' : isDone ? 'Lihat Laporan' : 'Baiki / Tulis Semula ✍️'}
-</button>
+                  className={`action-btn ${sub ? 'secondary' : 'primary'}`} 
+                  onClick={() => {
+                    if (!sub) {
+                      router.push(`/semakan?taskId=${task.id}`);
+                    } else if (isDone) {
+                      router.push(`/analisis/${sub.id}`);
+                    } else {
+                      const choice = confirm(
+                        "Anda sudah menghantar draf.\n\n" +
+                        "Klik 'OK' untuk teruskan BAIKI karangan sedia ada.\n" +
+                        "Klik 'Cancel' jika anda mahu PADAM & TULIS SEMULA karangan baru."
+                      );
+                      if (choice) {
+                        router.push(`/analisis/${sub.id}`);
+                      } else {
+                        const doubleCheck = confirm("ADAKAH ANDA PASTI? Karangan lama anda akan digantikan dengan yang baru.");
+                        if (doubleCheck) {
+                          router.push(`/semakan?taskId=${task.id}&overwrite=true`);
+                        }
+                      }
+                    }
+                  }}
+                >
+                  {!sub ? 'Mula Menulis ✨' : isDone ? 'Lihat Laporan' : 'Baiki / Tulis Semula ✍️'}
+                </button>
               </div>
             );
           })}
         </div>
         
-        {historySubmissions.length > 0 && (
-          <div style={{ marginTop: '40px' }}>
-            <h3 className="section-title">📜 Sejarah Penulisan Lain</h3>
-            <div className="mission-grid">
-              {historySubmissions.map(sub => {
+        {/* --- NEW SECTION: LATEST REPORTS --- */}
+        {latestReports.length > 0 && (
+          <div style={{ marginTop: '50px' }}>
+            <h3 className="section-title">📊 Laporan Hasil Karangan</h3>
+            <div className="report-list">
+              {latestReports.map(sub => {
                 const levelCfg = getLevelConfig(sub.level);
-                const displayMax = sub.pemarkahan?.max || levelCfg.max;
+                const taskRef = assignments.find(t => t.id === sub.taskId);
                 return (
-                  <div key={sub.id} className="card">
-                    <div className="card-header">
-                      <span className="level-badge" style={{ backgroundColor: levelCfg.color }}>{levelCfg.label}</span>
+                  <div key={sub.id} className="report-item">
+                    <div className="report-meta">
+                      <span className="report-date">{sub.sortDate.toLocaleDateString('ms-MY')}</span>
+                      <h4 className="report-title">{taskRef?.title || sub.tajuk || "Latihan Kendiri"}</h4>
                     </div>
-                    <h4 className="task-title">{sub.tajuk || "Latihan Kendiri"}</h4>
-                    <div className="sub-info">
-                      <div className="score-row">
-                        <div className="score-main">
-                          <span className="big-num">{sub.markah ?? sub.pemarkahan?.jumlah ?? 0}</span>
-                          <span className="total">/{displayMax}</span>
-                        </div>
-                      </div>
+                    <div className="report-score">
+                       <span className="score-pill">{sub.markah ?? sub.pemarkahan?.jumlah ?? 0} / {sub.pemarkahan?.max || levelCfg.max}</span>
+                       <button className="view-btn" onClick={() => router.push(`/analisis/${sub.id}`)}>Buka Laporan</button>
                     </div>
-                    <button 
-                      className="action-btn secondary" 
-                      onClick={() => {
-                        if (sub.status === 'murni_completed') {
-                          router.push(`/laporan/${sub.id}`);
-                        } else {
-                          router.push(`/analisis/${sub.id}`);
-                        }
-                      }}
-                    >
-                      Lihat Laporan
-                    </button>
                   </div>
                 );
               })}
@@ -243,7 +230,6 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
           </div>
         )}
 
-        {/* GAME & LEARNING HUB SECTION (Moved Down) */}
         <div className="game-hub" style={{ marginTop: '60px' }}>
           <h3 className="section-title">Sudah selesai?</h3>
           <p style={{ color: '#64748b', marginBottom: '20px', marginTop: '-15px' }}>Ayuh ulangkaji peribahasa sementara menunggu rakan-rakan yang lain.</p>
@@ -267,6 +253,7 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
       </main>
 
       <style jsx>{`
+        /* ... Existing Styles ... */
         .dashboard { background: #f0f2f5; min-height: 100vh; font-family: 'Plus Jakarta Sans', sans-serif; padding-bottom: 50px; }
         .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
         .header { background: #1a1a2e; color: white; padding: 20px 0 100px; border-radius: 0 0 40px 40px; }
@@ -280,41 +267,38 @@ localStorage.setItem("studentUser", JSON.stringify({ id: studentSnap.id, ...fres
         .stat-box { background: rgba(255,255,255,0.05); padding: 10px 20px; border-radius: 15px; text-align: center; min-width: 80px; }
         .stat-val { display: block; font-size: 1.5rem; font-weight: 800; }
         .stat-lab { font-size: 0.6rem; text-transform: uppercase; opacity: 0.7; }
-        
         .content { margin-top: -60px; }
-        
-        .game-hub { margin-bottom: 40px; }
-        .game-cards-container { display: flex; gap: 15px; flex-wrap: wrap; }
-        .game-link-card { 
-          flex: 1; min-width: 250px; background: white; padding: 20px; 
-          border-radius: 20px; display: flex; align-items: center; gap: 15px; 
-          cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-          border: 1px solid transparent;
-        }
-        .game-link-card:hover { transform: translateY(-5px); border-color: #a29bfe; }
-        .game-link-card.highlight { background: #6c5ce7; color: white; }
-        .game-link-card.highlight p { color: #e0e0e0; }
-        .game-icon { font-size: 2rem; }
-        .game-info h4 { margin: 0; font-size: 1rem; }
-        .game-info p { margin: 5px 0 0; font-size: 0.8rem; color: #636e72; }
-
         .section-title { color: #1a1a2e; margin-bottom: 20px; font-weight: 800; }
         .mission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         .card { background: white; border-radius: 25px; padding: 25px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); display: flex; flex-direction: column; transition: transform 0.2s; }
         .card.cleared { border: 2px solid #10b981; }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .level-badge { color: white; padding: 3px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 800; }
-        .done-check { color: #10b981; font-weight: 800; font-size: 0.8rem; }
         .task-title { font-size: 1.1rem; margin-bottom: 15px; color: #2d3436; flex-grow: 1; }
         .sub-info { background: #f8f9fa; border-radius: 15px; padding: 15px; margin-bottom: 15px; }
         .score-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .big-num { font-size: 1.8rem; font-weight: 900; color: #1a1a2e; }
-        .score-labels { font-size: 0.7rem; color: #636e72; text-align: right; }
-        .prog-track { height: 8px; background: #e9ecef; border-radius: 10px; overflow: hidden; }
-        .prog-fill { height: 100%; transition: width 0.6s ease-in-out; }
         .action-btn { width: 100%; padding: 12px; border-radius: 15px; border: none; font-weight: 800; cursor: pointer; transition: 0.2s; }
         .primary { background: #6c5ce7; color: white; }
         .secondary { background: #f0f2f5; color: #6c5ce7; }
+        
+        /* NEW REPORT STYLES */
+        .report-list { background: white; border-radius: 25px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        .report-item { display: flex; justify-content: space-between; align-items: center; padding: 20px 25px; border-bottom: 1px solid #f0f2f5; }
+        .report-item:last-child { border-bottom: none; }
+        .report-date { font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+        .report-title { margin: 2px 0 0; font-size: 1rem; color: #1a1a2e; }
+        .report-score { display: flex; align-items: center; gap: 15px; }
+        .score-pill { background: #f0f9f9; color: #00767b; padding: 6px 12px; border-radius: 10px; font-weight: 800; font-size: 0.9rem; border: 1px solid #d1e7e8; }
+        .view-btn { background: #1a1a2e; color: white; border: none; padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 0.8rem; cursor: pointer; }
+        
+        /* ... Remaining Game Hub Styles ... */
+        .game-hub { margin-bottom: 40px; }
+        .game-cards-container { display: flex; gap: 15px; flex-wrap: wrap; }
+        .game-link-card { flex: 1; min-width: 250px; background: white; padding: 20px; border-radius: 20px; display: flex; align-items: center; gap: 15px; cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.05); border: 1px solid transparent; }
+        .game-link-card:hover { transform: translateY(-5px); border-color: #a29bfe; }
+        .game-link-card.highlight { background: #6c5ce7; color: white; }
+        .game-icon { font-size: 2rem; }
         .loader-container { height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1a1a2e; color: white; }
         .rocket { font-size: 3rem; margin-bottom: 20px; animation: bounce 2s infinite; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
