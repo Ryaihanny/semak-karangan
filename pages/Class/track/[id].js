@@ -15,6 +15,15 @@ export default function AssignmentTracker() {
   const [loading, setLoading] = useState(true);
   const [classNameDisplay, setClassNameDisplay] = useState('');
 
+  // --- NEW STATES FOR PDF OPTIONS ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pdfOptions, setPdfOptions] = useState({
+    markah: true,
+    karangan: true,
+    analisis: true,
+    ulasan: true
+  });
+
   useEffect(() => {
     if (assignmentId && classId) { fetchTrackerData(); }
   }, [assignmentId, classId]);
@@ -38,7 +47,6 @@ export default function AssignmentTracker() {
       const statusMap = allStudents.map(student => {
         const result = allResults.find(r => r.studentId === student.id);
         
-        // --- SYNC WITH STUDENT DASHBOARD ---
         const totalMissions = result?.kesalahanBahasa?.length || 0;
         const solvedMissions = result?.solvedMissions?.length || 0;
         
@@ -147,55 +155,65 @@ export default function AssignmentTracker() {
       doc.text(`Tarikh: ${new Date().toLocaleDateString('ms-MY')}`, 160, y);
 
       y += 8;
-      const isJunior = (item.level === 'P3' || item.level === 'P4');
-      const maxIsi = isJunior ? 7 : 20;
-      const maxBhs = isJunior ? 8 : 20;
-      const totalMax = isJunior ? 15 : 40;
 
-      autoTable(doc, {
-        startY: y,
-        head: [['KRITERIA', 'MARKAH']],
-        body: [
-          ['Isi & Huraian', `${item.markahIsi} / ${maxIsi}`],
-          ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${maxBhs}`],
-          ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${totalMax}`],
-        ],
-        theme: 'grid',
-        headStyles: { fillColor: [0, 61, 64], textColor: [255, 255, 255] },
-        styles: { font: 'times', fontSize: 10 },
-        columnStyles: { 1: { halign: 'center', fontStyle: 'bold' } }
-      });
+      // --- CONDITIONAL: MARKAH ---
+      if (pdfOptions.markah) {
+        const isJunior = (item.level === 'P3' || item.level === 'P4');
+        const maxIsi = isJunior ? 7 : 20;
+        const maxBhs = isJunior ? 8 : 20;
+        const totalMax = isJunior ? 15 : 40;
 
-      y = doc.lastAutoTable.finalY + 12;
-      doc.setTextColor(0, 61, 64);
-      doc.setFont("times", "bold");
-      doc.text("TEKS KARANGAN:", margin, y);
-      y += 7;
-      doc.setFont("times", "normal");
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(11);
+        autoTable(doc, {
+          startY: y,
+          head: [['KRITERIA', 'MARKAH']],
+          body: [
+            ['Isi & Huraian', `${item.markahIsi} / ${maxIsi}`],
+            ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${maxBhs}`],
+            ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${totalMax}`],
+          ],
+          theme: 'grid',
+          headStyles: { fillColor: [0, 61, 64], textColor: [255, 255, 255] },
+          styles: { font: 'times', fontSize: 10 },
+          columnStyles: { 1: { halign: 'center', fontStyle: 'bold' } }
+        });
+        y = doc.lastAutoTable.finalY + 12;
+      } else {
+        y += 5;
+      }
 
-      const rawKarangan = cleanText(item.karangan);
-      const lines = doc.splitTextToSize(rawKarangan, usableWidth);
-      lines.forEach((line) => {
-        if (y > 275) { doc.addPage(); y = 20; }
-        doc.text(line, margin, y);
-        if (item.kesalahanBahasa) {
-          item.kesalahanBahasa.forEach((error) => {
-            const phrase = error.ayatSalah;
-            if (phrase && line.includes(phrase)) {
-              const startX = margin + doc.getTextWidth(line.substring(0, line.indexOf(phrase)));
-              const phraseWidth = doc.getTextWidth(phrase);
-              doc.setDrawColor(200, 0, 0);
-              doc.setLineWidth(0.2);
-              doc.line(startX, y + 1, startX + phraseWidth, y + 1);
-            }
-          });
-        }
+      // --- CONDITIONAL: TEKS KARANGAN ---
+      if (pdfOptions.karangan) {
+        doc.setTextColor(0, 61, 64);
+        doc.setFont("times", "bold");
+        doc.text("TEKS KARANGAN:", margin, y);
         y += 7;
-      });
+        doc.setFont("times", "normal");
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(11);
 
-      if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
+        const rawKarangan = cleanText(item.karangan);
+        const lines = doc.splitTextToSize(rawKarangan, usableWidth);
+        lines.forEach((line) => {
+          if (y > 275) { doc.addPage(); y = 20; }
+          doc.text(line, margin, y);
+          if (item.kesalahanBahasa) {
+            item.kesalahanBahasa.forEach((error) => {
+              const phrase = error.ayatSalah;
+              if (phrase && line.includes(phrase)) {
+                const startX = margin + doc.getTextWidth(line.substring(0, line.indexOf(phrase)));
+                const phraseWidth = doc.getTextWidth(phrase);
+                doc.setDrawColor(200, 0, 0);
+                doc.setLineWidth(0.2);
+                doc.line(startX, y + 1, startX + phraseWidth, y + 1);
+              }
+            });
+          }
+          y += 7;
+        });
+      }
+
+      // --- CONDITIONAL: ANALISIS KESALAHAN ---
+      if (pdfOptions.analisis && item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
         y += 5;
         if (y > 230) { doc.addPage(); y = 20; }
         doc.setTextColor(200, 0, 0);
@@ -218,23 +236,28 @@ export default function AssignmentTracker() {
         y = doc.lastAutoTable.finalY + 10;
       }
 
-      if (y > 240) { doc.addPage(); y = 20; }
-      doc.setFillColor(245, 250, 250);
-      doc.rect(margin, y, usableWidth, 25, 'F');
-      doc.setTextColor(0, 61, 64);
-      doc.setFont("times", "bold");
-      doc.text("ULASAN KESELURUHAN:", margin + 3, y + 8);
-      doc.setFont("times", "normal");
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      const ulasanSummary = typeof item.ulasan === 'object' ? cleanText(item.ulasan?.keseluruhan || "") : cleanText(item.ulasan);
-      const wrappedUlasan = doc.splitTextToSize(ulasanSummary, usableWidth - 6);
-      doc.text(wrappedUlasan, margin + 3, y + 15);
+      // --- CONDITIONAL: ULASAN ---
+      if (pdfOptions.ulasan) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        doc.setFillColor(245, 250, 250);
+        doc.rect(margin, y, usableWidth, 25, 'F');
+        doc.setTextColor(0, 61, 64);
+        doc.setFont("times", "bold");
+        doc.text("ULASAN KESELURUHAN:", margin + 3, y + 8);
+        doc.setFont("times", "normal");
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        const ulasanSummary = typeof item.ulasan === 'object' ? cleanText(item.ulasan?.keseluruhan || "") : cleanText(item.ulasan);
+        const wrappedUlasan = doc.splitTextToSize(ulasanSummary, usableWidth - 6);
+        doc.text(wrappedUlasan, margin + 3, y + 15);
+      }
+
       doc.setFontSize(8);
       doc.setTextColor(150);
       doc.text("Keputusan ini dijana secara digital berasaskan sistem SI-PINTAR.", 105, 290, { align: "center" });
     });
     doc.save(`Koleksi_Laporan_${classNameDisplay.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+    setIsModalOpen(false);
   };
 
   if (loading) return <div style={{padding:'50px', textAlign:'center'}}>Memuat naik data...</div>;
@@ -254,7 +277,8 @@ export default function AssignmentTracker() {
                <h1>{assignment?.title}</h1>
             </div>
           </div>
-          <button className="btn-main" onClick={generatePDF}>📥 Cetak Laporan PDF ({studentStatuses.filter(s => s.checked).length})</button>
+          {/* TRIGGER MODAL INSTEAD OF DIRECT PDF */}
+          <button className="btn-main" onClick={() => setIsModalOpen(true)}>📥 Cetak Laporan PDF ({studentStatuses.filter(s => s.checked).length})</button>
         </div>
       </header>
 
@@ -313,7 +337,6 @@ export default function AssignmentTracker() {
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       {s.submissionId && (
                         <>
-                         
                           <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
                         </>
                       )}
@@ -325,6 +348,43 @@ export default function AssignmentTracker() {
           </table>
         </div>
       </main>
+
+      {/* MODAL OVERLAY */}
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h2>⚙️ Konfigurasi Laporan PDF</h2>
+              <button className="close-x" onClick={() => setIsModalOpen(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Pilih bahagian yang ingin dimasukkan:</p>
+              <div className="options-list">
+                <label className="option-item">
+                  <input type="checkbox" checked={pdfOptions.markah} onChange={e => setPdfOptions({...pdfOptions, markah: e.target.checked})} />
+                  <div className="option-info"><strong>1) Markah & Kriteria</strong><span>Skor isi dan bahasa murid.</span></div>
+                </label>
+                <label className="option-item">
+                  <input type="checkbox" checked={pdfOptions.karangan} onChange={e => setPdfOptions({...pdfOptions, karangan: e.target.checked})} />
+                  <div className="option-info"><strong>2) Teks Karangan</strong><span>Teks asal yang ditulis murid.</span></div>
+                </label>
+                <label className="option-item">
+                  <input type="checkbox" checked={pdfOptions.analisis} onChange={e => setPdfOptions({...pdfOptions, analisis: e.target.checked})} />
+                  <div className="option-info"><strong>3) Analisis Kesalahan</strong><span>Jadual pembetulan ayat.</span></div>
+                </label>
+                <label className="option-item">
+                  <input type="checkbox" checked={pdfOptions.ulasan} onChange={e => setPdfOptions({...pdfOptions, ulasan: e.target.checked})} />
+                  <div className="option-info"><strong>4) Ulasan Keseluruhan</strong><span>Komen akhir daripada AI.</span></div>
+                </label>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={() => setIsModalOpen(false)}>Batal</button>
+              <button className="btn-confirm" onClick={generatePDF}>Muat Turun ({studentStatuses.filter(s => s.checked).length})</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .tracker-root { background: #F4F7F7; min-height: 100vh; font-family: 'Plus Jakarta Sans', sans-serif; color: #2D3436; }
@@ -364,6 +424,25 @@ export default function AssignmentTracker() {
         .btn-detail:hover { background: #003D40; color: white; border-color: #003D40; }
         .no-data { color: #DFE6E9; font-weight: 800; }
         .row-done { background: #FBFFFF; }
+
+        /* MODAL STYLES */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(4px); }
+        .modal-content { background: white; width: 90%; max-width: 420px; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.2); animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { padding: 20px; background: #F8FAFA; border-bottom: 1px solid #EEE; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { font-size: 1.1rem; margin: 0; color: #003D40; }
+        .close-x { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #B2BEC3; }
+        .modal-body { padding: 20px; }
+        .options-list { display: flex; flex-direction: column; gap: 10px; }
+        .option-item { display: flex; gap: 12px; padding: 12px; border: 1px solid #F0F2F2; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+        .option-item:hover { background: #F0F9F9; border-color: #48A6A7; }
+        .option-item input { width: 18px; height: 18px; accent-color: #48A6A7; margin-top: 3px; }
+        .option-info { display: flex; flex-direction: column; }
+        .option-info strong { font-size: 0.9rem; color: #2D3436; }
+        .option-info span { font-size: 0.75rem; color: #94A3B8; }
+        .modal-footer { padding: 15px 20px; background: #F8FAFA; display: flex; gap: 10px; }
+        .btn-cancel { flex: 1; padding: 12px; border: none; background: #E2E8F0; color: #64748B; border-radius: 10px; font-weight: 700; cursor: pointer; }
+        .btn-confirm { flex: 2; padding: 12px; border: none; background: #48A6A7; color: white; border-radius: 10px; font-weight: 700; cursor: pointer; }
       `}</style>
     </div>
   );
