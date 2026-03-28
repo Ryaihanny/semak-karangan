@@ -236,21 +236,30 @@ export default function AssignmentTracker() {
         y = doc.lastAutoTable.finalY + 10;
       }
 
-      // --- CONDITIONAL: ULASAN ---
-      if (pdfOptions.ulasan) {
-        if (y > 240) { doc.addPage(); y = 20; }
-        doc.setFillColor(245, 250, 250);
-        doc.rect(margin, y, usableWidth, 25, 'F');
-        doc.setTextColor(0, 61, 64);
-        doc.setFont("times", "bold");
-        doc.text("ULASAN KESELURUHAN:", margin + 3, y + 8);
-        doc.setFont("times", "normal");
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(10);
-        const ulasanSummary = typeof item.ulasan === 'object' ? cleanText(item.ulasan?.keseluruhan || "") : cleanText(item.ulasan);
-        const wrappedUlasan = doc.splitTextToSize(ulasanSummary, usableWidth - 6);
-        doc.text(wrappedUlasan, margin + 3, y + 15);
-      }
+// --- CONDITIONAL: ULASAN ---
+if (pdfOptions.ulasan) {
+  if (y > 240) { doc.addPage(); y = 20; }
+  doc.setFillColor(245, 250, 250);
+  doc.rect(margin, y, usableWidth, 25, 'F');
+  doc.setTextColor(0, 61, 64);
+  doc.setFont("times", "bold");
+  doc.text("ULASAN KESELURUHAN:", margin + 3, y + 8);
+  doc.setFont("times", "normal");
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+
+  // PEMBETULAN DI SINI:
+  // Kita semak semua kemungkinan nama field: ulasanKeseluruhan, ulasan.keseluruhan, atau ulasan
+  const ulasanSummary = cleanText(
+    student.result?.ulasanKeseluruhan || 
+    student.result?.ulasan?.keseluruhan || 
+    student.result?.ulasan || 
+    "Tiada ulasan."
+  );
+
+  const wrappedUlasan = doc.splitTextToSize(ulasanSummary, usableWidth - 6);
+  doc.text(wrappedUlasan, margin + 3, y + 15);
+}
 
       doc.setFontSize(8);
       doc.setTextColor(150);
