@@ -138,7 +138,7 @@ export default function AssignmentTracker() {
       doc.setTextColor(255, 255, 255);
       doc.setFont("times", "bold");
       doc.setFontSize(20);
-      doc.text("LAPORAN SEMAKAN SI-PINTAR", 105, 18, { align: "center" });
+      doc.text("LAPORAN SEMAKAN", 105, 18, { align: "center" });
       doc.setFontSize(10);
       doc.setFont("times", "normal");
       doc.text("Penilaian Karangan Sekolah Rendah Singapura", 105, 26, { align: "center" });
@@ -275,7 +275,7 @@ export default function AssignmentTracker() {
         doc.rect(margin, y, usableWidth, 30, 'F');
         doc.setTextColor(0, 61, 64);
         doc.setFont("times", "bold");
-        doc.text("KESIMPULAN GURU SI-PINTAR:", margin + 3, y + 8);
+        doc.text("KESIMPULAN:", margin + 3, y + 8);
         doc.setFont("times", "normal");
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
@@ -285,7 +285,7 @@ export default function AssignmentTracker() {
 
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text("Keputusan ini dijana secara digital berasaskan sistem SI-PINTAR.", 105, 290, { align: "center" });
+      doc.text("Keputusan ini dijana secara digital berasaskan sistem SemakBijak.", 105, 290, { align: "center" });
     });
     doc.save(`Koleksi_Laporan_${classNameDisplay.replace(/[^a-z0-9]/gi, '_')}.pdf`);
     setIsModalOpen(false);
