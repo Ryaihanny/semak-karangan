@@ -141,7 +141,7 @@ export default function AssignmentTracker() {
       doc.text("LAPORAN SEMAKAN SI-PINTAR", 105, 18, { align: "center" });
       doc.setFontSize(10);
       doc.setFont("times", "normal");
-      doc.text("Standard Penilaian Karangan MOE Singapura", 105, 26, { align: "center" });
+      doc.text("Penilaian Karangan Sekolah Rendah Singapura", 105, 26, { align: "center" });
 
       let y = 50;
       doc.setTextColor(0, 61, 64);
