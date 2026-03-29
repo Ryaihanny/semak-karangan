@@ -1,10 +1,10 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect, useCallback } from 'react';
-import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth'; // Added sendPasswordResetEmail
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import Head from 'next/head';
-import Link from 'next/link'; // Added Link
+import Link from 'next/link';
 
 export default function Home() {
   const router = useRouter();
@@ -14,6 +14,20 @@ export default function Home() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
+
+  // New function for password reset
+  const handleForgotPassword = async () => {
+    if (!identifier || !identifier.includes('@')) {
+      alert("Sila masukkan emel guru yang sah untuk set semula kata laluan.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, identifier.trim().toLowerCase());
+      alert("Pautan set semula kata laluan telah dihantar ke emel anda! Sila semak folder Inbox atau Spam.");
+    } catch (err) {
+      setError("Ralat: Emel tidak dijumpai atau masalah rangkaian.");
+    }
+  };
 
   // Robust Redirection Logic
   const redirectUser = useCallback(async (firebaseUser) => {
@@ -122,15 +136,20 @@ export default function Home() {
                 <input type={loginType === 'username' ? 'text' : 'email'} placeholder={loginType === 'username' ? "ID Murid (cth: ali123)" : "Emel Guru"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
               </div>
               <div className="input-group">
-                <input type="password" placeholder="Kata Laluan" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '0 5px' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#2D3436' }}>Kata Laluan</label>
+                  {loginType === 'email' && (
+                    <span onClick={handleForgotPassword} style={{ fontSize: '0.75rem', color: '#6C63FF', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}>Lupa?</span>
+                  )}
+                </div>
+                <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
               <button type="submit" className="submit-btn" disabled={loading}>{loading ? "Menyemak..." : "Masuk Sekarang"}</button>
             </form>
             
-            {/* ADDED: SIGNUP LINK */}
             <div className="signup-link">
-  Cikgu baru di sini? <Link href="/signup">Daftar Akaun Guru</Link>
-</div>
+              Cikgu baru di sini? <Link href="/signup">Daftar Akaun Guru</Link>
+            </div>
 
             {error && <div className="error-pill">{error}</div>}
           </div>

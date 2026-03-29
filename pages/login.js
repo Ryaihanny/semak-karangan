@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth'; // Added sendPasswordResetEmail
 import Link from 'next/link';
 
 export default function Login() {
@@ -11,6 +11,20 @@ export default function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // New function for password reset
+  const handleForgotPassword = async () => {
+    if (!identifier || !identifier.includes('@')) {
+      alert("Sila masukkan emel guru yang sah untuk set semula kata laluan.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, identifier.trim().toLowerCase());
+      alert("Pautan set semula kata laluan telah dihantar ke emel anda! Sila semak folder Inbox atau Spam.");
+    } catch (err) {
+      alert("Ralat: Emel tidak dijumpai atau masalah rangkaian.");
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -66,7 +80,12 @@ export default function Login() {
             <input type={loginType === 'username' ? "text" : "email"} placeholder={loginType === 'username' ? "Masukkan ID anda" : "guru@sekolah.edu"} value={identifier} onChange={(e) => setIdentifier(e.target.value)} required />
           </div>
           <div className="input-field">
-            <label>Kata Laluan</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label>Kata Laluan</label>
+              {loginType === 'email' && (
+                <span onClick={handleForgotPassword} className="forgot-link">Lupa?</span>
+              )}
+            </div>
             <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           <button type="submit" className="login-btn" disabled={loading}>{loading ? "Membuka Portal..." : "Mula Belajar!"}</button>
@@ -87,6 +106,7 @@ export default function Login() {
         .toggle-slider button.active { background: white; color: #6C63FF; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .input-field { text-align: left; margin-bottom: 20px; }
         label { display: block; margin-bottom: 8px; font-weight: 700; color: #2D3436; }
+        .forgot-link { font-size: 0.8rem; color: #6C63FF; font-weight: 700; cursor: pointer; text-decoration: underline; }
         input { width: 100%; padding: 15px; border-radius: 15px; border: 2px solid #F0F0F0; font-size: 1rem; outline: none; transition: 0.3s; box-sizing: border-box; }
         input:focus { border-color: #6C63FF; }
         .login-btn { width: 100%; background: #6C63FF; color: white; border: none; padding: 18px; border-radius: 20px; font-size: 1.1rem; font-weight: 800; cursor: pointer; margin-top: 10px; transition: 0.3s; }
