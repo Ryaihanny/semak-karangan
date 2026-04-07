@@ -68,19 +68,22 @@ const [allStudents, setAllStudents] = useState([]); // Add this line
     return () => unsubscribe();
   }, [router]);
 
-  const loadSystemData = async () => {
-    const [uSnap, cSnap, aSnap, rSnap] = await Promise.all([
+const loadSystemData = async () => {
+    // 1. Added sSnap to the array below
+    // 2. Added the missing commas
+    const [uSnap, cSnap, aSnap, rSnap, sSnap] = await Promise.all([
       getDocs(collection(db, 'users')),
       getDocs(collection(db, 'classes')),
       getDocs(collection(db, 'assignments')),
       getDocs(collection(db, 'karanganResults')), 
-getDocs(collection(db, 'students'))
+      getDocs(collection(db, 'students'))
     ]);
+
     setAllUsers(uSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllClasses(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllAssignments(aSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllResults(rSnap.docs.map(d => ({ id: d.id, ...d.data() }))); 
-setAllStudents(sSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    setAllStudents(sSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
   const loadGuruData = async (uid) => {
