@@ -142,39 +142,37 @@ export default function AdminMasterDashboard() {
 };
 
   // ANALYTICS CALCULATOR
-const getTeacherInsights = (tId) => {
+const getTeacherInsights = (teacherUid) => {
   try {
-    const teacher = allUsers?.find(u => u.id === tId) || {};
-    
+    const teacher = allUsers?.find(u => u.uid === teacherUid) || {};
+
     // 1. Account Created & Last Active (Requirement 1 & 6)
-    const createdDate = teacher?.createdAt?.toDate 
-      ? teacher.createdAt.toDate().toLocaleDateString('ms-MY') 
-      : 'Tiada Data';
-    
-    const lastActive = teacher?.lastActive?.toDate 
-      ? teacher.lastActive.toDate().toLocaleString('ms-MY') 
-      : 'Tiada Data';
+    // Note: Your Users table uses a String for createdAt, not a Timestamp
+    const createdDate = teacher?.createdAt ? new Date(teacher.createdAt).toLocaleDateString('ms-MY') : 'Tiada Data';
+    const lastActive = teacher?.lastActive?.toDate ? teacher.lastActive.toDate().toLocaleString('ms-MY') : 'Tiada Data';
 
     // 2. Jumlah Kelas (Requirement 2)
-    const teacherClasses = allClasses?.filter(c => c.teacherId === tId) || [];
+    // Logic: Find classes where teacherId matches teacher's uid
+    const teacherClasses = allClasses?.filter(c => c.teacherId === teacherUid) || [];
     const classIds = teacherClasses.map(c => c.id);
 
     // 3. Tugasan Dibuat (Requirement 3)
-    const teacherAssignments = allAssignments?.filter(a => a.teacherId === tId) || [];
+    const teacherAssignments = allAssignments?.filter(a => a.teacherId === teacherUid) || [];
 
-    // 4. Find Students under this Teacher (Required for Requirement 4 & 5)
-    // Looking for students where their classId belongs to this teacher
-    const teacherStudents = allStudents?.filter(s => classIds.includes(s.classId)) || [];
-    const studentIds = teacherStudents.map(s => s.id);
+    // 4. Find Students (Requirement 5)
+    // Logic: Students who have one of this teacher's class IDs in their 'enrolledClasses' array
+    const teacherStudents = allStudents?.filter(s => 
+      s.enrolledClasses?.some(id => classIds.includes(id))
+    ) || [];
 
     // 5. Semakan AI (Requirement 4)
-    // Total = Manual Teacher checks + Checks done by their students
+    // Logic: Counts results where studentId matches a student's username
+    const studentUsernames = teacherStudents.map(s => s.username);
     const totalSemakan = allResults?.filter(r => 
-      r.userId === tId || studentIds.includes(r.userId)
+      r.userId === teacherUid || studentUsernames.includes(r.studentId)
     ).length || 0;
 
     // 6. Purata Murid (Requirement 5)
-    // Calculated as Total Students divided by Total Classes
     const avgMurid = teacherClasses.length > 0 
       ? (teacherStudents.length / teacherClasses.length).toFixed(1) 
       : 0;
@@ -185,11 +183,10 @@ const getTeacherInsights = (tId) => {
       classes: teacherClasses.length,
       assignments: teacherAssignments.length,
       totalChecks: totalSemakan,
-      avgStudents: avgMurid,
-      studentTotal: teacherStudents.length
+      avgStudents: avgMurid
     };
   } catch (err) {
-    console.error("Insight Error:", err);
+    console.error("Deep Scan Error:", err);
     return { created: 'Error', lastActive: 'Error', classes: 0, assignments: 0, totalChecks: 0, avgStudents: 0 };
   }
 };
@@ -457,7 +454,7 @@ const generatePDF = (items) => {
                         <td 
                           style={{ cursor: 'pointer' }}
                           onClick={() => {
-                             const stats = getTeacherInsights(u.id);
+                             const stats = getTeacherInsights(u.uid);
                              setSelectedTeacherStats({ nama: u.nama || u.username, data: stats });
                           }}
                         >
