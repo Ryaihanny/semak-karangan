@@ -143,40 +143,36 @@ export default function AdminMasterDashboard() {
 
   // ANALYTICS CALCULATOR
 const getTeacherInsights = (tId) => {
-    // 1. Get the Teacher object
-    const teacher = allUsers.find(u => u.id === tId) || {};
-    
-    // 2. Filter Classes where teacherId matches
-    const teacherClasses = allClasses.filter(c => c.teacherId === tId);
-    const classIds = teacherClasses.map(c => c.id);
+  // 1. Ensure we have data to work with
+  if (!allResults || !tId) return { classes: 0, assignments: 0, checks: 0, avg: 0 };
 
-    // 3. Filter Assignments where teacherId matches
-    const teacherAssignments = allAssignments.filter(a => a.teacherId === tId);
+  // 2. Filter results (Checking both common naming conventions)
+  const teacherManualChecks = allResults.filter(r => 
+    r.userId === tId || r.userID === tId || r.authorId === tId
+  );
 
-    // 4. Filter Results (This is likely where the "Zero" was happening)
-    // We look for results that belong to this teacher's classes
-    const teacherResults = allResults.filter(r => 
-      r.userId === tId || classIds.includes(r.classId)
-    );
-    
-    const avgScore = teacherResults.length > 0 
-      ? (teacherResults.reduce((acc, r) => acc + (r.markahKeseluruhan || 0), 0) / teacherResults.length).toFixed(1)
-      : 0;
+  // 3. Filter classes/assignments
+  const teacherClasses = allClasses?.filter(c => c.teacherId === tId) || [];
+  const teacherAssignments = allAssignments?.filter(a => a.teacherId === tId) || [];
 
-    // 5. Date Formatting (Preventing .toDate() crashes)
-    const lastActiveStr = teacher?.lastActive 
-      ? (typeof teacher.lastActive.toDate === 'function' ? teacher.lastActive.toDate().toLocaleString('ms-MY') : 'Aktif')
-      : 'Tiada Data';
+  // 4. Calculate Average Score
+  // Note: Check if your score field is 'markahKeseluruhan' or just 'markah'
+  const totalScore = teacherManualChecks.reduce((acc, r) => {
+    const score = r.markahKeseluruhan || r.score || r.markah || 0;
+    return acc + Number(score);
+  }, 0);
 
-    return {
-      age: teacher?.createdAt ? "Aktif" : "Baru",
-      classes: teacherClasses.length,
-      assignments: teacherAssignments.length,
-      checks: teacherResults.length,
-      avg: avgScore,
-      lastActive: lastActiveStr
-    };
+  const avgScore = teacherManualChecks.length > 0 
+    ? (totalScore / teacherManualChecks.length).toFixed(1)
+    : 0;
+
+  return {
+    classes: teacherClasses.length,
+    assignments: teacherAssignments.length,
+    checks: teacherManualChecks.length,
+    avg: avgScore
   };
+};
 
   const uniqueTahap = useMemo(() => ['Semua Tahap', ...new Set(myResults.map(r => r.level).filter(Boolean))], [myResults]);
   const uniqueClasses = useMemo(() => ['Semua Kelas', ...new Set(myResults.map(r => r.kelas).filter(Boolean))], [myResults]);
