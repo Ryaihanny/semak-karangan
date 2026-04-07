@@ -34,8 +34,8 @@ export default function AdminMasterDashboard() {
   const [allClasses, setAllClasses] = useState([]);
   const [allAssignments, setAllAssignments] = useState([]);
   const [myResults, setMyResults] = useState([]);
-  const [allResults, setAllResults] = useState([]); // Added for Admin Analytics
-  const [selectedTeacherStats, setSelectedTeacherStats] = useState(null); // For Drill-down Modal
+  const [allResults, setAllResults] = useState([]); 
+  const [selectedTeacherStats, setSelectedTeacherStats] = useState(null); 
   const [layoutStyle, setLayoutStyle] = useState('list');
   const [selectedResultsIds, setSelectedResultsIds] = useState([]);
   
@@ -71,12 +71,12 @@ export default function AdminMasterDashboard() {
       getDocs(collection(db, 'users')),
       getDocs(collection(db, 'classes')),
       getDocs(collection(db, 'assignments')),
-      getDocs(collection(db, 'karanganResults')) // Added for analytics
+      getDocs(collection(db, 'karanganResults')) 
     ]);
     setAllUsers(uSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllClasses(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllAssignments(aSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-    setAllResults(rSnap.docs.map(d => ({ id: d.id, ...d.data() }))); // Store global results
+    setAllResults(rSnap.docs.map(d => ({ id: d.id, ...d.data() }))); 
   };
 
   const loadGuruData = async (uid) => {
@@ -167,7 +167,6 @@ export default function AdminMasterDashboard() {
     };
   };
 
-  // NEW FILTER LOGIC FOR KEPUTUSAN MURID
   const uniqueTahap = useMemo(() => ['Semua Tahap', ...new Set(myResults.map(r => r.level).filter(Boolean))], [myResults]);
   const uniqueClasses = useMemo(() => ['Semua Kelas', ...new Set(myResults.map(r => r.kelas).filter(Boolean))], [myResults]);
   const uniqueSets = useMemo(() => ['Semua Set', ...new Set(myResults.map(r => r.set).filter(Boolean))], [myResults]);
@@ -429,11 +428,17 @@ const generatePDF = (items) => {
                       <tr key={u.id} className={selectedUserIds.includes(u.id) ? 'active-row' : ''}>
                         <td><input type="checkbox" checked={selectedUserIds.includes(u.id)} onChange={() => setSelectedUserIds(prev => prev.includes(u.id) ? prev.filter(i => i !== u.id) : [...prev, u.id])} /></td>
                         <td 
-                          className="clickable-name" 
-                          onClick={() => setSelectedTeacherStats({ nama: u.nama || u.username, data: getTeacherInsights(u.id) })}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                             const stats = getTeacherInsights(u.id);
+                             setSelectedTeacherStats({ nama: u.nama || u.username, data: stats });
+                          }}
                         >
-                          <strong>{u.nama || u.username || 'Tiada Nama'}</strong>
-                          <br/><small style={{color: '#48A6A7'}}>Analisis Penggunaan</small>
+                          <div className="teacher-name-cell">
+                            <strong>{u.nama || u.username || 'Tiada Nama'}</strong>
+                            <br/>
+                            <span className="analisis-trigger">📊 Analisis Penggunaan</span>
+                          </div>
                         </td>
                         <td><small>{u.email}</small></td>
                         <td><span className={`tag ${u.role}`}>{u.role}</span></td>
@@ -634,15 +639,17 @@ const generatePDF = (items) => {
         </div>
       </main>
 
-      {/* --- DRILL DOWN MODAL --- */}
+      {/* --- DRILL DOWN MODAL (PLACED AT BOTTOM FOR PROPER Z-INDEX) --- */}
       {selectedTeacherStats && (
-        <div className="modal-overlay" onClick={() => setSelectedTeacherStats(null)}>
+        <div className="modal-overlay" style={{ display: 'flex', zIndex: 1000 }} onClick={() => setSelectedTeacherStats(null)}>
           <div className="pro-card insights-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Analisis Guru: {selectedTeacherStats.nama}</h3>
-              <button className="btn-close-modal" onClick={() => setSelectedTeacherStats(null)}>✕</button>
+              <h3 style={{margin:0}}>Analisis Guru: {selectedTeacherStats.nama}</h3>
+              <button className="btn-close-modal" onClick={() => setSelectedTeacherStats(null)} style={{background:'none', border:'none', fontSize:'24px', cursor:'pointer', color:'#666'}}>✕</button>
             </div>
             
+            <hr style={{ opacity: 0.1, margin: '15px 0' }} />
+
             <div className="insights-grid">
               <div className="insight-box">
                 <span>Usia Akaun</span>
@@ -666,7 +673,7 @@ const generatePDF = (items) => {
               </div>
               <div className="insight-box">
                 <span>Aktif Terakhir</span>
-                <small style={{display:'block', marginTop:'5px'}}>{selectedTeacherStats.data.lastActive}</small>
+                <small style={{display:'block', marginTop:'5px', fontSize:'0.75rem', color:'#666'}}>{selectedTeacherStats.data.lastActive}</small>
               </div>
             </div>
           </div>
@@ -680,63 +687,50 @@ const generatePDF = (items) => {
         .logo-icon { background: #FFD700; color: #003D40; font-weight: 900; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
         
         .mode-switcher-container { display: flex; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 12px; margin-bottom: 1.5rem; }
-        .mode-switcher-container button { flex: 1; border: none; background: transparent; color: white; padding: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; border-radius: 8px; }
-        .mode-switcher-container button.active { background: #48A6A7; }
+        .mode-switcher-container button { flex: 1; border: none; background: transparent; color: white; padding: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer; border-radius: 8px; transition: all 0.3s; }
+        .mode-switcher-container button.active { background: #48A6A7; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
 
-        .nav-header { font-size: 0.65rem; font-weight: 800; color: rgba(255,255,255,0.4); letter-spacing: 1.5px; margin: 1.5rem 0 0.8rem 15px; }
-        .nav-link { padding: 12px 15px; border-radius: 12px; cursor: pointer; margin-bottom: 4px; transition: 0.2s; color: rgba(255,255,255,0.7); font-size: 0.9rem; }
-        .nav-link:hover { background: rgba(255,255,255,0.05); color: white; }
-        .nav-link.active { background: #48A6A7; color: white; font-weight: 600; }
-        .nav-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 1.5rem 10px; }
-        .btn-logout-sidebar { margin-top: auto; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; border-radius: 10px; cursor: pointer; }
+        .sidebar-nav { flex: 1; }
+        .nav-header { font-size: 0.7rem; color: #48A6A7; font-weight: 800; letter-spacing: 1px; margin: 1.5rem 0 0.5rem; }
+        .nav-link { padding: 12px 15px; border-radius: 10px; cursor: pointer; font-size: 0.9rem; transition: 0.2s; color: rgba(255,255,255,0.7); }
+        .nav-link:hover { background: rgba(255,255,255,0.1); color: white; }
+        .nav-link.active { background: #48A6A7; color: white; font-weight: bold; }
 
-        .main-viewport { flex: 1; padding: 2.5rem 3.5rem; overflow-y: auto; }
+        .main-viewport { flex: 1; padding: 2rem; overflow-y: auto; }
         .viewport-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-        .global-search-container input { padding: 12px 20px; border-radius: 50px; border: 1px solid #E0E7E7; width: 250px; }
-        .credit-badge { background: #E0F2F1; color: #00695C; padding: 8px 15px; border-radius: 10px; font-size: 0.85rem; }
-
-        .pro-card { background: white; border-radius: 20px; border: 1px solid #E0E7E7; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 20px rgba(0,61,64,0.04); }
-        .no-padding { padding: 0; overflow: hidden; }
-
-        .toolbar-filters { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
-        .t-group { display: flex; flex-direction: column; gap: 5px; }
-        .t-group label { font-size: 0.7rem; font-weight: bold; color: #99AFAF; text-transform: uppercase; }
-        .t-group select { padding: 8px 12px; border-radius: 8px; border: 1px solid #E0E7E7; background: #F9FAFA; min-width: 140px; }
+        
+        .pro-card { background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,61,64,0.05); }
+        .pro-card.no-padding { padding: 0; overflow: hidden; }
 
         .modern-table { width: 100%; border-collapse: collapse; }
-        .modern-table th { background: #F9FAFA; padding: 15px 20px; text-align: left; font-size: 0.7rem; color: #99AFAF; border-bottom: 1px solid #E0E7E7; text-transform: uppercase; }
-        .modern-table td { padding: 15px 20px; border-bottom: 1px solid #F0F4F4; font-size: 0.9rem; }
-        
-        .active-row { background: #F0F9F9 !important; }
-        .status-pill { padding: 4px 10px; border-radius: 50px; font-size: 0.7rem; font-weight: bold; }
-        .status-pill.active { background: #E8F5E9; color: #2E7D32; }
-        .status-pill.late { background: #FFEBEE; color: #C62828; }
+        .modern-table th { background: #F8FBFA; padding: 15px; text-align: left; font-size: 0.85rem; color: #00695C; border-bottom: 2px solid #E0EDED; }
+        .modern-table td { padding: 15px; border-bottom: 1px solid #F0F5F5; font-size: 0.9rem; vertical-align: middle; }
+        .modern-table tr:hover { background: #F9FCFC; }
 
-        .bulk-action-bar { background: #003D40; color: white; padding: 12px 25px; border-radius: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .floating-bar { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); width: auto; min-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 1000; display: none; }
-        .floating-bar.visible { display: flex; }
-        .btn-bulk { background: #FFD700; color: #003D40; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .teacher-name-cell { transition: transform 0.2s; }
+        .teacher-name-cell:hover { transform: translateX(5px); }
+        .analisis-trigger { color: #48A6A7; font-size: 0.75rem; font-weight: bold; text-decoration: underline; opacity: 0.8; }
+        .analisis-trigger:hover { opacity: 1; }
 
-        .tag { font-size: 10px; padding: 4px 10px; border-radius: 4px; font-weight: bold; }
-        .tag.admin { background: #FFF4E5; color: #FF9800; }
-        .tag.guru { background: #E8F5E9; color: #4CAF50; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 30, 30, 0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .insights-modal { width: 100%; max-width: 600px; animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
-        .clickable-name { cursor: pointer; }
-        .clickable-name:hover strong { color: #48A6A7; text-decoration: underline; }
-
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
-        .insights-modal { width: 500px; padding: 2rem; border-top: 5px solid #FFD700; position: relative; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .btn-close-modal { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #99AFAF; }
-
-        .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .insight-box { background: #F9FAFA; padding: 15px; border-radius: 12px; border: 1px solid #E0E7E7; }
-        .insight-box span { display: block; font-size: 0.7rem; color: #99AFAF; text-transform: uppercase; font-weight: bold; }
-        .insight-box strong { font-size: 1.1rem; color: #003D40; display: block; margin-top: 5px; }
+        .insights-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 15px; }
+        .insight-box { background: #F8FBFA; border: 1px solid #E0EDED; padding: 15px; border-radius: 12px; text-align: center; }
+        .insight-box span { display: block; font-size: 0.7rem; color: #666; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .insight-box strong { font-size: 1.1rem; color: #003D40; }
         .insight-box.highlight { background: #E0F2F1; border-color: #48A6A7; }
+        .insight-box.highlight strong { color: #00796B; }
 
-        .class-grid-system { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
-        .class-badge { background: #48A6A7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
+        .tag { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+        .tag.admin { background: #E0F2F1; color: #00796B; }
+        .tag.guru { background: #FFF9C4; color: #F57F17; }
+        .credit-pill { background: #003D40; color: white; padding: 4px 12px; border-radius: 10px; font-weight: bold; font-size: 0.8rem; }
+        
+        .btn-action { border: none; background: #48A6A7; color: white; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; }
+        .btn-logout-sidebar { margin-top: auto; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 12px; border-radius: 10px; cursor: pointer; transition: 0.3s; }
+        .btn-logout-sidebar:hover { background: #C62828; }
       `}</style>
     </div>
   );
