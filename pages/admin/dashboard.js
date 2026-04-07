@@ -143,35 +143,50 @@ export default function AdminMasterDashboard() {
 
   // ANALYTICS CALCULATOR
 const getTeacherInsights = (tId) => {
-  // 1. Ensure we have data to work with
-  if (!allResults || !tId) return { classes: 0, assignments: 0, checks: 0, avg: 0 };
+  try {
+    const teacher = allUsers?.find(u => u.id === tId) || {};
+    
+    // 1. Account Created & Last Active
+    const createdDate = teacher?.createdAt?.toDate ? teacher.createdAt.toDate().toLocaleDateString('ms-MY') : 'Tiada Data';
+    const lastActive = teacher?.lastActive?.toDate ? teacher.lastActive.toDate().toLocaleString('ms-MY') : 'Tiada Data';
 
-  // 2. Filter results (Checking both common naming conventions)
-  const teacherManualChecks = allResults.filter(r => 
-    r.userId === tId || r.userID === tId || r.authorId === tId
-  );
+    // 2. Jumlah Kelas
+    const teacherClasses = allClasses?.filter(c => c.teacherId === tId) || [];
+    const classIds = teacherClasses.map(c => c.id);
 
-  // 3. Filter classes/assignments
-  const teacherClasses = allClasses?.filter(c => c.teacherId === tId) || [];
-  const teacherAssignments = allAssignments?.filter(a => a.teacherId === tId) || [];
+    // 3. Tugasan Dibuat
+    const teacherAssignments = allAssignments?.filter(a => a.teacherId === tId) || [];
 
-  // 4. Calculate Average Score
-  // Note: Check if your score field is 'markahKeseluruhan' or just 'markah'
-  const totalScore = teacherManualChecks.reduce((acc, r) => {
-    const score = r.markahKeseluruhan || r.score || r.markah || 0;
-    return acc + Number(score);
-  }, 0);
+    // 4. Find Students under this Teacher (to calculate their semakan)
+    // Assuming 'students' collection has a 'teacherId' or 'classId'
+    const teacherStudents = allStudents?.filter(s => 
+      s.teacherId === tId || classIds.includes(s.classId)
+    ) || [];
+    const studentIds = teacherStudents.map(s => s.id);
 
-  const avgScore = teacherManualChecks.length > 0 
-    ? (totalScore / teacherManualChecks.length).toFixed(1)
-    : 0;
+    // 5. Semakan AI (Manual Teacher + All their Students)
+    const allRelatedResults = allResults?.filter(r => 
+      r.userId === tId || studentIds.includes(r.userId) || classIds.includes(r.classId)
+    ) || [];
 
-  return {
-    classes: teacherClasses.length,
-    assignments: teacherAssignments.length,
-    checks: teacherManualChecks.length,
-    avg: avgScore
-  };
+    // 6. Purata Murid (Total Students / Total Classes)
+    const avgStudentsPerClass = teacherClasses.length > 0 
+      ? (teacherStudents.length / teacherClasses.length).toFixed(1) 
+      : 0;
+
+    return {
+      created: createdDate,
+      lastActive: lastActive,
+      classes: teacherClasses.length,
+      assignments: teacherAssignments.length,
+      totalChecks: allRelatedResults.length,
+      avgStudents: avgStudentsPerClass,
+      studentCount: teacherStudents.length
+    };
+  } catch (err) {
+    console.error("Insight Error:", err);
+    return { created: '?', lastActive: '?', classes: 0, assignments: 0, totalChecks: 0, avgStudents: 0 };
+  }
 };
 
   const uniqueTahap = useMemo(() => ['Semua Tahap', ...new Set(myResults.map(r => r.level).filter(Boolean))], [myResults]);
@@ -647,45 +662,55 @@ const generatePDF = (items) => {
       </main>
 
       {/* --- DRILL DOWN MODAL (PLACED AT BOTTOM FOR PROPER Z-INDEX) --- */}
-      {selectedTeacherStats && (
-        <div className="modal-overlay" style={{ display: 'flex', zIndex: 1000 }} onClick={() => setSelectedTeacherStats(null)}>
-          <div className="pro-card insights-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{margin:0}}>Analisis Guru: {selectedTeacherStats.nama}</h3>
-              <button className="btn-close-modal" onClick={() => setSelectedTeacherStats(null)} style={{background:'none', border:'none', fontSize:'24px', cursor:'pointer', color:'#666'}}>✕</button>
-            </div>
-            
-            <hr style={{ opacity: 0.1, margin: '15px 0' }} />
+     {selectedTeacherStats && (
+  <div className="modal-overlay" onClick={() => setSelectedTeacherStats(null)}>
+    <div className="insights-modal" onClick={e => e.stopPropagation()}>
+      <div style={{ borderBottom: '2px solid #f0f0f0', marginBottom: '20px', paddingBottom: '10px' }}>
+        <h2 style={{ color: '#004D40', margin: 0 }}>📊 Analisis Guru</h2>
+        <p style={{ color: '#666', fontSize: '0.9rem' }}>{selectedTeacherStats.nama}</p>
+      </div>
 
-            <div className="insights-grid">
-              <div className="insight-box">
-                <span>Usia Akaun</span>
-                <strong>{selectedTeacherStats.data.age}</strong>
-              </div>
-              <div className="insight-box">
-                <span>Jumlah Kelas</span>
-                <strong>{selectedTeacherStats.data.classes} Kelas</strong>
-              </div>
-              <div className="insight-box">
-                <span>Tugasan Dibuat</span>
-                <strong>{selectedTeacherStats.data.assignments} Unit</strong>
-              </div>
-              <div className="insight-box highlight">
-                <span>Semakan AI</span>
-                <strong>{selectedTeacherStats.data.checks} Kali</strong>
-              </div>
-              <div className="insight-box">
-                <span>Purata Markah Murid</span>
-                <strong>{selectedTeacherStats.data.avg} / 40</strong>
-              </div>
-              <div className="insight-box">
-                <span>Aktif Terakhir</span>
-                <small style={{display:'block', marginTop:'5px', fontSize:'0.75rem', color:'#666'}}>{selectedTeacherStats.data.lastActive}</small>
-              </div>
-            </div>
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+        {/* Row 1: Timeline */}
+        <div className="stat-box">
+          <small>Akaun Dicipta</small>
+          <div>{selectedTeacherStats.data.created}</div>
         </div>
-      )}
+        <div className="stat-box">
+          <small>Sesi Terakhir</small>
+          <div style={{ fontSize: '0.8rem' }}>{selectedTeacherStats.data.lastActive}</div>
+        </div>
+
+        {/* Row 2: Basic Totals */}
+        <div className="stat-box">
+          <small>Jumlah Kelas</small>
+          <div className="stat-val">{selectedTeacherStats.data.classes}</div>
+        </div>
+        <div className="stat-box">
+          <small>Tugasan Dibuat</small>
+          <div className="stat-val">{selectedTeacherStats.data.assignments}</div>
+        </div>
+
+        {/* Row 3: Usage & Students */}
+        <div className="stat-box" style={{ background: '#E0F2F1', gridColumn: 'span 1' }}>
+          <small style={{ color: '#00695C' }}>Semakan AI (Total)</small>
+          <div className="stat-val" style={{ color: '#004D40' }}>{selectedTeacherStats.data.totalChecks}</div>
+        </div>
+        <div className="stat-box" style={{ background: '#FFF3E0', gridColumn: 'span 1' }}>
+          <small style={{ color: '#E65100' }}>Purata Murid/Kelas</small>
+          <div className="stat-val" style={{ color: '#BF360C' }}>{selectedTeacherStats.data.avgStudents}</div>
+        </div>
+      </div>
+
+      <button 
+        onClick={() => setSelectedTeacherStats(null)}
+        style={{ marginTop: '20px', width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer', border: '1px solid #ccc' }}
+      >
+        Tutup
+      </button>
+    </div>
+  </div>
+)}
 
       <style jsx>{`
         .dashboard-wrapper { display: flex; min-height: 100vh; background: #F2F6F6; color: #003D40; font-family: 'Inter', sans-serif; }
@@ -714,6 +739,23 @@ const generatePDF = (items) => {
         .modern-table td { padding: 15px; border-bottom: 1px solid #F0F5F5; font-size: 0.9rem; vertical-align: middle; }
         .modern-table tr:hover { background: #F9FCFC; }
 
+.stat-box {
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border: 1px solid #eee;
+}
+.stat-box small {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 4px;
+}
+.stat-val {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
         .teacher-name-cell { transition: transform 0.2s; }
         .teacher-name-cell:hover { transform: translateX(5px); }
         .analisis-trigger { color: #48A6A7; font-size: 0.75rem; font-weight: bold; text-decoration: underline; opacity: 0.8; }
