@@ -142,28 +142,39 @@ export default function AdminMasterDashboard() {
 };
 
   // ANALYTICS CALCULATOR
-  const getTeacherInsights = (tId) => {
-    const teacher = allUsers.find(u => u.id === tId);
+const getTeacherInsights = (tId) => {
+    // 1. Get the Teacher object
+    const teacher = allUsers.find(u => u.id === tId) || {};
+    
+    // 2. Filter Classes where teacherId matches
     const teacherClasses = allClasses.filter(c => c.teacherId === tId);
+    const classIds = teacherClasses.map(c => c.id);
+
+    // 3. Filter Assignments where teacherId matches
     const teacherAssignments = allAssignments.filter(a => a.teacherId === tId);
-    const teacherResults = allResults.filter(r => r.userId === tId);
+
+    // 4. Filter Results (This is likely where the "Zero" was happening)
+    // We look for results that belong to this teacher's classes
+    const teacherResults = allResults.filter(r => 
+      r.userId === tId || classIds.includes(r.classId)
+    );
     
     const avgScore = teacherResults.length > 0 
       ? (teacherResults.reduce((acc, r) => acc + (r.markahKeseluruhan || 0), 0) / teacherResults.length).toFixed(1)
       : 0;
 
-    const joinDate = teacher?.createdAt?.toDate() || new Date();
-    const diffTime = Math.abs(new Date() - joinDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const ageLabel = diffDays > 30 ? `${Math.floor(diffDays/30)} bulan lepas` : `${diffDays} hari lepas`;
+    // 5. Date Formatting (Preventing .toDate() crashes)
+    const lastActiveStr = teacher?.lastActive 
+      ? (typeof teacher.lastActive.toDate === 'function' ? teacher.lastActive.toDate().toLocaleString('ms-MY') : 'Aktif')
+      : 'Tiada Data';
 
     return {
-      age: ageLabel,
+      age: teacher?.createdAt ? "Aktif" : "Baru",
       classes: teacherClasses.length,
       assignments: teacherAssignments.length,
       checks: teacherResults.length,
       avg: avgScore,
-      lastActive: teacher?.lastActive?.toDate()?.toLocaleString('ms-MY') || 'Tiada Data'
+      lastActive: lastActiveStr
     };
   };
 
