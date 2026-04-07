@@ -465,37 +465,48 @@ const generatePDF = (items) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {allUsers.filter(u => u.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
-                      <tr key={u.id} className={selectedUserIds.includes(u.id) ? 'active-row' : ''}>
-                        <td><input type="checkbox" checked={selectedUserIds.includes(u.id)} onChange={() => setSelectedUserIds(prev => prev.includes(u.id) ? prev.filter(i => i !== u.id) : [...prev, u.id])} />
+                   {allUsers.filter(u => u.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
+  <tr key={u.id} className={selectedUserIds.includes(u.id) ? 'active-row' : ''}>
+    {/* First Column: Checkbox */}
+    <td>
+      <input 
+        type="checkbox" 
+        checked={selectedUserIds.includes(u.id)} 
+        onChange={() => setSelectedUserIds(prev => prev.includes(u.id) ? prev.filter(i => i !== u.id) : [...prev, u.id])} 
+      />
+    </td>
 
-<td 
-  style={{ cursor: 'pointer' }}
-  onClick={() => {
-    const targetId = u.uid || u.id; 
-    const stats = getTeacherInsights(targetId);
-    setSelectedTeacherStats({ nama: u.nama || u.username, data: stats });
-  }}
->
-  <div className="teacher-name-cell">
-    <strong>{u.nama || u.username || 'Tiada Nama'}</strong>
-    <br/>
-    <span className="analisis-trigger" style={{fontSize: '11px', color: '#00695C'}}>
-      📊 Analisis Penggunaan
-    </span>
-  </div>
-</td>
-                        <td><small>{u.email}</small></td>
-                        <td><span className={`tag ${u.role}`}>{u.role}</span></td>
-                        <td><span className="credit-pill">{u.credits || 0}</span></td>
-                        <td style={{textAlign:'right', display:'flex', gap:'5px', justifyContent:'flex-end'}}>
-                          {u.role !== 'admin' && (
-                            <button className="btn-action" style={{background: '#00695C'}} onClick={() => handleMakeAdmin(u.id)}>Admin</button>
-                          )}
-                          <button className="btn-action" onClick={() => sendPasswordResetEmail(auth, u.email)}>Reset</button>
-                        </td>
-                      </tr>
-                    ))}
+    {/* Second Column: Name & Analytics Trigger */}
+    <td 
+      style={{ cursor: 'pointer' }}
+      onClick={() => {
+        const targetId = u.uid || u.id; 
+        const stats = getTeacherInsights(targetId);
+        setSelectedTeacherStats({ nama: u.nama || u.username, data: stats });
+      }}
+    >
+      <div className="teacher-name-cell">
+        <strong>{u.nama || u.username || 'Tiada Nama'}</strong>
+        <br/>
+        <span className="analisis-trigger" style={{fontSize: '11px', color: '#00695C'}}>
+          📊 Analisis Penggunaan
+        </span>
+      </div>
+    </td>
+
+    {/* Remaining Columns */}
+    <td><small>{u.email}</small></td>
+    <td><span className={`tag ${u.role}`}>{u.role}</span></td>
+    <td><span className="credit-pill">{u.credits || 0}</span></td>
+    <td style={{textAlign:'right', display:'flex', gap:'5px', justifyContent:'flex-end'}}>
+      {u.role !== 'admin' && (
+        <button className="btn-action" style={{background: '#00695C'}} onClick={() => handleMakeAdmin(u.id)}>Admin</button>
+      )}
+      <button className="btn-action" onClick={() => sendPasswordResetEmail(auth, u.email)}>Reset</button>
+    </td>
+  </tr>
+))}
+
                   </tbody>
                 </table>
               </div>
