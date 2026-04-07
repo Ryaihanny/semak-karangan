@@ -73,7 +73,7 @@ const [allStudents, setAllStudents] = useState([]); // Add this line
       getDocs(collection(db, 'users')),
       getDocs(collection(db, 'classes')),
       getDocs(collection(db, 'assignments')),
-      getDocs(collection(db, 'karanganResults')) 
+      getDocs(collection(db, 'karanganResults')), 
 getDocs(collection(db, 'students'))
     ]);
     setAllUsers(uSnap.docs.map(d => ({ id: d.id, ...d.data() })));
