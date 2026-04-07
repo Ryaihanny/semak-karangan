@@ -146,31 +146,36 @@ const getTeacherInsights = (tId) => {
   try {
     const teacher = allUsers?.find(u => u.id === tId) || {};
     
-    // 1. Account Created & Last Active
-    const createdDate = teacher?.createdAt?.toDate ? teacher.createdAt.toDate().toLocaleDateString('ms-MY') : 'Tiada Data';
-    const lastActive = teacher?.lastActive?.toDate ? teacher.lastActive.toDate().toLocaleString('ms-MY') : 'Tiada Data';
+    // 1. Account Created & Last Active (Requirement 1 & 6)
+    const createdDate = teacher?.createdAt?.toDate 
+      ? teacher.createdAt.toDate().toLocaleDateString('ms-MY') 
+      : 'Tiada Data';
+    
+    const lastActive = teacher?.lastActive?.toDate 
+      ? teacher.lastActive.toDate().toLocaleString('ms-MY') 
+      : 'Tiada Data';
 
-    // 2. Jumlah Kelas
+    // 2. Jumlah Kelas (Requirement 2)
     const teacherClasses = allClasses?.filter(c => c.teacherId === tId) || [];
     const classIds = teacherClasses.map(c => c.id);
 
-    // 3. Tugasan Dibuat
+    // 3. Tugasan Dibuat (Requirement 3)
     const teacherAssignments = allAssignments?.filter(a => a.teacherId === tId) || [];
 
-    // 4. Find Students under this Teacher (to calculate their semakan)
-    // Assuming 'students' collection has a 'teacherId' or 'classId'
-    const teacherStudents = allStudents?.filter(s => 
-      s.teacherId === tId || classIds.includes(s.classId)
-    ) || [];
+    // 4. Find Students under this Teacher (Required for Requirement 4 & 5)
+    // Looking for students where their classId belongs to this teacher
+    const teacherStudents = allStudents?.filter(s => classIds.includes(s.classId)) || [];
     const studentIds = teacherStudents.map(s => s.id);
 
-    // 5. Semakan AI (Manual Teacher + All their Students)
-    const allRelatedResults = allResults?.filter(r => 
-      r.userId === tId || studentIds.includes(r.userId) || classIds.includes(r.classId)
-    ) || [];
+    // 5. Semakan AI (Requirement 4)
+    // Total = Manual Teacher checks + Checks done by their students
+    const totalSemakan = allResults?.filter(r => 
+      r.userId === tId || studentIds.includes(r.userId)
+    ).length || 0;
 
-    // 6. Purata Murid (Total Students / Total Classes)
-    const avgStudentsPerClass = teacherClasses.length > 0 
+    // 6. Purata Murid (Requirement 5)
+    // Calculated as Total Students divided by Total Classes
+    const avgMurid = teacherClasses.length > 0 
       ? (teacherStudents.length / teacherClasses.length).toFixed(1) 
       : 0;
 
@@ -179,13 +184,13 @@ const getTeacherInsights = (tId) => {
       lastActive: lastActive,
       classes: teacherClasses.length,
       assignments: teacherAssignments.length,
-      totalChecks: allRelatedResults.length,
-      avgStudents: avgStudentsPerClass,
-      studentCount: teacherStudents.length
+      totalChecks: totalSemakan,
+      avgStudents: avgMurid,
+      studentTotal: teacherStudents.length
     };
   } catch (err) {
     console.error("Insight Error:", err);
-    return { created: '?', lastActive: '?', classes: 0, assignments: 0, totalChecks: 0, avgStudents: 0 };
+    return { created: 'Error', lastActive: 'Error', classes: 0, assignments: 0, totalChecks: 0, avgStudents: 0 };
   }
 };
 
@@ -665,48 +670,47 @@ const generatePDF = (items) => {
      {selectedTeacherStats && (
   <div className="modal-overlay" onClick={() => setSelectedTeacherStats(null)}>
     <div className="insights-modal" onClick={e => e.stopPropagation()}>
-      <div style={{ borderBottom: '2px solid #f0f0f0', marginBottom: '20px', paddingBottom: '10px' }}>
-        <h2 style={{ color: '#004D40', margin: 0 }}>📊 Analisis Guru</h2>
-        <p style={{ color: '#666', fontSize: '0.9rem' }}>{selectedTeacherStats.nama}</p>
+      <div style={{ borderBottom: '2px solid #004D40', marginBottom: '20px', paddingBottom: '10px' }}>
+        <h2 style={{ color: '#004D40', margin: 0 }}>Analisis Akaun Guru</h2>
+        <p style={{ color: '#666', margin: 0 }}>{selectedTeacherStats.nama}</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-        {/* Row 1: Timeline */}
+        {/* Row 1: Dates */}
         <div className="stat-box">
-          <small>Akaun Dicipta</small>
-          <div>{selectedTeacherStats.data.created}</div>
+          <label>Akaun Dicipta</label>
+          <div className="val-small">{selectedTeacherStats.data.created}</div>
         </div>
         <div className="stat-box">
-          <small>Sesi Terakhir</small>
-          <div style={{ fontSize: '0.8rem' }}>{selectedTeacherStats.data.lastActive}</div>
+          <label>Sesi Terakhir</label>
+          <div className="val-small">{selectedTeacherStats.data.lastActive}</div>
         </div>
 
-        {/* Row 2: Basic Totals */}
+        {/* Row 2: Management */}
         <div className="stat-box">
-          <small>Jumlah Kelas</small>
-          <div className="stat-val">{selectedTeacherStats.data.classes}</div>
+          <label>Jumlah Kelas</label>
+          <div className="val-big">{selectedTeacherStats.data.classes}</div>
         </div>
         <div className="stat-box">
-          <small>Tugasan Dibuat</small>
-          <div className="stat-val">{selectedTeacherStats.data.assignments}</div>
+          <label>Tugasan Dibuat</label>
+          <div className="val-big">{selectedTeacherStats.data.assignments}</div>
         </div>
 
-        {/* Row 3: Usage & Students */}
-        <div className="stat-box" style={{ background: '#E0F2F1', gridColumn: 'span 1' }}>
-          <small style={{ color: '#00695C' }}>Semakan AI (Total)</small>
-          <div className="stat-val" style={{ color: '#004D40' }}>{selectedTeacherStats.data.totalChecks}</div>
+        {/* Row 3: Performance */}
+        <div className="stat-box highlight-green">
+          <label>Total Semakan AI</label>
+          <div className="val-big">{selectedTeacherStats.data.totalChecks}</div>
+          <small>(Guru + Murid)</small>
         </div>
-        <div className="stat-box" style={{ background: '#FFF3E0', gridColumn: 'span 1' }}>
-          <small style={{ color: '#E65100' }}>Purata Murid/Kelas</small>
-          <div className="stat-val" style={{ color: '#BF360C' }}>{selectedTeacherStats.data.avgStudents}</div>
+        <div className="stat-box highlight-blue">
+          <label>Purata Murid</label>
+          <div className="val-big">{selectedTeacherStats.data.avgStudents}</div>
+          <small>Per Kelas</small>
         </div>
       </div>
 
-      <button 
-        onClick={() => setSelectedTeacherStats(null)}
-        style={{ marginTop: '20px', width: '100%', padding: '10px', borderRadius: '8px', cursor: 'pointer', border: '1px solid #ccc' }}
-      >
-        Tutup
+      <button className="close-btn" onClick={() => setSelectedTeacherStats(null)}>
+        Tutup Analisis
       </button>
     </div>
   </div>
@@ -740,22 +744,45 @@ const generatePDF = (items) => {
         .modern-table tr:hover { background: #F9FCFC; }
 
 .stat-box {
-  padding: 12px;
-  background: #f9f9f9;
-  border-radius: 8px;
+  padding: 15px;
+  background: #fdfdfd;
   border: 1px solid #eee;
+  border-radius: 10px;
+  text-align: center;
 }
-.stat-box small {
+.stat-box label {
   display: block;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
+  color: #777;
   text-transform: uppercase;
-  color: #888;
-  margin-bottom: 4px;
-}
-.stat-val {
-  font-size: 1.4rem;
   font-weight: bold;
 }
+.val-big {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #333;
+}
+.val-small {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
+  margin-top: 5px;
+}
+.highlight-green { background: #E8F5E9 !important; border-color: #C8E6C9 !important; }
+.highlight-green .val-big { color: #2E7D32; }
+.highlight-blue { background: #E3F2FD !important; border-color: #BBDEFB !important; }
+.highlight-blue .val-big { color: #1565C0; }
+.close-btn {
+  margin-top: 20px;
+  width: 100%;
+  padding: 12px;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
         .teacher-name-cell { transition: transform 0.2s; }
         .teacher-name-cell:hover { transform: translateX(5px); }
         .analisis-trigger { color: #48A6A7; font-size: 0.75rem; font-weight: bold; text-decoration: underline; opacity: 0.8; }
