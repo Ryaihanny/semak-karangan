@@ -34,6 +34,8 @@ export default function AdminMasterDashboard() {
   const [allClasses, setAllClasses] = useState([]);
   const [allAssignments, setAllAssignments] = useState([]);
   const [myResults, setMyResults] = useState([]);
+  const [allResults, setAllResults] = useState([]); // Added for Admin Analytics
+  const [selectedTeacherStats, setSelectedTeacherStats] = useState(null); // For Drill-down Modal
   const [layoutStyle, setLayoutStyle] = useState('list');
   const [selectedResultsIds, setSelectedResultsIds] = useState([]);
   
@@ -65,14 +67,16 @@ export default function AdminMasterDashboard() {
   }, [router]);
 
   const loadSystemData = async () => {
-    const [uSnap, cSnap, aSnap] = await Promise.all([
+    const [uSnap, cSnap, aSnap, rSnap] = await Promise.all([
       getDocs(collection(db, 'users')),
       getDocs(collection(db, 'classes')),
-      getDocs(collection(db, 'assignments'))
+      getDocs(collection(db, 'assignments')),
+      getDocs(collection(db, 'karanganResults')) // Added for analytics
     ]);
     setAllUsers(uSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllClasses(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllAssignments(aSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    setAllResults(rSnap.docs.map(d => ({ id: d.id, ...d.data() }))); // Store global results
   };
 
   const loadGuruData = async (uid) => {
@@ -88,19 +92,15 @@ export default function AdminMasterDashboard() {
     const amountPerPerson = parseInt(amountStr);
     const totalNeeded = amountPerPerson * selectedUserIds.length;
 
-    // Check if current Admin has enough credits
     if ((user.credits || 0) < totalNeeded) {
         alert(`Kredit anda tidak mencukupi! Perlu: ${totalNeeded}, Baki anda: ${user.credits}`);
         return;
     }
 
     const batch = writeBatch(db);
-    
-    // Deduct from Admin
     const adminRef = doc(db, 'users', user.uid);
     batch.update(adminRef, { credits: (user.credits - totalNeeded) });
 
-    // Add to Users
     selectedUserIds.forEach(uId => {
       const currentU = allUsers.find(u => u.id === uId);
       batch.update(doc(db, 'users', uId), { credits: (currentU.credits || 0) + amountPerPerson });
@@ -111,7 +111,6 @@ export default function AdminMasterDashboard() {
     
     setSelectedUserIds([]);
     loadSystemData();
-    // Re-fetch current user data to update local credit UI
     const updatedAdmin = await getDoc(adminRef);
     setUser({ uid: user.uid, ...updatedAdmin.data() });
   };
@@ -141,6 +140,32 @@ export default function AdminMasterDashboard() {
     loadSystemData();
   }
 };
+
+  // ANALYTICS CALCULATOR
+  const getTeacherInsights = (tId) => {
+    const teacher = allUsers.find(u => u.id === tId);
+    const teacherClasses = allClasses.filter(c => c.teacherId === tId);
+    const teacherAssignments = allAssignments.filter(a => a.teacherId === tId);
+    const teacherResults = allResults.filter(r => r.userId === tId);
+    
+    const avgScore = teacherResults.length > 0 
+      ? (teacherResults.reduce((acc, r) => acc + (r.markahKeseluruhan || 0), 0) / teacherResults.length).toFixed(1)
+      : 0;
+
+    const joinDate = teacher?.createdAt?.toDate() || new Date();
+    const diffTime = Math.abs(new Date() - joinDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const ageLabel = diffDays > 30 ? `${Math.floor(diffDays/30)} bulan lepas` : `${diffDays} hari lepas`;
+
+    return {
+      age: ageLabel,
+      classes: teacherClasses.length,
+      assignments: teacherAssignments.length,
+      checks: teacherResults.length,
+      avg: avgScore,
+      lastActive: teacher?.lastActive?.toDate()?.toLocaleString('ms-MY') || 'Tiada Data'
+    };
+  };
 
   // NEW FILTER LOGIC FOR KEPUTUSAN MURID
   const uniqueTahap = useMemo(() => ['Semua Tahap', ...new Set(myResults.map(r => r.level).filter(Boolean))], [myResults]);
@@ -253,7 +278,6 @@ const generatePDF = (items) => {
         y += 7;
       });
 
-      // --- UPDATED 4-COLUMN ANALYSIS TABLE ---
       if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
         y += 5;
         if (y > 230) { doc.addPage(); y = 20; }
@@ -267,7 +291,7 @@ const generatePDF = (items) => {
           body: item.kesalahanBahasa.map(k => [
             cleanText(k.kategori || 'Umum'),
             cleanText(k.ayatSalah),
-            cleanText(k.pembetulan || k.cadangan), // Uses pembetulan, falls back to cadangan if empty
+            cleanText(k.pembetulan || k.cadangan),
             cleanText(k.penjelasan)
           ]),
           theme: 'grid',
@@ -276,7 +300,7 @@ const generatePDF = (items) => {
           columnStyles: { 
             0: { cellWidth: 25 },
             1: { cellWidth: 45 },
-            2: { cellWidth: 55, textColor: [0, 100, 0], fontStyle: 'bold' }, // Green & Bold for corrections
+            2: { cellWidth: 55, textColor: [0, 100, 0], fontStyle: 'bold' },
             3: { cellWidth: 45 }
           }
         });
@@ -353,10 +377,7 @@ const generatePDF = (items) => {
       <div className="nav-header">UTAMA</div>
       <div className={`nav-link ${activeTab === 'rekod_murid' ? 'active' : ''}`} onClick={() => setActiveTab('rekod_murid')}>📊 Keputusan Murid</div>
       <div className={`nav-link ${activeTab === 'trend' ? 'active' : ''}`} onClick={() => setActiveTab('trend')}>📈 Analisis Murid</div>
-      
-      {/* ADDED THIS LINK BELOW */}
       <div className="nav-link" onClick={() => router.push('/admin/semak')}>✍️ Semak Karangan</div>
-      
       <div className="nav-divider"></div>
       <div className="nav-header">PENGURUSAN</div>
       <div className="nav-link" onClick={() => router.push('/admin/urus-kelas')}>🏫 Urus Kelas</div>
@@ -407,7 +428,13 @@ const generatePDF = (items) => {
                     {allUsers.filter(u => u.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
                       <tr key={u.id} className={selectedUserIds.includes(u.id) ? 'active-row' : ''}>
                         <td><input type="checkbox" checked={selectedUserIds.includes(u.id)} onChange={() => setSelectedUserIds(prev => prev.includes(u.id) ? prev.filter(i => i !== u.id) : [...prev, u.id])} /></td>
-                        <td><strong>{u.nama || u.username || 'Tiada Nama'}</strong></td>
+                        <td 
+                          className="clickable-name" 
+                          onClick={() => setSelectedTeacherStats({ nama: u.nama || u.username, data: getTeacherInsights(u.id) })}
+                        >
+                          <strong>{u.nama || u.username || 'Tiada Nama'}</strong>
+                          <br/><small style={{color: '#48A6A7'}}>Analisis Penggunaan</small>
+                        </td>
                         <td><small>{u.email}</small></td>
                         <td><span className={`tag ${u.role}`}>{u.role}</span></td>
                         <td><span className="credit-pill">{u.credits || 0}</span></td>
@@ -449,71 +476,67 @@ const generatePDF = (items) => {
           )}
 
           {/* TAB: ASSIGNMENTS */}
-          
-{isAdminMode && activeTab === 'assignments' && (
-  <>
-    {/* Bulk Action Bar for Assignments */}
-    {selectedAssignmentIds.length > 0 && (
-      <div className="bulk-action-bar" style={{ background: '#C62828' }}>
-        <span><b>{selectedAssignmentIds.length}</b> tugasan dipilih</span>
-        <button onClick={handleBulkDeleteAssignments} className="btn-bulk" style={{ background: 'white', color: '#C62828' }}>
-          🗑️ Padam Pukal
-        </button>
-      </div>
-    )}
-    
-    <div className="pro-card no-padding">
-      <table className="modern-table">
-        <thead>
-          <tr>
-            {/* Added Checkbox Header */}
-            <th style={{width: '40px'}}>
-              <input 
-                type="checkbox" 
-                onChange={(e) => setSelectedAssignmentIds(e.target.checked ? allAssignments.map(a => a.id) : [])} 
-              />
-            </th>
-            <th>Tugasan</th>
-            <th>Kelas / Guru</th>
-            <th>Status</th>
-            <th style={{textAlign:'right'}}>Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {allAssignments.map(a => {
-            const isLate = a.dueDate && new Date(a.dueDate) < new Date();
-            return (
-              <tr key={a.id} className={selectedAssignmentIds.includes(a.id) ? 'active-row' : ''}>
-                {/* Added Row Checkbox */}
-                <td>
-                  <input 
-                    type="checkbox" 
-                    checked={selectedAssignmentIds.includes(a.id)} 
-                    onChange={() => setSelectedAssignmentIds(prev => prev.includes(a.id) ? prev.filter(i => i !== a.id) : [...prev, a.id])} 
-                  />
-                </td>
-                <td><strong>{a.title}</strong><br/><small>Deadline: {a.dueDate || 'N/A'}</small></td>
-                <td>
-                  {allClasses.find(c => c.id === a.classId)?.className || '-'}<br/>
-                  <small>Oleh: {getTeacherName(a.teacherId)}</small>
-                </td>
-                <td>
-                  <span className={`status-pill ${isLate ? 'late' : 'active'}`}>
-                    {isLate ? 'Tamat Tempoh' : 'Aktif'}
-                  </span>
-                </td>
-                <td style={{textAlign:'right'}}>
-                  <button className="btn-delete-small" onClick={() => handleDeleteAssignment(a.id)}>Padam</button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  </>
-)}
-          {/* TAB: KEPUTUSAN MURID (INTEGRATED FROM YOUR CODE) */}
+          {isAdminMode && activeTab === 'assignments' && (
+            <>
+              {selectedAssignmentIds.length > 0 && (
+                <div className="bulk-action-bar" style={{ background: '#C62828' }}>
+                  <span><b>{selectedAssignmentIds.length}</b> tugasan dipilih</span>
+                  <button onClick={handleBulkDeleteAssignments} className="btn-bulk" style={{ background: 'white', color: '#C62828' }}>
+                    🗑️ Padam Pukal
+                  </button>
+                </div>
+              )}
+              <div className="pro-card no-padding">
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th style={{width: '40px'}}>
+                        <input 
+                          type="checkbox" 
+                          onChange={(e) => setSelectedAssignmentIds(e.target.checked ? allAssignments.map(a => a.id) : [])} 
+                        />
+                      </th>
+                      <th>Tugasan</th>
+                      <th>Kelas / Guru</th>
+                      <th>Status</th>
+                      <th style={{textAlign:'right'}}>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allAssignments.map(a => {
+                      const isLate = a.dueDate && new Date(a.dueDate) < new Date();
+                      return (
+                        <tr key={a.id} className={selectedAssignmentIds.includes(a.id) ? 'active-row' : ''}>
+                          <td>
+                            <input 
+                              type="checkbox" 
+                              checked={selectedAssignmentIds.includes(a.id)} 
+                              onChange={() => setSelectedAssignmentIds(prev => prev.includes(a.id) ? prev.filter(i => i !== a.id) : [...prev, a.id])} 
+                            />
+                          </td>
+                          <td><strong>{a.title}</strong><br/><small>Deadline: {a.dueDate || 'N/A'}</small></td>
+                          <td>
+                            {allClasses.find(c => c.id === a.classId)?.className || '-'}<br/>
+                            <small>Oleh: {getTeacherName(a.teacherId)}</small>
+                          </td>
+                          <td>
+                            <span className={`status-pill ${isLate ? 'late' : 'active'}`}>
+                              {isLate ? 'Tamat Tempoh' : 'Aktif'}
+                            </span>
+                          </td>
+                          <td style={{textAlign:'right'}}>
+                            <button className="btn-delete-small" onClick={() => handleDeleteAssignment(a.id)}>Padam</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* TAB: KEPUTUSAN MURID */}
           {!isAdminMode && activeTab === 'rekod_murid' && (
             <div className="fade-in">
               <div className="pro-card toolbar-filters">
@@ -591,7 +614,6 @@ const generatePDF = (items) => {
                 </div>
               )}
               
-              {/* ACTION BAR FOR MULTI-SELECT */}
               <div className={`bulk-action-bar floating-bar ${selectedResultsIds.length > 0 ? 'visible' : ''}`}>
                 <span><b>{selectedResultsIds.length}</b> rekod dipilih</span>
                 <div style={{display: 'flex', gap: '10px'}}>
@@ -611,6 +633,45 @@ const generatePDF = (items) => {
           )}
         </div>
       </main>
+
+      {/* --- DRILL DOWN MODAL --- */}
+      {selectedTeacherStats && (
+        <div className="modal-overlay" onClick={() => setSelectedTeacherStats(null)}>
+          <div className="pro-card insights-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Analisis Guru: {selectedTeacherStats.nama}</h3>
+              <button className="btn-close-modal" onClick={() => setSelectedTeacherStats(null)}>✕</button>
+            </div>
+            
+            <div className="insights-grid">
+              <div className="insight-box">
+                <span>Usia Akaun</span>
+                <strong>{selectedTeacherStats.data.age}</strong>
+              </div>
+              <div className="insight-box">
+                <span>Jumlah Kelas</span>
+                <strong>{selectedTeacherStats.data.classes} Kelas</strong>
+              </div>
+              <div className="insight-box">
+                <span>Tugasan Dibuat</span>
+                <strong>{selectedTeacherStats.data.assignments} Unit</strong>
+              </div>
+              <div className="insight-box highlight">
+                <span>Semakan AI</span>
+                <strong>{selectedTeacherStats.data.checks} Kali</strong>
+              </div>
+              <div className="insight-box">
+                <span>Purata Markah Murid</span>
+                <strong>{selectedTeacherStats.data.avg} / 40</strong>
+              </div>
+              <div className="insight-box">
+                <span>Aktif Terakhir</span>
+                <small style={{display:'block', marginTop:'5px'}}>{selectedTeacherStats.data.lastActive}</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .dashboard-wrapper { display: flex; min-height: 100vh; background: #F2F6F6; color: #003D40; font-family: 'Inter', sans-serif; }
@@ -637,7 +698,6 @@ const generatePDF = (items) => {
         .pro-card { background: white; border-radius: 20px; border: 1px solid #E0E7E7; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 20px rgba(0,61,64,0.04); }
         .no-padding { padding: 0; overflow: hidden; }
 
-        /* Toolbar / Filters */
         .toolbar-filters { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; }
         .t-group { display: flex; flex-direction: column; gap: 5px; }
         .t-group label { font-size: 0.7rem; font-weight: bold; color: #99AFAF; text-transform: uppercase; }
@@ -661,29 +721,22 @@ const generatePDF = (items) => {
         .tag.admin { background: #FFF4E5; color: #FF9800; }
         .tag.guru { background: #E8F5E9; color: #4CAF50; }
 
+        .clickable-name { cursor: pointer; }
+        .clickable-name:hover strong { color: #48A6A7; text-decoration: underline; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+        .insights-modal { width: 500px; padding: 2rem; border-top: 5px solid #FFD700; position: relative; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn-close-modal { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #99AFAF; }
+
+        .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .insight-box { background: #F9FAFA; padding: 15px; border-radius: 12px; border: 1px solid #E0E7E7; }
+        .insight-box span { display: block; font-size: 0.7rem; color: #99AFAF; text-transform: uppercase; font-weight: bold; }
+        .insight-box strong { font-size: 1.1rem; color: #003D40; display: block; margin-top: 5px; }
+        .insight-box.highlight { background: #E0F2F1; border-color: #48A6A7; }
+
         .class-grid-system { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
         .class-badge { background: #48A6A7; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; display: inline-block; margin-bottom: 10px; }
-        
-        .layout-slider { background: #F0F4F4; padding: 4px; border-radius: 12px; display: flex; height: 42px; width: 160px; margin-left: auto; }
-        .layout-slider button { flex: 1; border: none; background: transparent; cursor: pointer; border-radius: 8px; font-size: 0.8rem; color: #003D40; }
-        .layout-slider button.active { background: white; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
-
-        .original-grid-system { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .og-card { background: white; border-radius: 20px; padding: 1.8rem; border: 1px solid #E0E7E7; transition: 0.2s; }
-        .og-selected { border: 2px solid #48A6A7; background: #F0F9F9; }
-        .og-header { display: flex; justify-content: space-between; margin-bottom: 1rem; }
-        .og-set { font-size: 0.75rem; font-weight: 900; color: #99AFAF; }
-        .og-score-box { display: flex; justify-content: space-between; background: #F9FAFA; padding: 15px; border-radius: 12px; margin-bottom: 1.5rem; }
-        .sc-item { display: flex; flex-direction: column; align-items: center; }
-        .sc-item span { font-size: 0.6rem; color: #99AFAF; text-transform: uppercase; }
-        .sc-item b { font-size: 1rem; }
-        .sc-item.total b { color: #48A6A7; font-size: 1.2rem; }
-        .btn-og-print { width: 100%; padding: 12px; background: #003D40; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
-        .btn-action { background: #48A6A7; color: white; border: none; padding: 6px 15px; border-radius: 8px; cursor: pointer; font-weight: 600; }
-
-        .fade-in { animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .loader-box { height: 100vh; display: grid; place-items: center; font-weight: bold; color: #003D40; }
       `}</style>
     </div>
   );
