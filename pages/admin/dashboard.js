@@ -49,6 +49,8 @@ export default function AdminMasterDashboard() {
   const [selectedKelas, setSelectedKelas] = useState('Semua Kelas');
   const [selectedSet, setSelectedSet] = useState('Semua Set');
 
+const [allStudents, setAllStudents] = useState([]); // Add this line
+
   // 1. BOOTSTRAP DATA
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -72,11 +74,13 @@ export default function AdminMasterDashboard() {
       getDocs(collection(db, 'classes')),
       getDocs(collection(db, 'assignments')),
       getDocs(collection(db, 'karanganResults')) 
+getDocs(collection(db, 'students'))
     ]);
     setAllUsers(uSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllClasses(cSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllAssignments(aSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     setAllResults(rSnap.docs.map(d => ({ id: d.id, ...d.data() }))); 
+setAllStudents(sSnap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
   const loadGuruData = async (uid) => {
@@ -144,35 +148,45 @@ export default function AdminMasterDashboard() {
   // ANALYTICS CALCULATOR
 const getTeacherInsights = (teacherUid) => {
   try {
-    const teacher = allUsers?.find(u => u.uid === teacherUid) || {};
+    // 1. Find teacher (using .uid per your Firestore screenshot)
+    const teacher = allUsers?.find(u => u.uid === teacherUid || u.id === teacherUid) || {};
 
-    // 1. Account Created & Last Active (Requirement 1 & 6)
-    // Note: Your Users table uses a String for createdAt, not a Timestamp
-    const createdDate = teacher?.createdAt ? new Date(teacher.createdAt).toLocaleDateString('ms-MY') : 'Tiada Data';
-    const lastActive = teacher?.lastActive?.toDate ? teacher.lastActive.toDate().toLocaleString('ms-MY') : 'Tiada Data';
+    // 2. Date Handling (Requirement 1 & 6)
+    // Your 'createdAt' is a STRING, so we don't use .toDate()
+    const createdDate = teacher?.createdAt 
+      ? new Date(teacher.createdAt).toLocaleDateString('ms-MY') 
+      : 'Tiada Data';
+    
+    // 'lastActive' might be a Timestamp or String, let's be safe
+    let lastActive = 'Tiada Data';
+    if (teacher?.lastActive) {
+      lastActive = teacher.lastActive.toDate 
+        ? teacher.lastActive.toDate().toLocaleString('ms-MY') 
+        : new Date(teacher.lastActive).toLocaleString('ms-MY');
+    }
 
-    // 2. Jumlah Kelas (Requirement 2)
-    // Logic: Find classes where teacherId matches teacher's uid
+    // 3. Classes (Requirement 2)
     const teacherClasses = allClasses?.filter(c => c.teacherId === teacherUid) || [];
     const classIds = teacherClasses.map(c => c.id);
 
-    // 3. Tugasan Dibuat (Requirement 3)
+    // 4. Assignments (Requirement 3)
     const teacherAssignments = allAssignments?.filter(a => a.teacherId === teacherUid) || [];
 
-    // 4. Find Students (Requirement 5)
-    // Logic: Students who have one of this teacher's class IDs in their 'enrolledClasses' array
+    // 5. Students (Requirement 5)
+    // Check if any ID in the 'enrolledClasses' array matches our classIds
     const teacherStudents = allStudents?.filter(s => 
-      s.enrolledClasses?.some(id => classIds.includes(id))
+      Array.isArray(s.enrolledClasses) && s.enrolledClasses.some(id => classIds.includes(id))
     ) || [];
 
-    // 5. Semakan AI (Requirement 4)
-    // Logic: Counts results where studentId matches a student's username
-    const studentUsernames = teacherStudents.map(s => s.username);
+    // 6. Semakan AI (Requirement 4)
+    // Total = Checks by Teacher UID + Checks by Students' Usernames
+    const studentUsernames = teacherStudents.map(s => s.username).filter(Boolean);
     const totalSemakan = allResults?.filter(r => 
-      r.userId === teacherUid || studentUsernames.includes(r.studentId)
+      r.userId === teacherUid || 
+      (r.studentId && studentUsernames.includes(r.studentId))
     ).length || 0;
 
-    // 6. Purata Murid (Requirement 5)
+    // 7. Average Students (Requirement 5)
     const avgMurid = teacherClasses.length > 0 
       ? (teacherStudents.length / teacherClasses.length).toFixed(1) 
       : 0;
@@ -186,8 +200,8 @@ const getTeacherInsights = (teacherUid) => {
       avgStudents: avgMurid
     };
   } catch (err) {
-    console.error("Deep Scan Error:", err);
-    return { created: 'Error', lastActive: 'Error', classes: 0, assignments: 0, totalChecks: 0, avgStudents: 0 };
+    console.error("Critical Analysis Error:", err);
+    return { created: 'Error Logic', lastActive: 'Error Logic', classes: 0, assignments: 0, totalChecks: 0, avgStudents: 0 };
   }
 };
 
@@ -450,20 +464,24 @@ const generatePDF = (items) => {
                   <tbody>
                     {allUsers.filter(u => u.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email?.toLowerCase().includes(searchQuery.toLowerCase())).map(u => (
                       <tr key={u.id} className={selectedUserIds.includes(u.id) ? 'active-row' : ''}>
-                        <td><input type="checkbox" checked={selectedUserIds.includes(u.id)} onChange={() => setSelectedUserIds(prev => prev.includes(u.id) ? prev.filter(i => i !== u.id) : [...prev, u.id])} /></td>
-                        <td 
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => {
-                             const stats = getTeacherInsights(u.uid);
-                             setSelectedTeacherStats({ nama: u.nama || u.username, data: stats });
-                          }}
-                        >
-                          <div className="teacher-name-cell">
-                            <strong>{u.nama || u.username || 'Tiada Nama'}</strong>
-                            <br/>
-                            <span className="analisis-trigger">📊 Analisis Penggunaan</span>
-                          </div>
-                        </td>
+                        <td><input type="checkbox" checked={selectedUserIds.includes(u.id)} onChange={() => setSelectedUserIds(prev => prev.includes(u.id) ? prev.filter(i => i !== u.id) : [...prev, u.id])} />
+
+<td 
+  style={{ cursor: 'pointer' }}
+  onClick={() => {
+    const targetId = u.uid || u.id; 
+    const stats = getTeacherInsights(targetId);
+    setSelectedTeacherStats({ nama: u.nama || u.username, data: stats });
+  }}
+>
+  <div className="teacher-name-cell">
+    <strong>{u.nama || u.username || 'Tiada Nama'}</strong>
+    <br/>
+    <span className="analisis-trigger" style={{fontSize: '11px', color: '#00695C'}}>
+      📊 Analisis Penggunaan
+    </span>
+  </div>
+</td>
                         <td><small>{u.email}</small></td>
                         <td><span className={`tag ${u.role}`}>{u.role}</span></td>
                         <td><span className="credit-pill">{u.credits || 0}</span></td>
