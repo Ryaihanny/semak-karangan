@@ -56,7 +56,7 @@ export default function Signup() {
         email: formData.email.trim().toLowerCase(),
         role: 'guru', 
         sekolah: formData.sekolah,
-        credits: 20,
+        credits: 100,
         createdAt: new Date().toISOString()
       });
 
@@ -128,7 +128,7 @@ export default function Signup() {
           </div>
 
           <button type="submit" className="signup-btn" disabled={loading}>
-            {loading ? "Mendaftarkan Akaun..." : "Daftar & Dapatkan 20 Kredit"}
+            {loading ? "Mendaftarkan Akaun..." : "Daftar"}
           </button>
         </form>
 
