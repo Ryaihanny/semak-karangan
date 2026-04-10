@@ -321,7 +321,7 @@ const handleSemak = async (e) => {
                 </div>
               ))}
             </div>
-          </div>
+          </div> {
 
         <div style={styles.editorArea}>
           <div style={styles.inputHeader}>
