@@ -265,30 +265,38 @@ const handleSemak = async (e) => {
 
       <div style={styles.mainLayout}>
         <div style={styles.sidebar}>
-          <div style={styles.briefCard}>
-            <h3 style={{marginTop: 0}}>📋 Arahan Cikgu:</h3>
+         <div style={styles.briefCard}>
+            <h3 style={{ marginTop: 0 }}>📋 Arahan Cikgu:</h3>
             {taskData?.imageUrl && (
-  <div style={{ marginBottom: '15px' }}>
-    {taskData.imageUrl.toLowerCase().includes('.pdf') ? (
-      /* If it's a PDF, show a button to open/download */
-      <div style={styles.pdfCard}>
-        <div style={{ fontSize: '30px', marginBottom: '10px' }}>📄</div>
-        <p style={{ fontSize: '13px', fontWeight: 'bold', margin: '0 0 10px 0' }}>Dokumen PDF Tugasan</p>
-        <a 
-          href={taskData.imageUrl} 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          style={styles.pdfDownloadBtn}
-        >
-          Buka / Muat Turun PDF
-        </a>
-      </div>
-    ) : (
-      /* If it's an image, show it normally */
-      <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />
-    )}
-  </div>
-)}
+              <div style={{ marginBottom: '15px', width: '100%' }}>
+                {taskData.imageUrl.split('?')[0].toLowerCase().endsWith('.pdf') ? (
+                  <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #ddd', backgroundColor: '#f8f9fa' }}>
+                    <object
+                      data={taskData.imageUrl}
+                      type="application/pdf"
+                      width="100%"
+                      height="500px"
+                    >
+                      <iframe
+                        src={`https://docs.google.com/viewer?url=${encodeURIComponent(taskData.imageUrl)}&embedded=true`}
+                        style={{ width: '100%', height: '500px' }}
+                        frameBorder="0"
+                      ></iframe>
+                    </object>
+                    <a
+                      href={taskData.imageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'block', textAlign: 'center', fontSize: '12px', padding: '10px', color: '#6C5CE7', fontWeight: 'bold', textDecoration: 'none', background: '#f0eeff' }}
+                    >
+                      Buka PDF Skrin Penuh ↗️
+                    </a>
+                  </div>
+                ) : (
+                  <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />
+                )}
+              </div>
+            )}
             <p style={styles.taskText}>{taskData?.instructions || "Sila tulis karangan berdasarkan tajuk yang diberikan."}</p>
           </div>
 
@@ -296,7 +304,13 @@ const handleSemak = async (e) => {
             <h4 style={styles.toolTitle}>🛠️ Kotak Alatan Ajaib</h4>
             <div style={styles.tabRow}>
               {Object.keys(tools).map(key => (
-                <button key={key} onClick={() => setActiveTool(key)} style={{...styles.tabBtn, backgroundColor: activeTool === key ? '#6C5CE7' : '#FFF', color: activeTool === key ? '#FFF' : '#6C5CE7'}}>{tools[key].label}</button>
+                <button 
+                  key={key} 
+                  onClick={() => setActiveTool(key)} 
+                  style={{...styles.tabBtn, backgroundColor: activeTool === key ? '#6C5CE7' : '#FFF', color: activeTool === key ? '#FFF' : '#6C5CE7'}}
+                >
+                  {tools[key].label}
+                </button>
               ))}
             </div>
             <div style={styles.toolContent}>
@@ -308,7 +322,6 @@ const handleSemak = async (e) => {
               ))}
             </div>
           </div>
-        </div>
 
         <div style={styles.editorArea}>
           <div style={styles.inputHeader}>
