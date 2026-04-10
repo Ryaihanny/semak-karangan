@@ -321,9 +321,10 @@ const handleSemak = async (e) => {
                 </div>
               ))}
             </div>
-          </div> {
+        </div> 
+      </div> {/* This closes styles.sidebar */}
 
-        <div style={styles.editorArea}>
+      <div style={styles.editorArea}>
           <div style={styles.inputHeader}>
             <span>✍️ Tulis di sini:</span>
             <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
