@@ -267,7 +267,29 @@ const handleSemak = async (e) => {
         <div style={styles.sidebar}>
           <div style={styles.briefCard}>
             <h3 style={{marginTop: 0}}>📋 Arahan Cikgu:</h3>
-            {taskData?.imageUrl && <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />}
+           {taskData?.imageUrl && (
+  <div style={{ marginBottom: '15px', width: '100%' }}>
+    {taskData.imageUrl.toLowerCase().includes('.pdf') ? (
+      <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #ddd' }}>
+        <iframe
+          src={`https://docs.google.com/viewer?url=${encodeURIComponent(taskData.imageUrl)}&embedded=true`}
+          style={{ width: '100%', height: '500px' }}
+          frameBorder="0"
+        ></iframe>
+        <a 
+          href={taskData.imageUrl} 
+          target="_blank" 
+          style={{ display: 'block', textAlign: 'center', fontSize: '11px', padding: '5px', color: '#6C5CE7' }}
+        >
+          Buka Skrin Penuh ↗️
+        </a>
+      </div>
+    ) : (
+      <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />
+    )}
+  </div>
+)}
+
             <p style={styles.taskText}>{taskData?.instructions || "Sila tulis karangan berdasarkan tajuk yang diberikan."}</p>
           </div>
 

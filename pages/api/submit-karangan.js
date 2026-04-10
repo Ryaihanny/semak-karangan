@@ -63,12 +63,13 @@ export default async function handler(req, res) {
     const taskData = taskSnap.exists ? taskSnap.data() : { title: 'Misi Karangan' };
     const config = LEVEL_SETTINGS[effectiveLevel] || LEVEL_SETTINGS['P6'];
 
-    // 3. AI ANALYSIS (Synced with bulk logic)
+    // 3. AI ANALYSIS (Synced with dynamic stimulus detection)
     const analysis = await analyseKarangan({
       nama: effectiveName,
-      studentContent: [`Karangan murid: ${essay}`], // Wrapped exactly like bulk
+      studentContent: [`Karangan murid: ${essay}`],
       level: effectiveLevel,
-      stimulus: taskData.imageUrl || taskData.attachmentUrl || null
+      // Check all possible fields where the stimulus might be stored
+      stimulus: taskData.imageUrl || taskData.attachmentUrl || taskData.fileUrl || null
     });
 
     // 4. PREPARE PAYLOAD
