@@ -301,12 +301,7 @@ const handleSemak = async (e) => {
   )}
   <p style={styles.taskText}>{taskData?.instructions || "Sila tulis karangan berdasarkan tajuk yang diberikan."}</p>
 </div>
-    ) : (
-      <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />
-    )}
-  </div>
 )}
-
             <p style={styles.taskText}>{taskData?.instructions || "Sila tulis karangan berdasarkan tajuk yang diberikan."}</p>
           </div>
 
