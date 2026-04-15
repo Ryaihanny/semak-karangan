@@ -17,6 +17,7 @@ export default function SemakanPage() {
   const [studentName, setStudentName] = useState(nama || "Pelajar");
   const [credits, setCredits] = useState(null);
   const [studentLevel, setStudentLevel] = useState(null);
+const [showScaffold, setShowScaffold] = useState(true);
 
   // --- SCAFFOLDING LOGIC ---
   const [activeStep, setActiveStep] = useState(0);
@@ -315,61 +316,84 @@ export default function SemakanPage() {
           </button>
 
           <div style={styles.writingContainer}>
-            {isScaffoldedMode ? (
-              <div style={styles.scaffoldWrapper}>
-                <div style={styles.scaffoldHeader}>
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                    <h3 style={{margin:0, color:'#4338CA'}}>Gambar {activeStep + 1} / {picCount}</h3>
-                    <span style={styles.phaseBadge}>{scaffoldData[activeStep].subject ? "Fasa 3: Expansion" : "Fasa 1 & 2: Kosa Kata & Bina Ayat"}</span>
+            {/* LEFT SIDE: SCAFFOLD BOX */}
+            {isScaffoldedMode && (
+              <div style={{
+                ...styles.scaffoldSideWrapper,
+                width: showScaffold ? '50%' : '0px',
+                opacity: showScaffold ? 1 : 0,
+                marginRight: showScaffold ? '15px' : '0px',
+                pointerEvents: showScaffold ? 'auto' : 'none'
+              }}>
+                <div style={styles.scaffoldWrapper}>
+                  <div style={styles.scaffoldHeader}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                      <h3 style={{margin:0, color:'#4338CA', fontSize:'14px'}}>Gambar {activeStep + 1}</h3>
+                      <span style={styles.phaseBadge}>Step-by-Step</span>
+                    </div>
                   </div>
-                  <div style={styles.progressBar}><div style={{...styles.progressFill, width: `${((activeStep + 1)/picCount)*100}%`}}></div></div>
-                </div>
 
-                {/* INPUT AREAS */}
-                <div style={styles.phaseBox}>
-                  <p style={styles.phaseTitle}>PHASE 1: KOSA KATA</p>
-                  <div style={styles.grid3}>
-                    <textarea style={styles.scaffoldInput} placeholder="Kata Nama" value={scaffoldData[activeStep].nouns} onChange={(e) => updateScaffold(activeStep, 'nouns', e.target.value)} />
-                    <textarea style={styles.scaffoldInput} placeholder="Kata Kerja" value={scaffoldData[activeStep].verbs} onChange={(e) => updateScaffold(activeStep, 'verbs', e.target.value)} />
-                    <textarea style={styles.scaffoldInput} placeholder="Kata Adjektif" value={scaffoldData[activeStep].adjectives} onChange={(e) => updateScaffold(activeStep, 'adjectives', e.target.value)} />
+                  <div style={styles.phaseBox}>
+                    <p style={styles.phaseTitle}>PHASE 1: KOSA KATA</p>
+                    <div style={styles.grid3}>
+                      <textarea style={styles.scaffoldInput} placeholder="Nouns" value={scaffoldData[activeStep].nouns} onChange={(e) => updateScaffold(activeStep, 'nouns', e.target.value)} />
+                      <textarea style={styles.scaffoldInput} placeholder="Verbs" value={scaffoldData[activeStep].verbs} onChange={(e) => updateScaffold(activeStep, 'verbs', e.target.value)} />
+                      <textarea style={styles.scaffoldInput} placeholder="Adjectives" value={scaffoldData[activeStep].adjectives} onChange={(e) => updateScaffold(activeStep, 'adjectives', e.target.value)} />
+                    </div>
                   </div>
-                </div>
 
-                <div style={{...styles.phaseBox, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0'}}>
-                  <p style={{...styles.phaseTitle, color: '#15803D'}}>PHASE 2: BINA AYAT</p>
-                  <div style={styles.grid2}>
+                  <div style={{...styles.phaseBox, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0'}}>
+                    <p style={{...styles.phaseTitle, color: '#15803D'}}>PHASE 2: BINA AYAT</p>
                     <input style={styles.scaffoldInputLg} placeholder="Subjek" value={scaffoldData[activeStep].subject} onChange={(e) => updateScaffold(activeStep, 'subject', e.target.value)} />
-                    <input style={styles.scaffoldInputLg} placeholder="Predikat" value={scaffoldData[activeStep].predicate} onChange={(e) => updateScaffold(activeStep, 'predicate', e.target.value)} />
+                    <input style={{...styles.scaffoldInputLg, marginTop:'5px'}} placeholder="Predikat" value={scaffoldData[activeStep].predicate} onChange={(e) => updateScaffold(activeStep, 'predicate', e.target.value)} />
                   </div>
-                </div>
 
-                <div style={{...styles.phaseBox, backgroundColor: '#FEF2F2', borderColor: '#FECACA'}}>
-                  <p style={{...styles.phaseTitle, color: '#B91C1C'}}>PHASE 3: EXPANSION</p>
-                  <textarea style={styles.scaffoldInput} placeholder="Huraian Tambahan" value={scaffoldData[activeStep].expansion || ""} onChange={(e) => updateScaffold(activeStep, 'expansion', e.target.value)} />
-                </div>
+                  <div style={{...styles.phaseBox, backgroundColor: '#FEF2F2', borderColor: '#FECACA'}}>
+                    <p style={{...styles.phaseTitle, color: '#B91C1C'}}>PHASE 3: EXPANSION</p>
+                    <textarea style={styles.scaffoldInput} placeholder="Huraian Tambahan" value={scaffoldData[activeStep].expansion || ""} onChange={(e) => updateScaffold(activeStep, 'expansion', e.target.value)} />
+                  </div>
 
-                <div style={styles.scaffoldNav}>
-                  <button onClick={() => setActiveStep(s => Math.max(0, s - 1))} disabled={activeStep === 0} style={{...styles.navBtn, opacity: activeStep === 0 ? 0.5 : 1}}>⬅️ Kembali</button>
-                  <button onClick={() => { if (activeStep < picCount - 1) setActiveStep(activeStep + 1); }} style={{...styles.navBtn, backgroundColor: activeStep === picCount - 1 ? '#22C55E' : '#6C5CE7', color: 'white'}}>
-                    {activeStep === picCount - 1 ? "Selesai! ✅" : "Seterusnya ➡️"}
-                  </button>
+                  <div style={styles.scaffoldNav}>
+                    <button onClick={() => setActiveStep(s => Math.max(0, s - 1))} disabled={activeStep === 0} style={styles.navBtn}>⬅️</button>
+                    <button onClick={() => { if (activeStep < picCount - 1) setActiveStep(activeStep + 1); }} style={{...styles.navBtn, backgroundColor: '#6C5CE7', color: 'white'}}>
+                      {activeStep === picCount - 1 ? "✅" : "➡️"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            ) : null}
+            )}
 
-            {/* PREVIEW / MAIN TEXTAREA */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            {/* SLEEK VERTICAL TOGGLE HANDLE */}
+            {isScaffoldedMode && (
+              <div 
+                onClick={() => setShowScaffold(!showScaffold)} 
+                style={{
+                  ...styles.sleekToggleHandle,
+                  left: showScaffold ? 'calc(50% - 12px)' : '0px'
+                }}
+              >
+                {showScaffold ? "◀" : "▶"}
+              </div>
+            )}
+
+            {/* RIGHT SIDE: MAIN TEXTAREA */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
               <div style={styles.inputHeader}>
-                <span>{isScaffoldedMode ? "👀 Pratonton Karangan:" : "✍️ Tulis di sini:"}</span>
+                <span>{showScaffold ? "👀 Pratonton:" : "✍️ Bebas Menulis:"}</span>
                 <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
               </div>
               <textarea 
                 value={essay} 
                 onChange={(e) => setEssay(e.target.value)} 
                 placeholder="Tulis di sini..." 
-                style={{...styles.textarea, backgroundColor: isScaffoldedMode ? '#F9FAFB' : '#FFF', border: isScaffoldedMode ? '2px solid #6C5CE7' : '2px solid #EEE'}} 
+                style={{
+                  ...styles.textarea, 
+                  backgroundColor: showScaffold ? '#F9FAFB' : '#FFF',
+                  transition: 'all 0.3s ease'
+                }} 
               />
             </div>
+          </div>
 
             {coachSuggestion && (
               <div style={styles.sideCoachPanel}>
