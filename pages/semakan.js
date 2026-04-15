@@ -16,7 +16,7 @@ export default function SemakanPage() {
   const [activeId, setActiveId] = useState(null);
   const [studentName, setStudentName] = useState(nama || "Pelajar");
   const [credits, setCredits] = useState(null);
-const [studentLevel, setStudentLevel] = useState(null)z
+const [studentLevel, setStudentLevel] = useState(null);
 
   const [coachSuggestion, setCoachSuggestion] = useState("");
   const [isCoaching, setIsCoaching] = useState(false);
