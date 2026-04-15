@@ -202,12 +202,26 @@ export default function SemakanPage() {
     return () => unsub();
   }, [activeId, taskId]);
 
-  useEffect(() => {
+useEffect(() => {
     if (taskId) {
-      fetch(`https://semak-karangan-production.up.railway.app/api/get-task?taskId=${taskId}`)
-        .then(res => res.json())
-        .then(data => setTaskData(data))
-        .catch(err => console.error("Gagal muat turun tugasan:", err));
+      // Direct Firebase fetch to get studentConfig
+      const getTaskDetails = async () => {
+        try {
+          const taskRef = doc(db, 'assignments', taskId);
+          const taskSnap = await getDoc(taskRef);
+          if (taskSnap.exists()) {
+            setTaskData({ id: taskSnap.id, ...taskSnap.data() });
+          } else {
+            // Fallback to your API if document isn't in 'assignments'
+            const res = await fetch(`https://semak-karangan-production.up.railway.app/api/get-task?taskId=${taskId}`);
+            const data = await res.json();
+            setTaskData(data);
+          }
+        } catch (err) {
+          console.error("Gagal muat turun tugasan:", err);
+        }
+      };
+      getTaskDetails();
     }
   }, [taskId]);
 
