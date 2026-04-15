@@ -21,9 +21,9 @@ export default function SemakanPage() {
   // --- SCAFFOLDING LOGIC ---
   const [activeStep, setActiveStep] = useState(0);
   const picCount = (studentLevel === 'P5' || studentLevel === 'P6') ? 6 : 4;
-  const isScaffoldedMode = taskData?.studentConfig?.[activeId] 
-  ? taskData.studentConfig[activeId] === 'scaffolded'
-  : ['P3', 'P4', 'P5', 'P6'].includes(studentLevel);
+const isScaffoldedMode = taskData?.studentConfig?.[activeId] 
+    ? taskData.studentConfig[activeId] === 'scaffolded' 
+    : ['P3', 'P4', 'P5', 'P6'].includes(studentLevel);
 
   const [scaffoldData, setScaffoldData] = useState(
     Array(6).fill({ nouns: "", verbs: "", adjectives: "", subject: "", predicate: "", expansion: "" })
@@ -195,12 +195,25 @@ export default function SemakanPage() {
     return () => unsub();
   }, [activeId, taskId]);
 
-  useEffect(() => {
+useEffect(() => {
     if (taskId) {
-      fetch(`https://semak-karangan-production.up.railway.app/api/get-task?taskId=${taskId}`)
-        .then(res => res.json())
-        .then(data => setTaskData(data))
-        .catch(err => console.error("Gagal muat turun tugasan:", err));
+      const getTask = async () => {
+        try {
+          const taskRef = doc(db, 'assignments', taskId);
+          const taskSnap = await getDoc(taskRef);
+          if (taskSnap.exists()) {
+            setTaskData({ id: taskSnap.id, ...taskSnap.data() });
+          } else {
+            // Fallback to API if not in Firestore
+            const res = await fetch(`https://semak-karangan-production.up.railway.app/api/get-task?taskId=${taskId}`);
+            const data = await res.json();
+            setTaskData(data);
+          }
+        } catch (err) {
+          console.error("Error fetching task:", err);
+        }
+      };
+      getTask();
     }
   }, [taskId]);
 
