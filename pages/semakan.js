@@ -16,53 +16,18 @@ export default function SemakanPage() {
   const [activeId, setActiveId] = useState(null);
   const [studentName, setStudentName] = useState(nama || "Pelajar");
   const [credits, setCredits] = useState(null);
-  const [studentLevel, setStudentLevel] = useState(null);
-  
-  // CLEANUP: Set to false by default to hide the scaffold sleekly
-  const [showScaffold, setShowScaffold] = useState(false);
-
-  // --- SCAFFOLDING LOGIC (STAY UNTOUCHED) ---
-  const [activeStep, setActiveStep] = useState(0);
-  const picCount = (studentLevel === 'P5' || studentLevel === 'P6') ? 6 : 4;
-
-  const isScaffoldedMode = taskData?.studentConfig?.[activeId] 
-    ? taskData.studentConfig[activeId] === 'scaffolded' 
-    : (taskData?.studentConfig?.[activeId] === 'standard' 
-        ? false 
-        : ['P3', 'P4', 'P5', 'P6'].includes(studentLevel));
-
-  const [scaffoldData, setScaffoldData] = useState(
-    Array(6).fill({ nouns: "", verbs: "", adjectives: "", subject: "", predicate: "", expansion: "" })
-  );
-
-  const updateScaffold = (step, field, value) => {
-    const newData = [...scaffoldData];
-    newData[step] = { ...newData[step], [field]: value };
-    setScaffoldData(newData);
-    
-    const combinedEssay = newData
-      .slice(0, picCount)
-      .map(d => {
-        if (!d.subject && !d.predicate) return "";
-        let mainSentence = `${d.subject} ${d.predicate}`.trim();
-        let expansion = d.expansion ? d.expansion.trim() : "";
-        if (mainSentence && !mainSentence.endsWith('.')) mainSentence += ".";
-        if (expansion && !expansion.endsWith('.')) expansion += ".";
-        return `${mainSentence} ${expansion}`.trim();
-      })
-      .filter(s => s.length > 0)
-      .join(" ");
-      
-    setEssay(combinedEssay);
-  };
+const [studentLevel, setStudentLevel] = useState(null)z
 
   const [coachSuggestion, setCoachSuggestion] = useState("");
   const [isCoaching, setIsCoaching] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+
   const [isKamusVisible, setIsKamusVisible] = useState(false);
   const [kamusQuery, setKamusQuery] = useState("");
   const [kamusHasil, setKamusHasil] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Tambahan untuk Feedback & Broadcast
   const [feedback, setFeedback] = useState("");
   const isTeacherMode = router.query.mode === 'teacher';
 
@@ -99,6 +64,7 @@ export default function SemakanPage() {
     if (essay.trim().split(/\s+/).filter(Boolean).length < 5) {
       return alert("Tulis sekurang-kurangnya 5 patah perkataan untuk dibantu! ✍️");
     }
+    
     setIsCoaching(true);
     try {
       const res = await fetch('/api/ai-coach', {
@@ -120,6 +86,7 @@ export default function SemakanPage() {
     }
   };
 
+  // Fungsi Cikgu Hantar Feedback
   const handleSendFeedback = async () => {
     const draftRef = doc(db, 'drafts', `${activeId}_${taskId}`);
     await updateDoc(draftRef, { feedbackGuru: feedback });
@@ -132,63 +99,82 @@ export default function SemakanPage() {
     perasaan: { label: "🧠 Perasaan", items: ["gembira (happy) - gembira bukan kepalang", "gembira (happy) - senyuman lebar hingga ke telinga", "gementar (nervous) - jantung berdegup kencang seperti mahu luruh", "gementar (nervous) - peluh dingin mula membasahi dahi", "panik (panic) - keadaan menjadi kelam-bakut", "panik (panic) - terpinga-pinga seperti rusa masuk kampung", "sedih (sad) - air mata mula berlinangan", "sedih (sad) - hati hancur luluh bagai kaca terhempas ke batu"] }
   };
 
-  useEffect(() => {
-    const identifyAndLoad = async () => {
-      const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
-      const identifier = studentId || savedUser.id || savedUser.uid || auth.currentUser?.uid;
+useEffect(() => {
+  const identifyAndLoad = async () => {
+    // 1. GET DATA FROM LOCALSTORAGE IMMEDIATELY (FASTEST)
+    const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
+    
+    // Determine the ID from URL first, then LocalStorage, then Auth
+    const identifier = studentId || savedUser.id || savedUser.uid || auth.currentUser?.uid;
 
-      if (identifier) {
-        setActiveId(identifier);
-        if (savedUser.name) setStudentName(savedUser.name);
-        if (savedUser.level) setStudentLevel(savedUser.level);
+    if (identifier) {
+      setActiveId(identifier);
+      if (savedUser.name) setStudentName(savedUser.name);
+      
+      // 2. PRE-SET LEVEL FROM LOCALSTORAGE (Instant button unlock)
+      if (savedUser.level) {
+        setStudentLevel(savedUser.level);
+      }
 
+      try {
+        // 3. FETCH FRESH DATA FROM FIRESTORE IN BACKGROUND
+        const studentRef = doc(db, 'students', identifier);
+        const studentSnap = await getDoc(studentRef);
+        
+        if (studentSnap.exists()) {
+          const userData = studentSnap.data();
+          setCredits(userData.credits ?? 0);
+          setStudentLevel(userData.level); // Overwrite with fresh DB data
+          
+          // Update LocalStorage so it stays fresh for next time
+          localStorage.setItem("studentUser", JSON.stringify({ ...savedUser, ...userData }));
+        } else {
+          // If user doesn't exist, create them
+          await setDoc(studentRef, { 
+            credits: 5, 
+            name: studentName, 
+            role: 'student', 
+            createdAt: serverTimestamp() 
+          }, { merge: true });
+          setCredits(5);
+        }
+      } catch (err) {
+        console.error("Database fetch error:", err);
+      }
+
+      // 4. LOAD DRAFT (This part stays the same)
+      if (taskId) {
         try {
-          const studentRef = doc(db, 'students', identifier);
-          const studentSnap = await getDoc(studentRef);
-          if (studentSnap.exists()) {
-            const userData = studentSnap.data();
-            setCredits(userData.credits ?? 0);
-            setStudentLevel(userData.level);
-            localStorage.setItem("studentUser", JSON.stringify({ ...savedUser, ...userData }));
-          }
-        } catch (err) { console.error("Database fetch error:", err); }
-
-        if (taskId) {
-          try {
-            const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
-            if (isOverwrite) {
-              setEssay(""); 
-              const { overwrite: _, ...cleanQuery } = router.query;
-              router.replace({ query: cleanQuery }, undefined, { shallow: true });
-            } else {
-              const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-              const snap = await getDoc(draftRef);
-              if (snap.exists()) {
-                const savedEssay = snap.data().essay;
-                if (!essay && savedEssay) {
-                  if (submissionId) {
-                    const wantOld = confirm("Anda sudah menghantar karangan ini. Adakah anda mahu membaiki karangan lama? (Klik Cancel untuk tulis baru)");
-                    if (wantOld) setEssay(savedEssay); else setEssay("");
-                  } else {
-                    setEssay(savedEssay);
-                  }
-                }
-              }
+          const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
+          if (isOverwrite) {
+            setEssay(""); 
+            const { overwrite: _, ...cleanQuery } = router.query;
+            router.replace({ query: cleanQuery }, undefined, { shallow: true });
+          } else {
+            const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+            const snap = await getDoc(draftRef);
+            if (snap.exists()) {
+              setEssay(snap.data().essay);
             }
-          } catch (err) { console.error("Error loading draft:", err); }
+          }
+        } catch (err) {
+          console.error("Error loading draft:", err);
         }
       }
-    };
+    }
+  };
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setAuthReady(true);
-      if (user) identifyAndLoad();
-    });
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    setAuthReady(true);
+    if (user) identifyAndLoad(); // Re-run when auth is confirmed
+  });
 
-    identifyAndLoad();
-    return () => unsubscribe();
-  }, [taskId, studentId, studentName, overwrite, router.query.overwrite]);
+  identifyAndLoad(); // Run immediately on mount
+  return () => unsubscribe();
+}, [taskId, studentId, studentName, overwrite, router.query.overwrite]); // Added router.query.overwrite for safety
 
+
+  // 1 & 2: Listen untuk Feedback & Data Real-time
   useEffect(() => {
     if (!activeId || !taskId) return;
     const draftRef = doc(db, 'drafts', `${activeId}_${taskId}`);
@@ -222,7 +208,7 @@ export default function SemakanPage() {
     } catch (err) { alert("Gagal menyimpan."); } finally { setIsSaving(false); }
   };
 
-  const handleSemak = async (e) => {
+const handleSemak = async (e) => {
     if (e) e.preventDefault();
     if (credits !== null && credits <= 0) return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu! 💎");
     const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
@@ -231,6 +217,8 @@ export default function SemakanPage() {
     setLoading(true);
     const isOverwrite = router.query.overwrite === 'true';
     const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
+    
+    // Gunakan ID yang aktif atau ID dari localStorage (Dokumen dalam 'students')
     const finalStudentId = activeId || studentId || savedUser.id || savedUser.uid;
 
     try {
@@ -238,17 +226,27 @@ export default function SemakanPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          essay, studentId: finalStudentId, taskId: taskId, classId: classId || "umum", 
-          nama: studentName, studentLevel: studentLevel, submissionId, status: "submitted", isOverwrite: isOverwrite 
+          essay, 
+          studentId: finalStudentId, 
+          taskId: taskId, 
+          classId: classId || "umum", 
+          nama: studentName, 
+          studentLevel: studentLevel, 
+          submissionId, 
+          status: "submitted",
+          isOverwrite: isOverwrite 
         }),
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
+      
+      // Kemas kini kredit di skrin serta-merta selepas berjaya
       if (data.remainingCredits !== undefined) {
         setCredits(data.remainingCredits);
         localStorage.setItem("studentUser", JSON.stringify({ ...savedUser, credits: data.remainingCredits }));
       }
+
       router.push(`/analisis/${data.id}?classId=${classId || "umum"}`);
     } catch (err) { 
       alert(err.message); 
@@ -259,6 +257,7 @@ export default function SemakanPage() {
 
   return (
     <div style={styles.container}>
+      {/* ... [Sistem nav/layout sedia ada] ... */}
       <div style={styles.topNav}>
         <button onClick={() => router.back()} style={styles.backBtn}>⬅️ Kembali</button>
         <h1 style={styles.title}>🚀 Misi Karangan</h1>
@@ -266,15 +265,32 @@ export default function SemakanPage() {
 
       <div style={styles.mainLayout}>
         <div style={styles.sidebar}>
-          <div style={styles.briefCard}>
+         <div style={styles.briefCard}>
             <h3 style={{ marginTop: 0 }}>📋 Arahan Cikgu:</h3>
             {taskData?.imageUrl && (
               <div style={{ marginBottom: '15px', width: '100%' }}>
                 {taskData.imageUrl.split('?')[0].toLowerCase().endsWith('.pdf') ? (
                   <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #ddd', backgroundColor: '#f8f9fa' }}>
-                    <object data={taskData.imageUrl} type="application/pdf" width="100%" height="500px">
-                      <iframe src={`https://docs.google.com/viewer?url=${encodeURIComponent(taskData.imageUrl)}&embedded=true`} style={{ width: '100%', height: '500px' }} frameBorder="0"></iframe>
+                    <object
+                      data={taskData.imageUrl}
+                      type="application/pdf"
+                      width="100%"
+                      height="500px"
+                    >
+                      <iframe
+                        src={`https://docs.google.com/viewer?url=${encodeURIComponent(taskData.imageUrl)}&embedded=true`}
+                        style={{ width: '100%', height: '500px' }}
+                        frameBorder="0"
+                      ></iframe>
                     </object>
+                    <a
+                      href={taskData.imageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'block', textAlign: 'center', fontSize: '12px', padding: '10px', color: '#6C5CE7', fontWeight: 'bold', textDecoration: 'none', background: '#f0eeff' }}
+                    >
+                      Buka PDF Skrin Penuh ↗️
+                    </a>
                   </div>
                 ) : (
                   <img src={taskData.imageUrl} alt="Stimulus" style={styles.stimulusImg} />
@@ -288,7 +304,13 @@ export default function SemakanPage() {
             <h4 style={styles.toolTitle}>🛠️ Kotak Alatan Ajaib</h4>
             <div style={styles.tabRow}>
               {Object.keys(tools).map(key => (
-                <button key={key} onClick={() => setActiveTool(key)} style={{...styles.tabBtn, backgroundColor: activeTool === key ? '#6C5CE7' : '#FFF', color: activeTool === key ? '#FFF' : '#6C5CE7'}}>{tools[key].label}</button>
+                <button 
+                  key={key} 
+                  onClick={() => setActiveTool(key)} 
+                  style={{...styles.tabBtn, backgroundColor: activeTool === key ? '#6C5CE7' : '#FFF', color: activeTool === key ? '#FFF' : '#6C5CE7'}}
+                >
+                  {tools[key].label}
+                </button>
               ))}
             </div>
             <div style={styles.toolContent}>
@@ -299,148 +321,158 @@ export default function SemakanPage() {
                 </div>
               ))}
             </div>
-          </div> 
-        </div>
+        </div> 
+      </div> {/* This closes styles.sidebar */}
 
-        <div style={styles.editorArea}>
-          {feedback && <div style={styles.feedbackBanner}><strong>💡 Maklum Balas Cikgu:</strong><p>{feedback}</p></div>}
-          
+      <div style={styles.editorArea}>
+          <div style={styles.inputHeader}>
+            <span>✍️ Tulis di sini:</span>
+            <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
+          </div>
+
+          {/* Feedback Section */}
+          {feedback && (
+            <div style={styles.feedbackBanner}>
+              <strong>💡 Maklum Balas Cikgu:</strong>
+              <p>{feedback}</p>
+            </div>
+          )}
+
+          {/* Teacher Controls */}
+          {isTeacherMode && (
+            <div style={styles.teacherControlPanel}>
+              <textarea 
+                value={feedback} 
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Tulis maklum balas untuk murid..."
+                style={styles.textarea}
+              />
+              <button onClick={handleSendFeedback} style={styles.submitBtn}>Hantar Maklum Balas</button>
+            </div>
+          )}
+
           <button onClick={getAICoachHelp} disabled={isCoaching} style={styles.coachBtn}>
             {isCoaching ? "🪄 Cikgu AI sedang meneliti..." : "👩‍🏫 Minta Bimbingan Cikgu AI"}
           </button>
 
           <div style={styles.writingContainer}>
-            {/* CLEANUP: Scaffold is now hidden by default (showScaffold = false) */}
-            {isScaffoldedMode && (
-              <div style={{
-                ...styles.scaffoldSideWrapper,
-                width: showScaffold ? '50%' : '0px',
-                opacity: showScaffold ? 1 : 0,
-                marginRight: showScaffold ? '15px' : '0px',
-                pointerEvents: showScaffold ? 'auto' : 'none'
-              }}>
-                <div style={styles.scaffoldWrapper}>
-                  <div style={styles.scaffoldHeader}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                      <h3 style={{margin:0, color:'#4338CA', fontSize:'14px'}}>Gambar {activeStep + 1}</h3>
-                      <span style={styles.phaseBadge}>Step-by-Step</span>
-                    </div>
-                  </div>
+            <textarea 
+              value={essay} 
+              onChange={(e) => setEssay(e.target.value)} 
+              placeholder="Tulis di sini..." 
+              style={styles.textarea} 
+            />
 
-                  <div style={styles.phaseBox}>
-                    <p style={styles.phaseTitle}>PHASE 1: KOSA KATA</p>
-                    <div style={styles.grid3}>
-                      <textarea style={styles.scaffoldInput} placeholder="Nouns" value={scaffoldData[activeStep].nouns} onChange={(e) => updateScaffold(activeStep, 'nouns', e.target.value)} />
-                      <textarea style={styles.scaffoldInput} placeholder="Verbs" value={scaffoldData[activeStep].verbs} onChange={(e) => updateScaffold(activeStep, 'verbs', e.target.value)} />
-                      <textarea style={styles.scaffoldInput} placeholder="Adjectives" value={scaffoldData[activeStep].adjectives} onChange={(e) => updateScaffold(activeStep, 'adjectives', e.target.value)} />
-                    </div>
-                  </div>
-
-                  <div style={{...styles.phaseBox, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0'}}>
-                    <p style={{...styles.phaseTitle, color: '#15803D'}}>PHASE 2: BINA AYAT</p>
-                    <input style={styles.scaffoldInputLg} placeholder="Subjek" value={scaffoldData[activeStep].subject} onChange={(e) => updateScaffold(activeStep, 'subject', e.target.value)} />
-                    <input style={{...styles.scaffoldInputLg, marginTop:'5px'}} placeholder="Predikat" value={scaffoldData[activeStep].predicate} onChange={(e) => updateScaffold(activeStep, 'predicate', e.target.value)} />
-                  </div>
-
-                  <div style={{...styles.phaseBox, backgroundColor: '#FEF2F2', borderColor: '#FECACA'}}>
-                    <p style={{...styles.phaseTitle, color: '#B91C1C'}}>PHASE 3: EXPANSION</p>
-                    <textarea style={styles.scaffoldInput} placeholder="Huraian Tambahan" value={scaffoldData[activeStep].expansion || ""} onChange={(e) => updateScaffold(activeStep, 'expansion', e.target.value)} />
-                  </div>
-
-                  <div style={styles.scaffoldNav}>
-                    <button onClick={() => setActiveStep(s => Math.max(0, s - 1))} disabled={activeStep === 0} style={styles.navBtn}>⬅️</button>
-                    <button onClick={() => { if (activeStep < picCount - 1) setActiveStep(activeStep + 1); }} style={{...styles.navBtn, backgroundColor: '#6C5CE7', color: 'white'}}>
-                      {activeStep === picCount - 1 ? "✅" : "➡️"}
-                    </button>
-                  </div>
+            {coachSuggestion && (
+              <div style={styles.sideCoachPanel}>
+                <div style={styles.sideCoachHeader}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                     <span>💡</span>
+                     <span>Bimbingan AI</span>
+                   </div>
+                   <button onClick={() => speakSuggestion(coachSuggestion)} style={styles.miniVoiceBtn}>
+                     {isSpeaking ? "🔊" : "🔈"}
+                   </button>
                 </div>
+                <div style={styles.sideCoachBody}>{coachSuggestion}</div>
+                <button onClick={() => { window.speechSynthesis.cancel(); setCoachSuggestion(""); }} style={styles.sideCloseBtn}>
+                  Tutup Panel
+                </button>
               </div>
             )}
-
-            {/* RIGHT SIDE: MAIN TEXTAREA (Expanded for sleek look) */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-              <div style={styles.inputHeader}>
-                <span>{showScaffold ? "👀 Pratonton:" : "✍️ Bebas Menulis:"}</span>
-                <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
-              </div>
-              <textarea 
-                value={essay} 
-                onChange={(e) => setEssay(e.target.value)} 
-                placeholder="Tulis di sini..." 
-                style={{
-                  ...styles.textarea, 
-                  backgroundColor: showScaffold ? '#F9FAFB' : '#FFF',
-                  transition: 'all 0.3s ease'
-                }} 
-              />
-            </div>
           </div>
-
-          {/* AI COACH SUGGESTION PANEL */}
-          {coachSuggestion && (
-            <div style={styles.sideCoachPanel}>
-              <div style={styles.sideCoachHeader}>
-                 <span>💡 Bimbingan AI</span>
-                 <button onClick={() => speakSuggestion(coachSuggestion)} style={styles.miniVoiceBtn}>{isSpeaking ? "🔊" : "🔈"}</button>
-              </div>
-              <div style={styles.sideCoachBody}>{coachSuggestion}</div>
-              <button onClick={() => setCoachSuggestion("")} style={styles.sideCloseBtn}>Tutup</button>
-            </div>
-          )}
-          
-          {/* TEACHER FEEDBACK INPUT */}
-          {isTeacherMode && (
-            <div style={styles.teacherControlPanel}>
-              <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Tulis maklum balas..." style={{...styles.textarea, height: '100px', marginBottom: '10px'}} />
-              <button onClick={handleSendFeedback} style={styles.submitBtn}>Hantar Maklum Balas</button>
-            </div>
-          )}
 
           <div style={styles.statusFooter}>
-            <span>Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName} | Tahap: {studentLevel || "..."}</span>
-            <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
-          </div>
+  <span>
+    Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName} | 
+    <span style={{ color: '#6C5CE7', fontWeight: 'bold', marginLeft: '5px' }}>
+      Tahap: {studentLevel || "Memuat..."}
+    </span>
+  </span>
+  <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
+</div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳" : "💾 Simpan"}</button>
-            <button onClick={handleSemak} disabled={loading || !studentLevel} style={{ ...styles.submitBtn, flex: 2 }}>{loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}</button>
+            <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
+           <button 
+  onClick={handleSemak} 
+  disabled={loading || !studentLevel} // Button is disabled if studentLevel is null
+  style={{ 
+    ...styles.submitBtn, 
+    flex: 2, 
+    opacity: !studentLevel ? 0.6 : 1, // Dims the button if level is missing
+    cursor: !studentLevel ? 'not-allowed' : 'pointer' 
+  }}
+>
+  {loading ? "⚡ Memproses..." : !studentLevel ? "⏳ Memuatkan Tahap..." : "Hantar Misi! ✨"}
+</button>
           </div>
         </div>
       </div>
 
-      <button onClick={() => setIsKamusVisible(!isKamusVisible)} style={styles.floatingToggle}>{isKamusVisible ? "✖" : "📖 Kamus"}</button>
+      <button onClick={() => setIsKamusVisible(!isKamusVisible)} style={styles.floatingToggle}>
+        {isKamusVisible ? "✖" : "📖 Kamus"}
+      </button>
+
+      {/* ... [Sistem kamus sedia ada] ... */}
       {isKamusVisible && (
         <div style={styles.floatingKamus}>
-          <div style={styles.kamusHeader}>📖 Kamus</div>
+          <div style={styles.kamusHeader}>📖 Kamus Pintar</div>
           <div style={{ padding: '12px' }}>
-            <input value={kamusQuery} onChange={(e) => setKamusQuery(e.target.value)} placeholder="Cari..." style={styles.kamusInput} onKeyDown={(e) => e.key === 'Enter' && handleKamusSearch()} />
-            <button onClick={handleKamusSearch} style={styles.searchBtn}>{isSearching ? "Mencari..." : "Cari"}</button>
+            <input 
+              value={kamusQuery} 
+              onChange={(e) => setKamusQuery(e.target.value)}
+              placeholder="Cari English/Malay..."
+              style={styles.kamusInput}
+              onKeyDown={(e) => e.key === 'Enter' && handleKamusSearch()}
+            />
+            <button onClick={handleKamusSearch} style={styles.searchBtn}>
+              {isSearching ? "Mencari..." : "Cari Maklumat"}
+            </button>
           </div>
-          <div style={styles.kamusBody}>{kamusHasil || "Taip dan Cari."}</div>
+          <div style={styles.kamusBody}>
+            {kamusHasil ? (
+              <div style={{ fontSize: '13px', whiteSpace: 'pre-line' }}>{kamusHasil}</div>
+            ) : (
+              <p style={{fontSize: '11px', color: '#94A3B8', textAlign: 'center'}}>Taip perkataan dan tekan Cari.</p>
+            )}
+          </div>
         </div>
       )}
-
-      {loading && (
-        <div style={styles.overlay}>
-          <div style={styles.loaderBox}>
-            <div style={styles.spinner}></div>
-            <h2>Cikgu AI sedang menyemak... ⚡</h2>
-          </div>
-        </div>
-      )}
+{/* LOADING OVERLAY */}
+{loading && (
+  <div style={styles.overlay}>
+    <div style={styles.loaderBox}>
+      <div style={styles.spinner}></div>
+      <h2 style={{ color: '#4338CA', marginBottom: '10px' }}>Cikgu AI sedang menyemak... ⚡</h2>
+      <p style={{ color: '#64748B' }}>Sila tunggu sebentar, kami sedang meneliti setiap perkataan anda.</p>
+      <div style={styles.loadingBarContainer}>
+        <div style={styles.loadingBarFill}></div>
+      </div>
+    </div>
+  </div>
+)}
+<style jsx global>{`
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  @keyframes pulse {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(200%); }
+  }
+`}</style>
     </div>
   );
 }
 
 const styles = {
-  // --- LAYOUT & CONTAINER ---
+  // ... [Existing Styles]
   container: { backgroundColor: '#F0F3F7', minHeight: '100vh', padding: '20px' },
   topNav: { display: 'flex', alignItems: 'center', marginBottom: '20px', maxWidth: '1200px', margin: '0 auto 20px auto' },
   backBtn: { padding: '8px 15px', borderRadius: '10px', border: 'none', cursor: 'pointer', marginRight: '20px', fontWeight: 'bold', background: '#fff' },
   title: { fontSize: '24px', margin: 0, color: '#2D3436' },
   mainLayout: { display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', maxWidth: '1200px', margin: '0 auto' },
   sidebar: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  
-  // --- CARDS & PANELS ---
   briefCard: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
   stimulusImg: { width: '100%', borderRadius: '10px', marginBottom: '10px' },
   taskText: { fontSize: '15px', lineHeight: '1.5', color: '#444' },
@@ -450,54 +482,66 @@ const styles = {
   tabBtn: { padding: '6px 10px', borderRadius: '8px', border: '1px solid #6C5CE7', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' },
   toolContent: { display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '250px', overflowY: 'auto' },
   toolItem: { backgroundColor: '#FFF', padding: '10px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', border: '1px solid #C7D2FE' },
-  
-  // --- EDITOR AREA ---
   editorArea: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
   inputHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' },
   wordCount: { color: '#6C5CE7' },
-  writingContainer: { display: 'flex', gap: '0px', alignItems: 'flex-start', marginBottom: '10px', position: 'relative' },
-  textarea: { width: '100%', height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
-  
-  // --- AI COACH PANEL ---
-  sideCoachPanel: { marginTop: '15px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column' },
+  writingContainer: { display: 'flex', gap: '15px', alignItems: 'flex-start', marginBottom: '10px' },
+  textarea: { flex: 1, height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none' },
+  sideCoachPanel: { width: '280px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '420px' },
   sideCoachHeader: { padding: '12px', background: '#6C5CE7', color: 'white', borderRadius: '12px 12px 0 0', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'space-between' },
   miniVoiceBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '5px', color: 'white', cursor: 'pointer', padding: '2px 8px' },
-  sideCoachBody: { padding: '15px', fontSize: '14px', lineHeight: '1.7', color: '#334155', whiteSpace: 'pre-line' },
+  sideCoachBody: { padding: '15px', fontSize: '14px', lineHeight: '1.7', overflowY: 'auto', color: '#334155', whiteSpace: 'pre-line', flex: 1 },
   sideCloseBtn: { padding: '8px', border: 'none', background: 'transparent', color: '#94A3B8', fontSize: '11px', cursor: 'pointer', borderTop: '1px solid #E2E8F0' },
-  
-  // --- BUTTONS ---
   submitBtn: { width: '100%', padding: '15px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' },
   coachBtn: { width: '100%', padding: '12px', marginBottom: '10px', borderRadius: '12px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontWeight: 'bold', cursor: 'pointer' },
-  
-  // --- FOOTER & STATUS ---
   statusFooter: { fontSize: '12px', color: '#666', margin: '10px 0', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between' },
   creditBadge: { fontWeight: 'bold', color: '#6C5CE7' },
-  
-  // --- FLOATING TOOLS (KAMUS) ---
   floatingToggle: { position: 'fixed', bottom: '20px', right: '20px', width: '80px', height: '80px', borderRadius: '40px', backgroundColor: '#6C5CE7', color: 'white', border: 'none', boxShadow: '0 4px 15px rgba(108, 92, 231, 0.4)', cursor: 'pointer', fontWeight: 'bold', zIndex: 3000 },
   floatingKamus: { position: 'fixed', bottom: '110px', right: '20px', width: '300px', backgroundColor: 'white', borderRadius: '15px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '2px solid #E2E8F0', zIndex: 3000, overflow: 'hidden' },
   kamusHeader: { padding: '12px', background: '#6C5CE7', color: 'white', fontWeight: 'bold', fontSize: '14px', textAlign: 'center' },
   kamusInput: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginBottom: '8px', boxSizing: 'border-box' },
   searchBtn: { width: '100%', padding: '8px', background: '#6C5CE7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
   kamusBody: { padding: '15px', maxHeight: '250px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
-  
-  // --- FEEDBACK & LOADING ---
+  // New Styles
   feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
   teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' },
-  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255, 255, 255, 0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(5px)' },
-  loaderBox: { textAlign: 'center', padding: '40px', backgroundColor: '#fff', borderRadius: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', maxWidth: '400px' },
-  spinner: { width: '50px', height: '50px', border: '5px solid #E2E8F0', borderTop: '5px solid #6366F1', borderRadius: '50%', margin: '0 auto 20px auto', animation: 'spin 1s linear infinite' },
-
-  // --- SCAFFOLDING STYLES (HIDDEN) ---
-  scaffoldWrapper: { flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' },
-  scaffoldHeader: { padding: '12px', background: '#EEF2FF', borderRadius: '12px', border: '1px solid #C7D2FE' },
-  phaseBadge: { fontSize: '10px', background: '#4338CA', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' },
-  phaseBox: { padding: '15px', borderRadius: '12px', border: '2px solid #E0E7FF', backgroundColor: '#F8FAFC' },
-  phaseTitle: { fontSize: '11px', fontWeight: '800', color: '#4338CA', marginBottom: '10px', marginTop: 0, textTransform: 'uppercase', letterSpacing: '0.5px' },
-  grid3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' },
-  scaffoldInput: { width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', minHeight: '60px', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' },
-  scaffoldInputLg: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #94A3B8', fontSize: '15px', fontWeight: '500', boxSizing: 'border-box' },
-  scaffoldSideWrapper: { overflow: 'hidden', transition: 'all 0.3s ease-in-out', display: 'flex', flexDirection: 'column' },
-  scaffoldNav: { display: 'flex', justifyContent: 'space-between', marginTop: '5px' },
-  navBtn: { padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer', background: '#E2E8F0', fontSize: '14px' }
+  overlay: {
+    position: 'fixed',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    display: 'flex', justifyContent: 'center', alignItems: 'center',
+    zIndex: 9999,
+    backdropFilter: 'blur(5px)'
+  },
+  loaderBox: {
+    textAlign: 'center',
+    padding: '40px',
+    backgroundColor: '#fff',
+    borderRadius: '24px',
+    boxSizing: 'border-box',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+    maxWidth: '400px'
+  },
+  spinner: {
+    width: '50px',
+    height: '50px',
+    border: '5px solid #E2E8F0',
+    borderTop: '5px solid #6366F1',
+    borderRadius: '50%',
+    margin: '0 auto 20px auto',
+    animation: 'spin 1s linear infinite'
+  },
+  loadingBarContainer: {
+    width: '100%',
+    height: '6px',
+    backgroundColor: '#E2E8F0',
+    borderRadius: '10px',
+    marginTop: '20px',
+    overflow: 'hidden'
+  },
+  loadingBarFill: {
+    height: '100%',
+    backgroundColor: '#6366F1',
+    width: '50%'
+  }
 };
