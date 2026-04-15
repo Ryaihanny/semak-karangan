@@ -22,7 +22,26 @@ export default function ClassManagement() {
   
   // Forms
   const [bulkInput, setBulkInput] = useState('');
-  const [newTask, setNewTask] = useState({ title: '', instructions: '', dueDate: '', targetClasses: [], file: null });
+  const [newTask, setNewTask] = useState({ 
+  title: '', 
+  instructions: '', 
+  dueDate: '', 
+  targetClasses: [], 
+  file: null,
+  studentConfig: {} // Stores { studentId: 'scaffolded' }
+});
+
+// Helper function to toggle mode
+const toggleStudentMode = (studentId) => {
+  setNewTask(prev => ({
+    ...prev,
+    studentConfig: {
+      ...prev.studentConfig,
+      [studentId]: prev.studentConfig[studentId] === 'scaffolded' ? 'standard' : 'scaffolded'
+    }
+  }));
+};
+
   const [teacherClasses, setTeacherClasses] = useState([]);
   const [schoolRegistry, setSchoolRegistry] = useState([]);
   const [selectedStudents, setSelectedStudents] = useState([]);
@@ -115,22 +134,23 @@ const fetchData = async () => {
       for (const targetId of newTask.targetClasses) {
         const newTaskRef = doc(collection(db, 'assignments'));
         batch.set(newTaskRef, {
-          title: newTask.title,
-          instructions: newTask.instructions || "",
-          dueDate: newTask.dueDate || null,
-          attachmentUrl: fileUrl,
-          classId: targetId,
-          teacherId: classData.teacherId, // Important for tracking
-          createdAt: serverTimestamp(),
-          status: 'active'
-        });
+  title: newTask.title,
+  instructions: newTask.instructions || "",
+  dueDate: newTask.dueDate || null,
+  attachmentUrl: fileUrl,
+  classId: targetId,
+  teacherId: classData.teacherId,
+  createdAt: serverTimestamp(),
+  status: 'active',
+  studentConfig: newTask.studentConfig // This saves the selection
+});
       }
 
       await batch.commit();
       
       alert("Tugasan berjaya dihantar ke " + newTask.targetClasses.length + " kelas.");
       setShowTaskModal(false);
-      setNewTask({ title: '', instructions: '', dueDate: '', targetClasses: [], file: null });
+      setNewTask({ title: '', instructions: '', dueDate: '', targetClasses: [], file: null, studentConfig: {} });
       fetchData();
     } catch (e) {
       console.error("Full Error details:", e);
@@ -518,6 +538,25 @@ const fetchSchoolRegistry = async () => {
                 <label>Arahan (Opsional)</label>
                 <textarea className="small-text" placeholder="Tulis arahan di sini..." onChange={e => setNewTask({...newTask, instructions: e.target.value})} />
             </div>
+<div className="form-group">
+  <label>Penetapan Aras Pelajar (Differentiated)</label>
+  <p className="hint" style={{marginTop: '-5px', fontSize: '0.7rem'}}>Pilih 'Scaffolded' untuk pelajar yang perlukan bantuan kotak Subject/Predicate.</p>
+  <div className="student-diff-list">
+    {students.map(s => (
+      <div key={s.id} className="student-diff-item">
+        <span>{s.nama || s.name}</span>
+        <button 
+          type="button"
+          className={`btn-mode-toggle ${newTask.studentConfig[s.id] === 'scaffolded' ? 'is-scaffold' : ''}`}
+          onClick={() => toggleStudentMode(s.id)}
+        >
+          {newTask.studentConfig[s.id] === 'scaffolded' ? '🧩 Scaffolded' : '📝 Standard'}
+        </button>
+      </div>
+    ))}
+  </div>
+</div>
+
             <div className="form-group">
                 <label>Tarikh Tutup</label>
                 <input type="date" onChange={e => setNewTask({...newTask, dueDate: e.target.value})} />
@@ -596,6 +635,36 @@ const fetchSchoolRegistry = async () => {
         .credit-badge { background: #F0FFF4; color: #2F855A; padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; }
         .btn-reset { background: #FFF5F5; color: #C53030; border: 1px solid #FEB2B2; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
         .modal { position: fixed; inset: 0; background: rgba(0,45,47,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+.student-diff-list {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 2px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 5px;
+  background: #f8fafc;
+}
+.student-diff-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #edf2f7;
+}
+.btn-mode-toggle {
+  padding: 4px 10px;
+  border-radius: 15px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.btn-mode-toggle.is-scaffold {
+  background: #00767B;
+  color: white;
+  border-color: #00767B;
+}
         .modal-content { background: white; padding: 40px; border-radius: 30px; width: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
         .modal-content.large { width: 600px; }
         .form-group { margin-bottom: 20px; }
