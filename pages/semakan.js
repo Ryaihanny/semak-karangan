@@ -524,6 +524,7 @@ const styles = {
     fontFamily: 'inherit',
     boxSizing: 'border-box' 
   },
+
   scaffoldInputLg: { 
     width: '100%', 
     padding: '10px', 
@@ -532,6 +533,29 @@ const styles = {
     fontSize: '15px', 
     fontWeight: '500',
     boxSizing: 'border-box' 
+  },
+sleekToggleHandle: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    zIndex: 10,
+    width: '24px',
+    height: '48px',
+    backgroundColor: '#6C5CE7',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+    transition: 'all 0.3s ease',
+  },
+  scaffoldSideWrapper: {
+    overflow: 'hidden',
+    transition: 'all 0.3s ease-in-out',
+    display: 'flex',
+    flexDirection: 'column'
   },
   scaffoldNav: { display: 'flex', justifyContent: 'space-between', marginTop: '5px' },
   navBtn: { padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer', background: '#E2E8F0', fontSize: '14px' }
