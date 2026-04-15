@@ -21,10 +21,15 @@ export default function SemakanPage() {
   // --- SCAFFOLDING LOGIC ---
   const [activeStep, setActiveStep] = useState(0);
   const picCount = (studentLevel === 'P5' || studentLevel === 'P6') ? 6 : 4;
-const isScaffoldedMode = taskData?.studentConfig?.[activeId] 
-    ? taskData.studentConfig[activeId] === 'scaffolded' 
-    : ['P3', 'P4', 'P5', 'P6'].includes(studentLevel);
 
+  // FIX: Check for 'standard' specifically. 
+  // If the teacher has set a config for this student, use that.
+  // Otherwise, fallback to the default level-based logic.
+  const isScaffoldedMode = taskData?.studentConfig?.[activeId] 
+    ? taskData.studentConfig[activeId] === 'scaffolded' 
+    : (taskData?.studentConfig?.[activeId] === 'standard' 
+        ? false 
+        : ['P3', 'P4', 'P5', 'P6'].includes(studentLevel));
   const [scaffoldData, setScaffoldData] = useState(
     Array(6).fill({ nouns: "", verbs: "", adjectives: "", subject: "", predicate: "", expansion: "" })
   );
