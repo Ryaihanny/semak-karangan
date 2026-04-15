@@ -403,8 +403,7 @@ export default function SemakanPage() {
             <button onClick={handleSemak} disabled={loading || !studentLevel} style={{ ...styles.submitBtn, flex: 2 }}>{loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}</button>
           </div>
         </div>
-      </div>
-
+    
       <button onClick={() => setIsKamusVisible(!isKamusVisible)} style={styles.floatingToggle}>{isKamusVisible ? "✖" : "📖 Kamus"}</button>
       {isKamusVisible && (
         <div style={styles.floatingKamus}>
