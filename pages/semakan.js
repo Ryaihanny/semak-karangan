@@ -202,26 +202,12 @@ export default function SemakanPage() {
     return () => unsub();
   }, [activeId, taskId]);
 
-useEffect(() => {
+  useEffect(() => {
     if (taskId) {
-      // Direct Firebase fetch to get studentConfig
-      const getTaskDetails = async () => {
-        try {
-          const taskRef = doc(db, 'assignments', taskId);
-          const taskSnap = await getDoc(taskRef);
-          if (taskSnap.exists()) {
-            setTaskData({ id: taskSnap.id, ...taskSnap.data() });
-          } else {
-            // Fallback to your API if document isn't in 'assignments'
-            const res = await fetch(`https://semak-karangan-production.up.railway.app/api/get-task?taskId=${taskId}`);
-            const data = await res.json();
-            setTaskData(data);
-          }
-        } catch (err) {
-          console.error("Gagal muat turun tugasan:", err);
-        }
-      };
-      getTaskDetails();
+      fetch(`https://semak-karangan-production.up.railway.app/api/get-task?taskId=${taskId}`)
+        .then(res => res.json())
+        .then(data => setTaskData(data))
+        .catch(err => console.error("Gagal muat turun tugasan:", err));
     }
   }, [taskId]);
 
@@ -317,115 +303,113 @@ useEffect(() => {
           </div> 
         </div>
 
-<div style={styles.editorArea}>
-  {feedback && <div style={styles.feedbackBanner}><strong>💡 Maklum Balas Cikgu:</strong><p>{feedback}</p></div>}
-  
-  {isTeacherMode && (
-    <div style={styles.teacherControlPanel}>
-      <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Tulis maklum balas..." style={styles.textarea} />
-      <button onClick={handleSendFeedback} style={styles.submitBtn}>Hantar Maklum Balas</button>
+        <div style={styles.editorArea}>
+          {feedback && <div style={styles.feedbackBanner}><strong>💡 Maklum Balas Cikgu:</strong><p>{feedback}</p></div>}
+          {isTeacherMode && (
+            <div style={styles.teacherControlPanel}>
+              <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Tulis maklum balas..." style={styles.textarea} />
+              <button onClick={handleSendFeedback} style={styles.submitBtn}>Hantar Maklum Balas</button>
+            </div>
+          )}
+
+          <button onClick={getAICoachHelp} disabled={isCoaching} style={styles.coachBtn}>
+            {isCoaching ? "🪄 Cikgu AI sedang meneliti..." : "👩‍🏫 Minta Bimbingan Cikgu AI"}
+          </button>
+
+ <div style={styles.writingContainer}>
+  {/* ONLY show the scaffold boxes if the mode is actually 'scaffolded' */}
+  {isScaffoldedMode && (
+    <div style={styles.scaffoldWrapper}>
+      <div style={styles.scaffoldHeader}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <h3 style={{margin:0, color:'#4338CA'}}>Gambar {activeStep + 1} / {picCount}</h3>
+          <span style={styles.phaseBadge}>Mod Berpandu</span>
+        </div>
+        <div style={styles.progressBar}>
+          <div style={{...styles.progressFill, width: `${((activeStep + 1)/picCount)*100}%`}}></div>
+        </div>
+      </div>
+
+      {/* PHASE 1: KOSA KATA */}
+      <div style={styles.phaseBox}>
+        <p style={styles.phaseTitle}>PHASE 1: KOSA KATA</p>
+        <div style={styles.grid3}>
+          <textarea style={styles.scaffoldInput} placeholder="Kata Nama" value={scaffoldData[activeStep].nouns} onChange={(e) => updateScaffold(activeStep, 'nouns', e.target.value)} />
+          <textarea style={styles.scaffoldInput} placeholder="Kata Kerja" value={scaffoldData[activeStep].verbs} onChange={(e) => updateScaffold(activeStep, 'verbs', e.target.value)} />
+          <textarea style={styles.scaffoldInput} placeholder="Kata Adjektif" value={scaffoldData[activeStep].adjectives} onChange={(e) => updateScaffold(activeStep, 'adjectives', e.target.value)} />
+        </div>
+      </div>
+
+      {/* PHASE 2: BINA AYAT */}
+      <div style={{...styles.phaseBox, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0'}}>
+        <p style={{...styles.phaseTitle, color: '#15803D'}}>PHASE 2: BINA AYAT</p>
+        <div style={styles.grid2}>
+          <input style={styles.scaffoldInputLg} placeholder="Subjek" value={scaffoldData[activeStep].subject} onChange={(e) => updateScaffold(activeStep, 'subject', e.target.value)} />
+          <input style={styles.scaffoldInputLg} placeholder="Predikat" value={scaffoldData[activeStep].predicate} onChange={(e) => updateScaffold(activeStep, 'predicate', e.target.value)} />
+        </div>
+      </div>
+
+      {/* PHASE 3: EXPANSION */}
+      <div style={{...styles.phaseBox, backgroundColor: '#FEF2F2', borderColor: '#FECACA'}}>
+        <p style={{...styles.phaseTitle, color: '#B91C1C'}}>PHASE 3: EXPANSION</p>
+        <textarea style={styles.scaffoldInput} placeholder="Huraian Tambahan" value={scaffoldData[activeStep].expansion || ""} onChange={(e) => updateScaffold(activeStep, 'expansion', e.target.value)} />
+      </div>
+
+      <div style={styles.scaffoldNav}>
+        <button onClick={() => setActiveStep(s => Math.max(0, s - 1))} disabled={activeStep === 0} style={{...styles.navBtn, opacity: activeStep === 0 ? 0.5 : 1}}>⬅️ Kembali</button>
+        <button onClick={() => { if (activeStep < picCount - 1) setActiveStep(activeStep + 1); }} style={{...styles.navBtn, backgroundColor: activeStep === picCount - 1 ? '#22C55E' : '#6C5CE7', color: 'white'}}>
+          {activeStep === picCount - 1 ? "Selesai! ✅" : "Seterusnya ➡️"}
+        </button>
+      </div>
     </div>
   )}
 
-  <button onClick={getAICoachHelp} disabled={isCoaching} style={styles.coachBtn}>
-    {isCoaching ? "🪄 Cikgu AI sedang meneliti..." : "👩‍🏫 Minta Bimbingan Cikgu AI"}
-  </button>
-
-  {/* WRITING ZONE */}
-  <div style={{...styles.writingContainer, flexDirection: isScaffoldedMode ? 'row' : 'column'}}>
-    
-    {/* LEFT SIDE: SCAFFOLD (Only if active) */}
-    {isScaffoldedMode && (
-      <div style={styles.scaffoldWrapper}>
-        <div style={styles.scaffoldHeader}>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-            <h3 style={{margin:0, color:'#4338CA'}}>Gambar {activeStep + 1} / {picCount}</h3>
-            <span style={styles.phaseBadge}>Mod Berpandu</span>
-          </div>
-          <div style={styles.progressBar}>
-            <div style={{...styles.progressFill, width: `${((activeStep + 1)/picCount)*100}%`}}></div>
-          </div>
-        </div>
-
-        <div style={styles.phaseBox}>
-          <p style={styles.phaseTitle}>PHASE 1: KOSA KATA</p>
-          <div style={styles.grid3}>
-            <textarea style={styles.scaffoldInput} placeholder="Kata Nama" value={scaffoldData[activeStep].nouns} onChange={(e) => updateScaffold(activeStep, 'nouns', e.target.value)} />
-            <textarea style={styles.scaffoldInput} placeholder="Kata Kerja" value={scaffoldData[activeStep].verbs} onChange={(e) => updateScaffold(activeStep, 'verbs', e.target.value)} />
-            <textarea style={styles.scaffoldInput} placeholder="Kata Adjektif" value={scaffoldData[activeStep].adjectives} onChange={(e) => updateScaffold(activeStep, 'adjectives', e.target.value)} />
-          </div>
-        </div>
-
-        <div style={{...styles.phaseBox, backgroundColor: '#F0FDF4', borderColor: '#BBF7D0'}}>
-          <p style={{...styles.phaseTitle, color: '#15803D'}}>PHASE 2: BINA AYAT</p>
-          <div style={styles.grid2}>
-            <input style={styles.scaffoldInputLg} placeholder="Subjek" value={scaffoldData[activeStep].subject} onChange={(e) => updateScaffold(activeStep, 'subject', e.target.value)} />
-            <input style={styles.scaffoldInputLg} placeholder="Predikat" value={scaffoldData[activeStep].predicate} onChange={(e) => updateScaffold(activeStep, 'predicate', e.target.value)} />
-          </div>
-        </div>
-
-        <div style={{...styles.phaseBox, backgroundColor: '#FEF2F2', borderColor: '#FECACA'}}>
-          <p style={{...styles.phaseTitle, color: '#B91C1C'}}>PHASE 3: EXPANSION</p>
-          <textarea style={styles.scaffoldInput} placeholder="Huraian Tambahan" value={scaffoldData[activeStep].expansion || ""} onChange={(e) => updateScaffold(activeStep, 'expansion', e.target.value)} />
-        </div>
-
-        <div style={styles.scaffoldNav}>
-          <button onClick={() => setActiveStep(s => Math.max(0, s - 1))} disabled={activeStep === 0} style={{...styles.navBtn, opacity: activeStep === 0 ? 0.5 : 1}}>⬅️ Kembali</button>
-          <button onClick={() => { if (activeStep < picCount - 1) setActiveStep(activeStep + 1); }} style={{...styles.navBtn, backgroundColor: activeStep === picCount - 1 ? '#22C55E' : '#6C5CE7', color: 'white'}}>
-            {activeStep === picCount - 1 ? "Selesai! ✅" : "Seterusnya ➡️"}
-          </button>
-        </div>
-      </div>
-    )}
-
-    {/* RIGHT SIDE: MAIN TEXTAREA */}
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      <div style={styles.inputHeader}>
-        <span>{isScaffoldedMode ? "✍️ Cantumkan & Gilap Karangan:" : "✍️ Tulis Karangan:"}</span>
-        <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
-      </div>
-      <textarea 
-        value={essay} 
-        onChange={(e) => setEssay(e.target.value)} 
-        placeholder="Tulis di sini..." 
-        style={{
-          ...styles.textarea, 
-          backgroundColor: '#FFF', 
-          border: '2px solid #EEE',
-          minHeight: isScaffoldedMode ? '420px' : '600px'
-        }} 
-      />
-      {isScaffoldedMode && (
-        <p style={{fontSize: '11px', color: '#666', marginTop: '5px'}}>
-          💡 <b>Tips:</b> Gunakan kotak kiri untuk bina rangka, kemudian tambah penanda wacana di sini.
-        </p>
-      )}
+  {/* MAIN TEXTAREA: Always visible, always editable */}
+  <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div style={styles.inputHeader}>
+      <span>{isScaffoldedMode ? "✍️ Cantumkan & Gilap Karangan:" : "✍️ Tulis Karangan:"}</span>
+      <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
     </div>
-
-    {/* FLOATING AI COACH PANEL (Shows next to textarea) */}
-    {coachSuggestion && (
-      <div style={styles.sideCoachPanel}>
-        <div style={styles.sideCoachHeader}>
-           <span>💡 Bimbingan AI</span>
-           <button onClick={() => speakSuggestion(coachSuggestion)} style={styles.miniVoiceBtn}>{isSpeaking ? "🔊" : "🔈"}</button>
-        </div>
-        <div style={styles.sideCoachBody}>{coachSuggestion}</div>
-        <button onClick={() => setCoachSuggestion("")} style={styles.sideCloseBtn}>Tutup</button>
-      </div>
+    <textarea 
+      value={essay} 
+      onChange={(e) => setEssay(e.target.value)} 
+      placeholder="Tulis di sini..." 
+      style={{
+        ...styles.textarea, 
+        backgroundColor: '#FFF', 
+        border: '2px solid #EEE',
+        minHeight: isScaffoldedMode ? '420px' : '600px' // Makes it bigger for standard users
+      }} 
+    />
+    {isScaffoldedMode && (
+      <p style={{fontSize: '11px', color: '#666', marginTop: '5px'}}>
+        💡 <b>Tips:</b> Gunakan kotak kiri untuk bina rangka, kemudian tambah penanda wacana (Seterusnya, Selain itu) di dalam kotak utama ini.
+      </p>
     )}
   </div>
+</div>
 
-  {/* BOTTOM ACTIONS */}
-  <div style={styles.statusFooter}>
-    <span>Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName} | Tahap: {studentLevel || "..."}</span>
-    <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
-  </div>
-  <div style={{ display: 'flex', gap: '10px' }}>
-    <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳" : "💾 Simpan"}</button>
-    <button onClick={handleSemak} disabled={loading || !studentLevel} style={{ ...styles.submitBtn, flex: 2 }}>{loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}</button>
-  </div>
-</div>
-</div>
+            {coachSuggestion && (
+              <div style={styles.sideCoachPanel}>
+                <div style={styles.sideCoachHeader}>
+                   <span>💡 Bimbingan AI</span>
+                   <button onClick={() => speakSuggestion(coachSuggestion)} style={styles.miniVoiceBtn}>{isSpeaking ? "🔊" : "🔈"}</button>
+                </div>
+                <div style={styles.sideCoachBody}>{coachSuggestion}</div>
+                <button onClick={() => setCoachSuggestion("")} style={styles.sideCloseBtn}>Tutup</button>
+              </div>
+            )}
+          </div>
+
+          <div style={styles.statusFooter}>
+            <span>Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName} | Tahap: {studentLevel || "..."}</span>
+            <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳" : "💾 Simpan"}</button>
+            <button onClick={handleSemak} disabled={loading || !studentLevel} style={{ ...styles.submitBtn, flex: 2 }}>{loading ? "⚡ Memproses..." : "Hantar Misi! ✨"}</button>
+          </div>
+        </div>
     
       <button onClick={() => setIsKamusVisible(!isKamusVisible)} style={styles.floatingToggle}>{isKamusVisible ? "✖" : "📖 Kamus"}</button>
       {isKamusVisible && (
