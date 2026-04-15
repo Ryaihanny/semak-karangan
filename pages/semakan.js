@@ -17,20 +17,20 @@ export default function SemakanPage() {
   const [studentName, setStudentName] = useState(nama || "Pelajar");
   const [credits, setCredits] = useState(null);
   const [studentLevel, setStudentLevel] = useState(null);
-const [showScaffold, setShowScaffold] = useState(true);
+  
+  // CLEANUP: Set to false by default to hide the scaffold sleekly
+  const [showScaffold, setShowScaffold] = useState(false);
 
-  // --- SCAFFOLDING LOGIC ---
+  // --- SCAFFOLDING LOGIC (STAY UNTOUCHED) ---
   const [activeStep, setActiveStep] = useState(0);
   const picCount = (studentLevel === 'P5' || studentLevel === 'P6') ? 6 : 4;
 
-  // FIX: Check for 'standard' specifically. 
-  // If the teacher has set a config for this student, use that.
-  // Otherwise, fallback to the default level-based logic.
   const isScaffoldedMode = taskData?.studentConfig?.[activeId] 
     ? taskData.studentConfig[activeId] === 'scaffolded' 
     : (taskData?.studentConfig?.[activeId] === 'standard' 
         ? false 
         : ['P3', 'P4', 'P5', 'P6'].includes(studentLevel));
+
   const [scaffoldData, setScaffoldData] = useState(
     Array(6).fill({ nouns: "", verbs: "", adjectives: "", subject: "", predicate: "", expansion: "" })
   );
@@ -304,19 +304,13 @@ const [showScaffold, setShowScaffold] = useState(true);
 
         <div style={styles.editorArea}>
           {feedback && <div style={styles.feedbackBanner}><strong>💡 Maklum Balas Cikgu:</strong><p>{feedback}</p></div>}
-          {isTeacherMode && (
-            <div style={styles.teacherControlPanel}>
-              <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Tulis maklum balas..." style={styles.textarea} />
-              <button onClick={handleSendFeedback} style={styles.submitBtn}>Hantar Maklum Balas</button>
-            </div>
-          )}
-
+          
           <button onClick={getAICoachHelp} disabled={isCoaching} style={styles.coachBtn}>
             {isCoaching ? "🪄 Cikgu AI sedang meneliti..." : "👩‍🏫 Minta Bimbingan Cikgu AI"}
           </button>
 
           <div style={styles.writingContainer}>
-            {/* LEFT SIDE: SCAFFOLD BOX */}
+            {/* CLEANUP: Scaffold is now hidden by default (showScaffold = false) */}
             {isScaffoldedMode && (
               <div style={{
                 ...styles.scaffoldSideWrapper,
@@ -363,20 +357,7 @@ const [showScaffold, setShowScaffold] = useState(true);
               </div>
             )}
 
-            {/* SLEEK VERTICAL TOGGLE HANDLE */}
-            {isScaffoldedMode && (
-              <div 
-                onClick={() => setShowScaffold(!showScaffold)} 
-                style={{
-                  ...styles.sleekToggleHandle,
-                  left: showScaffold ? 'calc(50% - 12px)' : '0px'
-                }}
-              >
-                {showScaffold ? "◀" : "▶"}
-              </div>
-            )}
-
-            {/* RIGHT SIDE: MAIN TEXTAREA */}
+            {/* RIGHT SIDE: MAIN TEXTAREA (Expanded for sleek look) */}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative' }}>
               <div style={styles.inputHeader}>
                 <span>{showScaffold ? "👀 Pratonton:" : "✍️ Bebas Menulis:"}</span>
@@ -395,17 +376,25 @@ const [showScaffold, setShowScaffold] = useState(true);
             </div>
           </div>
 
-            {coachSuggestion && (
-              <div style={styles.sideCoachPanel}>
-                <div style={styles.sideCoachHeader}>
-                   <span>💡 Bimbingan AI</span>
-                   <button onClick={() => speakSuggestion(coachSuggestion)} style={styles.miniVoiceBtn}>{isSpeaking ? "🔊" : "🔈"}</button>
-                </div>
-                <div style={styles.sideCoachBody}>{coachSuggestion}</div>
-                <button onClick={() => setCoachSuggestion("")} style={styles.sideCloseBtn}>Tutup</button>
+          {/* AI COACH SUGGESTION PANEL */}
+          {coachSuggestion && (
+            <div style={styles.sideCoachPanel}>
+              <div style={styles.sideCoachHeader}>
+                 <span>💡 Bimbingan AI</span>
+                 <button onClick={() => speakSuggestion(coachSuggestion)} style={styles.miniVoiceBtn}>{isSpeaking ? "🔊" : "🔈"}</button>
               </div>
-            )}
-          </div>
+              <div style={styles.sideCoachBody}>{coachSuggestion}</div>
+              <button onClick={() => setCoachSuggestion("")} style={styles.sideCloseBtn}>Tutup</button>
+            </div>
+          )}
+          
+          {/* TEACHER FEEDBACK INPUT */}
+          {isTeacherMode && (
+            <div style={styles.teacherControlPanel}>
+              <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Tulis maklum balas..." style={{...styles.textarea, height: '100px', marginBottom: '10px'}} />
+              <button onClick={handleSendFeedback} style={styles.submitBtn}>Hantar Maklum Balas</button>
+            </div>
+          )}
 
           <div style={styles.statusFooter}>
             <span>Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName} | Tahap: {studentLevel || "..."}</span>
@@ -466,14 +455,14 @@ const styles = {
   editorArea: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
   inputHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' },
   wordCount: { color: '#6C5CE7' },
-  writingContainer: { display: 'flex', gap: '15px', alignItems: 'flex-start', marginBottom: '10px' },
-  textarea: { flex: 1, height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
+  writingContainer: { display: 'flex', gap: '0px', alignItems: 'flex-start', marginBottom: '10px', position: 'relative' },
+  textarea: { width: '100%', height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
   
   // --- AI COACH PANEL ---
-  sideCoachPanel: { width: '280px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '420px' },
+  sideCoachPanel: { marginTop: '15px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column' },
   sideCoachHeader: { padding: '12px', background: '#6C5CE7', color: 'white', borderRadius: '12px 12px 0 0', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'space-between' },
   miniVoiceBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '5px', color: 'white', cursor: 'pointer', padding: '2px 8px' },
-  sideCoachBody: { padding: '15px', fontSize: '14px', lineHeight: '1.7', overflowY: 'auto', color: '#334155', whiteSpace: 'pre-line', flex: 1 },
+  sideCoachBody: { padding: '15px', fontSize: '14px', lineHeight: '1.7', color: '#334155', whiteSpace: 'pre-line' },
   sideCloseBtn: { padding: '8px', border: 'none', background: 'transparent', color: '#94A3B8', fontSize: '11px', cursor: 'pointer', borderTop: '1px solid #E2E8F0' },
   
   // --- BUTTONS ---
@@ -498,65 +487,17 @@ const styles = {
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255, 255, 255, 0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(5px)' },
   loaderBox: { textAlign: 'center', padding: '40px', backgroundColor: '#fff', borderRadius: '24px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', maxWidth: '400px' },
   spinner: { width: '50px', height: '50px', border: '5px solid #E2E8F0', borderTop: '5px solid #6366F1', borderRadius: '50%', margin: '0 auto 20px auto', animation: 'spin 1s linear infinite' },
-  loadingBarContainer: { width: '100%', height: '6px', backgroundColor: '#E2E8F0', borderRadius: '10px', marginTop: '20px', overflow: 'hidden' },
-  loadingBarFill: { height: '100%', backgroundColor: '#6366F1', width: '50%' },
 
-  // --- SCAFFOLDING STYLES ---
+  // --- SCAFFOLDING STYLES (HIDDEN) ---
   scaffoldWrapper: { flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' },
   scaffoldHeader: { padding: '12px', background: '#EEF2FF', borderRadius: '12px', border: '1px solid #C7D2FE' },
   phaseBadge: { fontSize: '10px', background: '#4338CA', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' },
-  progressBar: { width: '100%', height: '6px', background: '#CBD5E1', borderRadius: '3px', marginTop: '8px', overflow: 'hidden' },
-  progressFill: { height: '100%', background: '#6C5CE7', transition: 'width 0.3s ease' },
   phaseBox: { padding: '15px', borderRadius: '12px', border: '2px solid #E0E7FF', backgroundColor: '#F8FAFC' },
   phaseTitle: { fontSize: '11px', fontWeight: '800', color: '#4338CA', marginBottom: '10px', marginTop: 0, textTransform: 'uppercase', letterSpacing: '0.5px' },
   grid3: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' },
-  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' },
-  inputGroup: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  label: { fontSize: '10px', color: '#475569', fontWeight: 'bold' },
-  scaffoldInput: { 
-    width: '100%', 
-    padding: '8px', 
-    borderRadius: '6px', 
-    border: '1px solid #CBD5E1', 
-    fontSize: '13px', 
-    minHeight: '60px', 
-    resize: 'none', 
-    fontFamily: 'inherit',
-    boxSizing: 'border-box' 
-  },
-
-  scaffoldInputLg: { 
-    width: '100%', 
-    padding: '10px', 
-    borderRadius: '6px', 
-    border: '1px solid #94A3B8', 
-    fontSize: '15px', 
-    fontWeight: '500',
-    boxSizing: 'border-box' 
-  },
-sleekToggleHandle: {
-    position: 'absolute',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    zIndex: 10,
-    width: '24px',
-    height: '48px',
-    backgroundColor: '#6C5CE7',
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-    transition: 'all 0.3s ease',
-  },
-  scaffoldSideWrapper: {
-    overflow: 'hidden',
-    transition: 'all 0.3s ease-in-out',
-    display: 'flex',
-    flexDirection: 'column'
-  },
+  scaffoldInput: { width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px', minHeight: '60px', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' },
+  scaffoldInputLg: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #94A3B8', fontSize: '15px', fontWeight: '500', boxSizing: 'border-box' },
+  scaffoldSideWrapper: { overflow: 'hidden', transition: 'all 0.3s ease-in-out', display: 'flex', flexDirection: 'column' },
   scaffoldNav: { display: 'flex', justifyContent: 'space-between', marginTop: '5px' },
   navBtn: { padding: '10px 20px', borderRadius: '8px', border: 'none', fontWeight: 'bold', cursor: 'pointer', background: '#E2E8F0', fontSize: '14px' }
 };
