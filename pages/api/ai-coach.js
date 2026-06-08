@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `
       You are 'Cikgu AI', a friendly Malay Language Writing Coach for Primary School students (Ages 9-12) in Singapore. 
