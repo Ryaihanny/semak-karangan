@@ -16,7 +16,7 @@ export default function SemakanPage() {
   const [activeId, setActiveId] = useState(null);
   const [studentName, setStudentName] = useState(nama || "Pelajar");
   const [credits, setCredits] = useState(null);
-const [studentLevel, setStudentLevel] = useState(null);
+  const [studentLevel, setStudentLevel] = useState(null);
 
   const [coachSuggestion, setCoachSuggestion] = useState("");
   const [isCoaching, setIsCoaching] = useState(false);
@@ -116,79 +116,79 @@ const [studentLevel, setStudentLevel] = useState(null);
     perasaan: { label: "🧠 Perasaan", items: ["gembira (happy) - gembira bukan kepalang", "gembira (happy) - senyuman lebar hingga ke telinga", "gementar (nervous) - jantung berdegup kencang seperti mahu luruh", "gementar (nervous) - peluh dingin mula membasahi dahi", "panik (panic) - keadaan menjadi kelam-bakut", "panik (panic) - terpinga-pinga seperti rusa masuk kampung", "sedih (sad) - air mata mula berlinangan", "sedih (sad) - hati hancur luluh bagai kaca terhempas ke batu"] }
   };
 
-useEffect(() => {
-  const identifyAndLoad = async () => {
-    // 1. GET DATA FROM LOCALSTORAGE IMMEDIATELY (FASTEST)
-    const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
-    
-    // Determine the ID from URL first, then LocalStorage, then Auth
-    const identifier = studentId || savedUser.id || savedUser.uid || auth.currentUser?.uid;
-
-    if (identifier) {
-      setActiveId(identifier);
-      if (savedUser.name) setStudentName(savedUser.name);
+  useEffect(() => {
+    const identifyAndLoad = async () => {
+      // 1. GET DATA FROM LOCALSTORAGE IMMEDIATELY (FASTEST)
+      const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
       
-      // 2. PRE-SET LEVEL FROM LOCALSTORAGE (Instant button unlock)
-      if (savedUser.level) {
-        setStudentLevel(savedUser.level);
-      }
+      // Determine the ID from URL first, then LocalStorage, then Auth
+      const identifier = studentId || savedUser.id || savedUser.uid || auth.currentUser?.uid;
 
-      try {
-        // 3. FETCH FRESH DATA FROM FIRESTORE IN BACKGROUND
-        const studentRef = doc(db, 'students', identifier);
-        const studentSnap = await getDoc(studentRef);
+      if (identifier) {
+        setActiveId(identifier);
+        if (savedUser.name) setStudentName(savedUser.name);
         
-        if (studentSnap.exists()) {
-          const userData = studentSnap.data();
-          setCredits(userData.credits ?? 0);
-          setStudentLevel(userData.level); // Overwrite with fresh DB data
-          
-          // Update LocalStorage so it stays fresh for next time
-          localStorage.setItem("studentUser", JSON.stringify({ ...savedUser, ...userData }));
-        } else {
-          // If user doesn't exist, create them
-          await setDoc(studentRef, { 
-            credits: 5, 
-            name: studentName, 
-            role: 'student', 
-            createdAt: serverTimestamp() 
-          }, { merge: true });
-          setCredits(5);
+        // 2. PRE-SET LEVEL FROM LOCALSTORAGE (Instant button unlock)
+        if (savedUser.level) {
+          setStudentLevel(savedUser.level);
         }
-      } catch (err) {
-        console.error("Database fetch error:", err);
-      }
 
-      // 4. LOAD DRAFT (This part stays the same)
-      if (taskId) {
         try {
-          const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
-          if (isOverwrite) {
-            setEssay(""); 
-            const { overwrite: _, ...cleanQuery } = router.query;
-            router.replace({ query: cleanQuery }, undefined, { shallow: true });
+          // 3. FETCH FRESH DATA FROM FIRESTORE IN BACKGROUND
+          const studentRef = doc(db, 'students', identifier);
+          const studentSnap = await getDoc(studentRef);
+          
+          if (studentSnap.exists()) {
+            const userData = studentSnap.data();
+            setCredits(userData.credits ?? 0);
+            setStudentLevel(userData.level); // Overwrite with fresh DB data
+            
+            // Update LocalStorage so it stays fresh for next time
+            localStorage.setItem("studentUser", JSON.stringify({ ...savedUser, ...userData }));
           } else {
-            const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
-            const snap = await getDoc(draftRef);
-            if (snap.exists()) {
-              setEssay(snap.data().essay);
-            }
+            // If user doesn't exist, create them
+            await setDoc(studentRef, { 
+              credits: 5, 
+              name: studentName, 
+              role: 'student', 
+              createdAt: serverTimestamp() 
+            }, { merge: true });
+            setCredits(5);
           }
         } catch (err) {
-          console.error("Error loading draft:", err);
+          console.error("Database fetch error:", err);
+        }
+
+        // 4. LOAD DRAFT (This part stays the same)
+        if (taskId) {
+          try {
+            const isOverwrite = (router.query.overwrite === 'true') || (overwrite === 'true');
+            if (isOverwrite) {
+              setEssay(""); 
+              const { overwrite: _, ...cleanQuery } = router.query;
+              router.replace({ query: cleanQuery }, undefined, { shallow: true });
+            } else {
+              const draftRef = doc(db, 'drafts', `${identifier}_${taskId}`);
+              const snap = await getDoc(draftRef);
+              if (snap.exists()) {
+                setEssay(snap.data().essay);
+              }
+            }
+          } catch (err) {
+            console.error("Error loading draft:", err);
+          }
         }
       }
-    }
-  };
+    };
 
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    setAuthReady(true);
-    if (user) identifyAndLoad(); // Re-run when auth is confirmed
-  });
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthReady(true);
+      if (user) identifyAndLoad(); // Re-run when auth is confirmed
+    });
 
-  identifyAndLoad(); // Run immediately on mount
-  return () => unsubscribe();
-}, [taskId, studentId, studentName, overwrite, router.query.overwrite]); // Added router.query.overwrite for safety
+    identifyAndLoad(); // Run immediately on mount
+    return () => unsubscribe();
+  }, [taskId, studentId, studentName, overwrite, router.query.overwrite]); // Added router.query.overwrite for safety
 
 
   // 1 & 2: Listen untuk Feedback & Data Real-time
@@ -225,7 +225,7 @@ useEffect(() => {
     } catch (err) { alert("Gagal menyimpan."); } finally { setIsSaving(false); }
   };
 
-const handleSemak = async (e) => {
+  const handleSemak = async (e) => {
     if (e) e.preventDefault();
     if (credits !== null && credits <= 0) return alert("Ops! Kredit anda telah habis. Sila hubungi cikgu! 💎");
     const wordCount = essay.trim().split(/\s+/).filter(Boolean).length;
@@ -274,7 +274,6 @@ const handleSemak = async (e) => {
 
   return (
     <div style={styles.container}>
-      {/* ... [Sistem nav/layout sedia ada] ... */}
       <div style={styles.topNav}>
         <button onClick={() => router.back()} style={styles.backBtn}>⬅️ Kembali</button>
         <h1 style={styles.title}>🚀 Misi Karangan</h1>
@@ -282,18 +281,13 @@ const handleSemak = async (e) => {
 
       <div style={styles.mainLayout}>
         <div style={styles.sidebar}>
-         <div style={styles.briefCard}>
+          <div style={styles.briefCard}>
             <h3 style={{ marginTop: 0 }}>📋 Arahan Cikgu:</h3>
             {taskData?.imageUrl && (
               <div style={{ marginBottom: '15px', width: '100%' }}>
                 {taskData.imageUrl.split('?')[0].toLowerCase().endsWith('.pdf') ? (
                   <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #ddd', backgroundColor: '#f8f9fa' }}>
-                    <object
-                      data={taskData.imageUrl}
-                      type="application/pdf"
-                      width="100%"
-                      height="500px"
-                    >
+                    <object data={taskData.imageUrl} type="application/pdf" width="100%" height="500px">
                       <iframe
                         src={`https://docs.google.com/viewer?url=${encodeURIComponent(taskData.imageUrl)}&embedded=true`}
                         style={{ width: '100%', height: '500px' }}
@@ -338,10 +332,10 @@ const handleSemak = async (e) => {
                 </div>
               ))}
             </div>
-        </div> 
-      </div> {/* This closes styles.sidebar */}
+          </div> 
+        </div> {/* Closes styles.sidebar */}
 
-      <div style={styles.editorArea}>
+        <div style={styles.editorArea}>
           <div style={styles.inputHeader}>
             <span>✍️ Tulis di sini:</span>
             <span style={styles.wordCount}>{essay.trim().split(/\s+/).filter(Boolean).length} Patah Perkataan</span>
@@ -400,28 +394,29 @@ const handleSemak = async (e) => {
           </div>
 
           <div style={styles.statusFooter}>
-  <span>
-    Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName} | 
-    <span style={{ color: '#6C5CE7', fontWeight: 'bold', marginLeft: '5px' }}>
-      Tahap: {studentLevel || "Memuat..."}
-    </span>
-  </span>
-  <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
-</div>
+            <span>
+              Status: {activeId ? `✅ Terhubung` : `🔗 Mencari ID...`} | Pelajar: {studentName} | 
+              <span style={{ color: '#6C5CE7', fontWeight: 'bold', marginLeft: '5px' }}>
+                Tahap: {studentLevel || "Memuat..."}
+              </span>
+            </span>
+            <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
+          </div>
+
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
-           <button 
-  onClick={handleSemak} 
-  disabled={loading || !studentLevel} // Button is disabled if studentLevel is null
-  style={{ 
-    ...styles.submitBtn, 
-    flex: 2, 
-    opacity: !studentLevel ? 0.6 : 1, // Dims the button if level is missing
-    cursor: !studentLevel ? 'not-allowed' : 'pointer' 
-  }}
->
-  {loading ? "⚡ Memproses..." : !studentLevel ? "⏳ Memuatkan Tahap..." : "Hantar Misi! ✨"}
-</button>
+            <button 
+              onClick={handleSemak} 
+              disabled={loading || !studentLevel} 
+              style={{ 
+                ...styles.submitBtn, 
+                flex: 2, 
+                opacity: !studentLevel ? 0.6 : 1, 
+                cursor: !studentLevel ? 'not-allowed' : 'pointer' 
+              }}
+            >
+              {loading ? "⚡ Memproses..." : !studentLevel ? "⏳ Memuatkan Tahap..." : "Hantar Misi! ✨"}
+            </button>
           </div>
         </div>
       </div>
@@ -430,7 +425,6 @@ const handleSemak = async (e) => {
         {isKamusVisible ? "✖" : "📖 Kamus"}
       </button>
 
-      {/* ... [Sistem kamus sedia ada] ... */}
       {isKamusVisible && (
         <div style={styles.floatingKamus}>
           <div style={styles.kamusHeader}>📖 Kamus Pintar</div>
@@ -455,35 +449,32 @@ const handleSemak = async (e) => {
           </div>
         </div>
       )}
-{/* LOADING OVERLAY */}
-{loading && (
-  <div style={styles.overlay}>
-    <div style={styles.loaderBox}>
-      <div style={styles.spinner}></div>
-      <h2 style={{ color: '#4338CA', marginBottom: '10px' }}>Cikgu AI sedang menyemak... ⚡</h2>
-      <p style={{ color: '#64748B' }}>Sila tunggu sebentar, kami sedang meneliti setiap perkataan anda.</p>
-      <div style={styles.loadingBarContainer}>
-        <div style={styles.loadingBarFill}></div>
-      </div>
-    </div>
-  </div>
-)}
-<style jsx global>{`
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  @keyframes pulse {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(200%); }
-  }
-`}</style>
+
+      {/* LOADING OVERLAY */}
+      {loading && (
+        <div style={styles.overlay}>
+          <div style={styles.loaderBox}>
+            <div style={styles.spinner}></div>
+            <h2 style={{ color: '#4338CA', marginBottom: '10px' }}>Cikgu AI sedang menyemak... ⚡</h2>
+            <p style={{ color: '#64748B' }}>Sila tunggu sebentar, kami sedang meneliti setiap perkataan anda.</p>
+            <div style={styles.loadingBarContainer}>
+              <div style={styles.loadingBarFill}></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
 
 const styles = {
-  // ... [Existing Styles]
   container: { backgroundColor: '#F0F3F7', minHeight: '100vh', padding: '20px' },
   topNav: { display: 'flex', alignItems: 'center', marginBottom: '20px', maxWidth: '1200px', margin: '0 auto 20px auto' },
   backBtn: { padding: '8px 15px', borderRadius: '10px', border: 'none', cursor: 'pointer', marginRight: '20px', fontWeight: 'bold', background: '#fff' },
@@ -502,9 +493,12 @@ const styles = {
   editorArea: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
   inputHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' },
   wordCount: { color: '#6C5CE7' },
-  writingContainer: { display: 'flex', gap: '15px', alignItems: 'flex-start', marginBottom: '10px' },
-  textarea: { flex: 1, height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none' },
-  sideCoachPanel: { width: '280px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '420px' },
+  
+  // FIX HERE: changed display to 'flex' and layout properties so fields divide nicely
+  writingContainer: { display: 'flex', gap: '15px', width: '100%', alignItems: 'stretch', marginBottom: '10px' },
+  textarea: { flex: 1, minWidth: '50%', height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
+  sideCoachPanel: { width: '50%', minWidth: '260px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '420px', boxSizing: 'border-box' },
+  
   sideCoachHeader: { padding: '12px', background: '#6C5CE7', color: 'white', borderRadius: '12px 12px 0 0', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'space-between' },
   miniVoiceBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '5px', color: 'white', cursor: 'pointer', padding: '2px 8px' },
   sideCoachBody: { padding: '15px', fontSize: '14px', lineHeight: '1.7', overflowY: 'auto', color: '#334155', whiteSpace: 'pre-line', flex: 1 },
@@ -519,46 +513,11 @@ const styles = {
   kamusInput: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginBottom: '8px', boxSizing: 'border-box' },
   searchBtn: { width: '100%', padding: '8px', background: '#6C5CE7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
   kamusBody: { padding: '15px', maxHeight: '250px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
-  // New Styles
   feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
   teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' },
-  overlay: {
-    position: 'fixed',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    display: 'flex', justifyContent: 'center', alignItems: 'center',
-    zIndex: 9999,
-    backdropFilter: 'blur(5px)'
-  },
-  loaderBox: {
-    textAlign: 'center',
-    padding: '40px',
-    backgroundColor: '#fff',
-    borderRadius: '24px',
-    boxSizing: 'border-box',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-    maxWidth: '400px'
-  },
-  spinner: {
-    width: '50px',
-    height: '50px',
-    border: '5px solid #E2E8F0',
-    borderTop: '5px solid #6366F1',
-    borderRadius: '50%',
-    margin: '0 auto 20px auto',
-    animation: 'spin 1s linear infinite'
-  },
-  loadingBarContainer: {
-    width: '100%',
-    height: '6px',
-    backgroundColor: '#E2E8F0',
-    borderRadius: '10px',
-    marginTop: '20px',
-    overflow: 'hidden'
-  },
-  loadingBarFill: {
-    height: '100%',
-    backgroundColor: '#6366F1',
-    width: '50%'
-  }
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255, 255, 255, 0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(5px)' },
+  loaderBox: { textAlign: 'center', padding: '40px', backgroundColor: '#fff', borderRadius: '24px', boxSizing: 'border-box', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', maxWidth: '400px' },
+  spinner: { width: '50px', height: '50px', border: '5px solid #E2E8F0', borderTop: '5px solid #6366F1', borderRadius: '50%', margin: '0 auto 20px auto', animation: 'spin 1s linear infinite' },
+  loadingBarContainer: { width: '100%', height: '6px', backgroundColor: '#E2E8F0', borderRadius: '10px', marginTop: '20px', overflow: 'hidden' },
+  loadingBarFill: { height: '100%', backgroundColor: '#6366F1', width: '50%' }
 };
