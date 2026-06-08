@@ -45,6 +45,7 @@ export default function SemakanPage() {
   const handleKamusSearch = async () => {
     if (!kamusQuery.trim()) return;
     setIsSearching(true);
+    setKamusHasil(null); // Clear previous results before searching
     try {
       const res = await fetch('/api/kamus-ai', {
         method: 'POST',
@@ -188,7 +189,7 @@ export default function SemakanPage() {
 
     identifyAndLoad(); // Run immediately on mount
     return () => unsubscribe();
-  }, [taskId, studentId, studentName, overwrite, router.query.overwrite]); // Added router.query.overwrite for safety
+  }, [taskId, studentId, studentName, overwrite, router.query.overwrite]);
 
 
   // 1 & 2: Listen untuk Feedback & Data Real-time
@@ -235,7 +236,6 @@ export default function SemakanPage() {
     const isOverwrite = router.query.overwrite === 'true';
     const savedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("studentUser") || "{}") : {};
     
-    // Gunakan ID yang aktif atau ID dari localStorage (Dokumen dalam 'students')
     const finalStudentId = activeId || studentId || savedUser.id || savedUser.uid;
 
     try {
@@ -258,7 +258,6 @@ export default function SemakanPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message);
       
-      // Kemas kini kredit di skrin serta-merta selepas berjaya
       if (data.remainingCredits !== undefined) {
         setCredits(data.remainingCredits);
         localStorage.setItem("studentUser", JSON.stringify({ ...savedUser, credits: data.remainingCredits }));
@@ -333,7 +332,7 @@ export default function SemakanPage() {
               ))}
             </div>
           </div> 
-        </div> {/* Closes styles.sidebar */}
+        </div>
 
         <div style={styles.editorArea}>
           <div style={styles.inputHeader}>
@@ -427,24 +426,37 @@ export default function SemakanPage() {
 
       {isKamusVisible && (
         <div style={styles.floatingKamus}>
-          <div style={styles.kamusHeader}>📖 Kamus Pintar</div>
+          <div style={styles.kamusHeader}>📖 Kamus Pintar Ajaib</div>
           <div style={{ padding: '12px' }}>
             <input 
               value={kamusQuery} 
               onChange={(e) => setKamusQuery(e.target.value)}
-              placeholder="Cari English/Malay..."
+              placeholder="Taip English / Melayu..."
               style={styles.kamusInput}
               onKeyDown={(e) => e.key === 'Enter' && handleKamusSearch()}
             />
-            <button onClick={handleKamusSearch} style={styles.searchBtn}>
-              {isSearching ? "Mencari..." : "Cari Maklumat"}
+            <button onClick={handleKamusSearch} disabled={isSearching} style={styles.searchBtn}>
+              {isSearching ? "Mencari ilmu..." : "Cari Maklumat ✨"}
             </button>
           </div>
           <div style={styles.kamusBody}>
-            {kamusHasil ? (
-              <div style={{ fontSize: '13px', whiteSpace: 'pre-line' }}>{kamusHasil}</div>
+            {isSearching ? (
+              <p style={{fontSize: '12px', color: '#6C5CE7', textAlign: 'center', margin: '15px 0'}}>Membuka kitab pangkalan data... ⚡</p>
+            ) : kamusHasil ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ background: '#EEF2F6', padding: '10px', borderRadius: '8px' }}>
+                  <strong style={{ fontSize: '11px', color: '#475569', display: 'block', marginBottom: '4px' }}>💡 Hasil Carian / Maksud:</strong>
+                  <div style={{ fontSize: '14px', whiteSpace: 'pre-line', color: '#1E293B', lineHeight: '1.5' }}>{kamusHasil}</div>
+                </div>
+                <button 
+                  onClick={() => { navigator.clipboard.writeText(kamusHasil); alert("Maksud disalin! 📋"); }}
+                  style={styles.miniCopyBtn}
+                >
+                  📋 Salin Jawapan
+                </button>
+              </div>
             ) : (
-              <p style={{fontSize: '11px', color: '#94A3B8', textAlign: 'center'}}>Taip perkataan dan tekan Cari.</p>
+              <p style={{fontSize: '11px', color: '#94A3B8', textAlign: 'center'}}>Taip perkataan atau "phrase" dalam English/Malay dan tekan Cari.</p>
             )}
           </div>
         </div>
@@ -493,12 +505,9 @@ const styles = {
   editorArea: { backgroundColor: '#fff', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' },
   inputHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' },
   wordCount: { color: '#6C5CE7' },
-  
-  // FIX HERE: changed display to 'flex' and layout properties so fields divide nicely
   writingContainer: { display: 'flex', gap: '15px', width: '100%', alignItems: 'stretch', marginBottom: '10px' },
   textarea: { flex: 1, minWidth: '50%', height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
   sideCoachPanel: { width: '50%', minWidth: '260px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '420px', boxSizing: 'border-box' },
-  
   sideCoachHeader: { padding: '12px', background: '#6C5CE7', color: 'white', borderRadius: '12px 12px 0 0', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'space-between' },
   miniVoiceBtn: { background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '5px', color: 'white', cursor: 'pointer', padding: '2px 8px' },
   sideCoachBody: { padding: '15px', fontSize: '14px', lineHeight: '1.7', overflowY: 'auto', color: '#334155', whiteSpace: 'pre-line', flex: 1 },
@@ -508,16 +517,28 @@ const styles = {
   statusFooter: { fontSize: '12px', color: '#666', margin: '10px 0', background: '#f0f0f0', padding: '8px', borderRadius: '5px', display: 'flex', justifyContent: 'space-between' },
   creditBadge: { fontWeight: 'bold', color: '#6C5CE7' },
   floatingToggle: { position: 'fixed', bottom: '20px', right: '20px', width: '80px', height: '80px', borderRadius: '40px', backgroundColor: '#6C5CE7', color: 'white', border: 'none', boxShadow: '0 4px 15px rgba(108, 92, 231, 0.4)', cursor: 'pointer', fontWeight: 'bold', zIndex: 3000 },
-  floatingKamus: { position: 'fixed', bottom: '110px', right: '20px', width: '300px', backgroundColor: 'white', borderRadius: '15px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '2px solid #E2E8F0', zIndex: 3000, overflow: 'hidden' },
+  floatingKamus: { position: 'fixed', bottom: '110px', right: '20px', width: '350px', backgroundColor: 'white', borderRadius: '15px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', border: '2px solid #E2E8F0', zIndex: 3000, overflow: 'hidden' },
   kamusHeader: { padding: '12px', background: '#6C5CE7', color: 'white', fontWeight: 'bold', fontSize: '14px', textAlign: 'center' },
   kamusInput: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginBottom: '8px', boxSizing: 'border-box' },
   searchBtn: { width: '100%', padding: '8px', background: '#6C5CE7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
-  kamusBody: { padding: '15px', maxHeight: '250px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
+  kamusBody: { padding: '15px', maxHeight: '420px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
   feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
   teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' },
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255, 255, 255, 0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(5px)' },
   loaderBox: { textAlign: 'center', padding: '40px', backgroundColor: '#fff', borderRadius: '24px', boxSizing: 'border-box', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', maxWidth: '400px' },
   spinner: { width: '50px', height: '50px', border: '5px solid #E2E8F0', borderTop: '5px solid #6366F1', borderRadius: '50%', margin: '0 auto 20px auto', animation: 'spin 1s linear infinite' },
   loadingBarContainer: { width: '100%', height: '6px', backgroundColor: '#E2E8F0', borderRadius: '10px', marginTop: '20px', overflow: 'hidden' },
-  loadingBarFill: { height: '100%', backgroundColor: '#6366F1', width: '50%' }
+  loadingBarFill: { height: '100%', backgroundColor: '#6366F1', width: '50%' },
+  miniCopyBtn: {
+    width: '100%',
+    padding: '8px 10px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    backgroundColor: '#6C5CE7',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    textAlign: 'center'
+  }
 };
