@@ -439,7 +439,7 @@ export default function AssignmentTracker() {
               <button className="close-x" onClick={() => setIsModalOpen(false)}>×</button>
             </div>
             <div className="modal-body">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <p style={{ margin: 0 }}>Pilih bahagian yang ingin dimasukkan:</p>
                 <label style={{ fontSize: '0.85rem', color: '#48A6A7', cursor: 'pointer', fontWeight: 700 }}>
                   <input 
