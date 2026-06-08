@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import Head from 'next/head';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -27,72 +27,86 @@ export default function AssignmentTracker() {
   });
 
   useEffect(() => {
-    if (assignmentId && classId) { fetchTrackerData(); }
-  }, [assignmentId, classId]);
+  if (!assignmentId || !classId) return;
 
-  const fetchTrackerData = async () => {
+  let unsubscribeResults = () => {};
+  setLoading(true);
+
+  const setupLiveTracker = async () => {
     try {
-      setLoading(true);
+      // 1. Fetch Class and Assignment Metadata once
       const cSnap = await getDoc(doc(db, 'classes', classId));
       if (cSnap.exists()) setClassNameDisplay(cSnap.data().className || classId);
 
       const aSnap = await getDoc(doc(db, 'assignments', assignmentId));
-      if (!aSnap.exists()) return;
-      setAssignment(aSnap.data());
+      if (aSnap.exists()) setAssignment(aSnap.data());
 
+      // 2. Fetch the roster students list once
       const sSnap = await getDocs(query(collection(db, 'students'), where('enrolledClasses', 'array-contains', classId)));
       const allStudents = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const rSnap = await getDocs(query(collection(db, 'karanganResults'), where('taskId', '==', assignmentId)));
-      const allResults = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      // 3. Setup a LIVE snapshot listener on the results collection
+      const resultsQuery = query(collection(db, 'karanganResults'), where('taskId', '==', assignmentId));
+      
+      unsubscribeResults = onSnapshot(resultsQuery, (snapshot) => {
+        const allResults = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const statusMap = allStudents.map(student => {
-        const result = allResults.find(r => r.studentId === student.id);
-        
-        const totalMissions = result?.kesalahanBahasa?.length || 0;
-        const solvedMissions = result?.solvedMissions?.length || 0;
-        
-        let status = 'Belum Hantar';
-        let progress = 0;
+        const statusMap = allStudents.map(student => {
+          const result = allResults.find(r => r.studentId === student.id);
+          
+          const totalMissions = result?.kesalahanBahasa?.length || 0;
+          const solvedMissions = result?.solvedMissions?.length || 0;
+          
+          let status = 'Belum Hantar';
+          let progress = 0;
 
-        if (result) {
-          if (result.status === 'murni_completed') {
-            status = 'Selesai';
-            progress = 100;
-          } else {
-            status = 'Sedang Baiki';
-            progress = totalMissions > 0 ? Math.round((solvedMissions / totalMissions) * 100) : 50;
+          if (result) {
+            if (result.status === 'murni_completed') {
+              status = 'Selesai';
+              progress = 100;
+            } else {
+              status = 'Sedang Baiki';
+              progress = totalMissions > 0 ? Math.round((solvedMissions / totalMissions) * 100) : 50;
+            }
           }
-        }
 
-        const mIsi = result?.pemarkahan?.isi || 0;
-        const mBahasa = result?.pemarkahan?.bahasa || 0;
-        const mTotal = result?.pemarkahan?.jumlah || 0;
-        
-        const isHighLevel = ['P5', 'P6'].includes(student.level);
-        const maxIsi = isHighLevel ? 20 : 8;
-        const maxBahasa = isHighLevel ? 20 : 7;
-        const maxTotal = isHighLevel ? 40 : 15;
+          const isHighLevel = ['P5', 'P6'].includes(student.level);
+          const maxIsi = isHighLevel ? 20 : 7;
+          const maxBahasa = isHighLevel ? 20 : 8;
+          const maxTotal = isHighLevel ? 40 : 15;
 
-        return {
-          ...student,
-          checked: false,
-          submissionId: result?.id || null,
-          result: result || null,
-          markahIsi: mIsi,
-          markahBahasa: mBahasa,
-          score: mTotal,
-          maxIsi,
-          maxBahasa,
-          maxTotal,
-          progress,
-          status
-        };
-      }).sort((a, b) => b.progress - a.progress);
+          return {
+            ...student,
+            checked: false,
+            submissionId: result?.id || null,
+            result: result || null,
+            markahIsi: result?.pemarkahan?.isi || 0,
+            markahBahasa: result?.pemarkahan?.bahasa || 0,
+            score: result?.pemarkahan?.jumlah || 0,
+            maxIsi,
+            maxBahasa,
+            maxTotal,
+            progress,
+            status
+          };
+        }).sort((a, b) => b.progress - a.progress);
 
-      setStudentStatuses(statusMap);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+        setStudentStatuses(statusMap);
+        setLoading(false);
+      });
+
+    } catch (e) {
+      console.error(e);
+      setLoading(false);
+    }
   };
+
+  setupLiveTracker();
+
+  // Clean up listener when the component unmounts or IDs change
+  return () => unsubscribeResults();
+}, [assignmentId, classId]);
+
 
   const generatePDF = () => {
     const selectedStudents = studentStatuses.filter(s => s.checked && s.result);
@@ -160,20 +174,15 @@ export default function AssignmentTracker() {
 
       y += 8;
 
-      // --- CONDITIONAL: MARKAH ---
+// --- CONDITIONAL: MARKAH ---
       if (pdfOptions.markah) {
-        const isJunior = (item.level === 'P3' || item.level === 'P4');
-        const maxIsi = isJunior ? 7 : 20;
-        const maxBhs = isJunior ? 8 : 20;
-        const totalMax = isJunior ? 15 : 40;
-
         autoTable(doc, {
           startY: y,
           head: [['KRITERIA', 'MARKAH']],
           body: [
-            ['Isi & Huraian', `${item.markahIsi} / ${maxIsi}`],
-            ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${maxBhs}`],
-            ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${totalMax}`],
+            ['Isi & Huraian', `${item.markahIsi} / ${student.maxIsi}`],
+            ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${student.maxBahasa}`],
+            ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${student.maxTotal}`],
           ],
           theme: 'grid',
           headStyles: { fillColor: [0, 61, 64], textColor: [255, 255, 255] },
