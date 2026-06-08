@@ -214,16 +214,37 @@ export default function SemakanPage() {
     }
   }, [taskId]);
 
-  const handleSaveProgress = async () => {
+  // Real-time Silent Auto-Save Debounce Effect
+  useEffect(() => {
+    if (!essay.trim() || !activeId || !taskId) return;
+
+    const delayDebounceFn = setTimeout(() => {
+      handleSaveProgress(true);
+    }, 2000);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [essay, activeId, taskId]);
+
+  const handleSaveProgress = async (isAuto = false) => {
     const finalId = activeId || auth.currentUser?.uid || studentId;
-    if (!finalId) return alert("ID tidak dikesan.");
-    if (!essay.trim()) return alert("Sila tulis karangan sebelum simpan.");
-    setIsSaving(true);
+    if (!finalId) {
+      if (!isAuto) alert("ID tidak dikesan.");
+      return;
+    }
+    if (!essay.trim()) {
+      if (!isAuto) alert("Sila tulis karangan sebelum simpan.");
+      return;
+    }
+    if (!isAuto) setIsSaving(true);
     try {
       const draftRef = doc(db, 'drafts', `${finalId}_${taskId || 'umum'}`);
-      await setDoc(draftRef, { userId: finalId, taskId: taskId || 'umum', essay: essay, nama: studentName, updatedAt: serverTimestamp() });
-      alert("Progress berjaya disimpan! ✨");
-    } catch (err) { alert("Gagal menyimpan."); } finally { setIsSaving(false); }
+      await setDoc(draftRef, { userId: finalId, taskId: taskId || 'umum', essay: essay, nama: studentName, updatedAt: serverTimestamp() }, { merge: true });
+      if (!isAuto) alert("Progress berjaya disimpan! ✨");
+    } catch (err) { 
+      if (!isAuto) alert("Gagal menyimpan."); 
+    } finally { 
+      if (!isAuto) setIsSaving(false); 
+    }
   };
 
   const handleSemak = async (e) => {
@@ -405,7 +426,7 @@ export default function SemakanPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
+            <button onClick={() => handleSaveProgress(false)} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
             <button 
               onClick={handleSemak} 
               disabled={loading || !studentLevel} 

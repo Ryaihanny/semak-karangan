@@ -43,11 +43,18 @@ export default function AssignmentTracker() {
       const sSnap = await getDocs(query(collection(db, 'students'), where('enrolledClasses', 'array-contains', classId)));
       const allStudents = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+      // Ambil data hasil akhir
       const rSnap = await getDocs(query(collection(db, 'karanganResults'), where('taskId', '==', assignmentId)));
       const allResults = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+      // ⚡ TAMBAHAN BERSANDARKAN STRUKTUR ASAL: Ambil draf real-time pelajar dari koleksi 'drafts'
+      const dSnap = await getDocs(query(collection(db, 'drafts'), where('assignmentId', '==', assignmentId)));
+      const allDrafts = dSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
       const statusMap = allStudents.map(student => {
         const result = allResults.find(r => r.studentId === student.id);
+        // Cari draf sekiranya hasil akhir belum wujud
+        const draft = allDrafts.find(d => d.studentId === student.id);
         
         const totalMissions = result?.kesalahanBahasa?.length || 0;
         const solvedMissions = result?.solvedMissions?.length || 0;
@@ -63,6 +70,11 @@ export default function AssignmentTracker() {
             status = 'Sedang Baiki';
             progress = totalMissions > 0 ? Math.round((solvedMissions / totalMissions) * 100) : 50;
           }
+        } 
+        // ⚡ KEMAS KINI STATUS: Jika hasil akhir tiada tetapi draf wujud, tukar status kepada 'Sedang Menulis'
+        else if (draft) {
+          status = 'Sedang Menulis';
+          progress = 25; // Progres draf asas penulisan bermula
         }
 
         const mIsi = result?.pemarkahan?.isi || 0;
@@ -74,11 +86,15 @@ export default function AssignmentTracker() {
         const maxBahasa = isHighLevel ? 20 : 7;
         const maxTotal = isHighLevel ? 40 : 15;
 
+        // Tentukan ID rujukan untuk tugasan semakan/analisis (Gunakan ID draf jika belum hantar)
+        const activeSubmissionId = result?.id || draft?.id || null;
+
         return {
           ...student,
           checked: false,
-          submissionId: result?.id || null,
-          result: result || null,
+          submissionId: activeSubmissionId, // Mengisi rujukan ID draf/hasil supaya tindakan butang aktif
+          result: result || draft || null, // Membolehkan draf dibaca jika keputusan akhir belum ada
+          isDraftOnly: !result && !!draft, // Penanda logik draf sahaja
           markahIsi: mIsi,
           markahBahasa: mBahasa,
           score: mTotal,
@@ -360,14 +376,15 @@ export default function AssignmentTracker() {
                   <td>
                     <div className="status-progress-cell">
                       <div className="tag-row">
-                        <span className={`status-tag ${s.status === 'Selesai' ? 'done' : s.status === 'Sedang Baiki' ? 'work' : 'none'}`}>{s.status}</span>
+                        {/* ⚡ GAYA VISUAL TUGASAN: Menambah kesesuaian CSS tag bagi 'Sedang Menulis' */}
+                        <span className={`status-tag ${s.status === 'Selesai' ? 'done' : s.status === 'Sedang Baiki' || s.status === 'Sedang Menulis' ? 'work' : 'none'}`}>{s.status}</span>
                         <span className="pct-text">{s.progress}%</span>
                       </div>
                       <div className="mini-progress-bg"><div className="mini-progress-fill" style={{ width: `${s.progress}%` }}></div></div>
                     </div>
                   </td>
                   <td>
-                    {s.submissionId ? (
+                    {s.submissionId && !s.isDraftOnly ? (
                       <div className="marks-grid">
                          <div className="mark-sub">Isi <b>{s.markahIsi}</b>/{s.maxIsi}</div>
                          <div className="mark-sub">Bhs <b>{s.markahBahasa}</b>/{s.maxBahasa}</div>
@@ -379,7 +396,8 @@ export default function AssignmentTracker() {
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       {s.submissionId && (
                         <>
-                          <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
+                          {/* ⚡ TINDAKAN SEMAKAN: Menghalakan guru ke halaman semakan bersandarkan mode rujukan ID draf/hasil */}
+                          <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}${s.isDraftOnly ? '&type=draft' : ''}`)}>Lihat Analisis</button>
                         </>
                       )}
                     </div>

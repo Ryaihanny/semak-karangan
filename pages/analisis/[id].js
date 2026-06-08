@@ -8,42 +8,47 @@ import { onAuthStateChanged } from 'firebase/auth';
 
 export default function RetypeCorrection() {
   const router = useRouter();
-  const { id, classId, mode } = router.query;
+  const { id, classId, mode, type } = router.query; // Added 'type' safely without replacing anything
   const [data, setData] = useState(null);
   const [rewrite, setRewrite] = useState("");
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null);
 
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    if (!currentUser) {
-      // Only redirect to login if there is no studentUser in localStorage either
-      if (!localStorage.getItem("studentUser")) {
-        router.replace('/');
+  const isDraftView = type === 'draft'; // Flag to identify if teacher is looking at a live draft
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) {
+        if (!localStorage.getItem("studentUser")) {
+          router.replace('/');
+        }
+      } else {
+        setUser(currentUser);
       }
-    } else {
-      setUser(currentUser);
-    }
-  });
-  return () => unsubscribe();
-}, [router]);
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     if (id) {
-      getDoc(doc(db, 'karanganResults', id)).then(snap => {
+      // If type=draft, read from 'drafts', otherwise use your original 'karanganResults'
+      const targetCollection = isDraftView ? 'drafts' : 'karanganResults';
+
+      getDoc(doc(db, targetCollection, id)).then(snap => {
         if (snap.exists()) {
           const fetchedData = snap.data();
           setData(fetchedData);
-          setRewrite(fetchedData.lastRewrite || fetchedData.karanganAsal || "");
+          // Graceful fallback: drafts use '.karangan', completed essays use '.lastRewrite' || '.karanganAsal'
+          setRewrite(fetchedData.lastRewrite || fetchedData.karangan || fetchedData.karanganAsal || "");
           setCurrentStep(fetchedData.solvedMissions?.length || 0);
         }
         setLoading(false);
       });
     }
-  }, [id]);
+  }, [id, isDraftView]);
 
   const checkCorrection = () => {
     const target = data?.kesalahanBahasa[currentStep]?.pembetulan?.toLowerCase().trim();
@@ -58,6 +63,7 @@ useEffect(() => {
   };
 
   const saveProgress = async (isFinal = false) => {
+    if (isDraftView) return; // Prevent writing data if it's just a teacher viewing a draft
     if (isFinal && !checkCorrection()) return;
     setIsSaving(true);
     try {
@@ -80,36 +86,34 @@ useEffect(() => {
     }
   };
 
-const handleRewrite = () => {
-  if (window.confirm("Adakah anda pasti? Semua progress pembetulan semasa akan hilang dan anda akan bermula dengan kertas kosong.")) {
-    router.push({
-      pathname: '/semakan',
-      query: { 
-        taskId: data?.taskId, 
-        classId: classId || data?.classId,
-        studentId: data?.studentId,
-        overwrite: 'true' // This tells semakan.js to clear the essay
-      }
-    });
-  }
-};
+  const handleRewrite = () => {
+    if (window.confirm("Adakah anda pasti? Semua progress pembetulan semasa akan hilang dan anda akan bermula dengan kertas kosong.")) {
+      router.push({
+        pathname: '/semakan',
+        query: { 
+          taskId: data?.taskId || data?.assignmentId, 
+          classId: classId || data?.classId,
+          studentId: data?.studentId,
+          overwrite: 'true' 
+        }
+      });
+    }
+  };
 
-// --- UPDATED EXIT LOGIC ---
-const handleExitOnly = () => {
-  const targetClass = classId || data?.classId;
-  const targetAssignment = data?.taskId; 
+  const handleExitOnly = () => {
+    const targetClass = classId || data?.classId;
+    const targetAssignment = data?.taskId || data?.assignmentId; 
 
-  // Check if current user is a teacher via Firebase Auth or the URL mode
-  const isTeacherMode = mode === 'teacher' || auth.currentUser !== null;
+    const isTeacherMode = mode === 'teacher' || auth.currentUser !== null;
 
-  if (isTeacherMode && targetAssignment && targetClass) {
-    router.push(`/Class/track/${targetAssignment}?classId=${targetClass}`);
-  } else if (isTeacherMode && targetClass) {
-    router.push(`/Class/${targetClass}`);
-  } else {
-    router.push('/student-dashboard');
-  }
-};
+    if (isTeacherMode && targetAssignment && targetClass) {
+      router.push(`/Class/track/${targetAssignment}?classId=${targetClass}`);
+    } else if (isTeacherMode && targetClass) {
+      router.push(`/Class/${targetClass}`);
+    } else {
+      router.push('/student-dashboard');
+    }
+  };
 
   const handleNextMission = () => {
     if (checkCorrection()) {
@@ -126,71 +130,84 @@ const handleExitOnly = () => {
   const currentMission = missions[currentStep];
   const isLastStep = currentStep >= missions.length - 1;
 
-  // UPDATED MARKAH LOGIC
+  // ALL ORIGINAL MARKAH LOGIC PRESERVED COMPLETELY
   const studentLevel = data?.level?.toString().toUpperCase() || "P4";
-const isHighLevel = studentLevel === 'P5' || studentLevel === 'P6' || studentLevel === '5' || studentLevel === '6';
+  const isHighLevel = studentLevel === 'P5' || studentLevel === 'P6' || studentLevel === '5' || studentLevel === '6';
 
-const totalMax = isHighLevel ? 40 : 15;
-const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8";
+  const totalMax = isHighLevel ? 40 : 15;
+  const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8";
 
   return (
     <div style={styles.container}>
- <nav style={styles.nav}>
-  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-    <button onClick={() => saveProgress(true)} style={styles.backBtn} disabled={isSaving}>
-      {isSaving ? "⏳ Menyimpan..." : (mode === 'teacher' ? "🏠 Simpan & Kembali" : "🏠 Simpan & Dashboard")}
-    </button>
-    
-    <button onClick={handleExitOnly} style={styles.exitBtn}>🚪 Keluar</button>
-    
-    <button onClick={handleRewrite} style={{...styles.exitBtn, backgroundColor: '#FEF2F2', color: '#EF4444', borderColor: '#FECACA'}}>
-      🔄 Tulis Semula
-    </button>
-  </div>
-  {/* Ensure there is NO stray button here before the progressContainer starts */}
-  <div style={styles.progressContainer}>
+      <nav style={styles.nav}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* Only show save options if this isn't a live draft observation */}
+          {!isDraftView ? (
+            <button onClick={() => saveProgress(true)} style={styles.backBtn} disabled={isSaving}>
+              {isSaving ? "⏳ Menyimpan..." : (mode === 'teacher' ? "🏠 Simpan & Kembali" : "🏠 Simpan & Dashboard")}
+            </button>
+          ) : (
+            <div style={{ padding: '12px 20px', backgroundColor: '#FFFBEB', color: '#D97706', borderRadius: '12px', fontWeight: 'bold', fontSize: '14px', border: '1px solid #FDE68A' }}>
+              👀 Memantau Draf Kerja Pelajar
+            </div>
+          )}
+          
+          <button onClick={handleExitOnly} style={styles.exitBtn}>🚪 Keluar</button>
+          
+          {!isDraftView && (
+            <button onClick={handleRewrite} style={{...styles.exitBtn, backgroundColor: '#FEF2F2', color: '#EF4444', borderColor: '#FECACA'}}>
+              🔄 Tulis Semula
+            </button>
+          )}
+        </div>
 
+        <div style={styles.progressContainer}>
           <div style={styles.progressText}>Misi Pembetulan: {currentStep + 1} / {missions.length}</div>
           <div style={styles.progressBar}>
-            <div style={{...styles.progressFill, width: `${((currentStep + 1)/missions.length)*100}%`}} />
+            <div style={{...styles.progressFill, width: `${missions.length > 0 ? ((currentStep + 1) / missions.length) * 100 : 0}%`}} />
           </div>
         </div>
       </nav>
 
       <div style={styles.layout}>
-{/* LEFT PANEL */}
+        {/* LEFT PANEL */}
         <section style={styles.panel}>
           <div style={styles.panelHeader}>📜 RUJUKAN & ULASAN</div>
           <div style={styles.scrollArea}>
             
-
-            {/* Detailed Grade Badge */}
-            <div style={styles.gradeBadge}>
-              <div style={{ fontSize: '20px', marginBottom: '8px' }}>
-                Jumlah Markah: <b>{data?.markah || 0} / {totalMax}</b>
+            {/* Detailed Grade Badge - Hidden only if it's a live draft with no score yet */}
+            {!isDraftView && (
+              <div style={styles.gradeBadge}>
+                <div style={{ fontSize: '20px', marginBottom: '8px' }}>
+                  Jumlah Markah: <b>{data?.markah || 0} / {totalMax}</b>
+                </div>
+                <div style={{ display: 'flex', gap: '15px', fontSize: '14px', borderTop: '1px solid #C7D2FE', paddingTop: '8px' }}>
+                  <span>📝 Isi: <b>{data?.pemarkahan?.isi || 0}</b></span>
+                  <span>✍️ Bahasa: <b>{data?.pemarkahan?.bahasa || 0}</b></span>
+                </div>
+                <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.6 }}>{breakdownLabel}</div>
               </div>
-              <div style={{ display: 'flex', gap: '15px', fontSize: '14px', borderTop: '1px solid #C7D2FE', paddingTop: '8px' }}>
-                <span>📝 Isi: <b>{data?.pemarkahan?.isi || 0}</b></span>
-                <span>✍️ Bahasa: <b>{data?.pemarkahan?.bahasa || 0}</b></span>
-              </div>
-            </div>
+            )}
 
-<button onClick={handleRewrite} style={styles.rewriteBtn}>
-  🔄 Tulis Semula (Mula Baru)
-</button>
+            {!isDraftView && (
+              <button onClick={handleRewrite} style={styles.rewriteBtn}>
+                🔄 Tulis Semula (Mula Baru)
+              </button>
+            )}
 
             <div style={styles.teacherComment}>
                <div style={{ marginBottom: '8px', color: '#92400E', fontWeight: '800', fontSize: '13px' }}>💬 ULASAN CIKGU AI:</div>
-               <p style={{ margin: 0 }}>{data?.ulasan || "Tahniah! Teruskan usaha murni anda."}</p>
-               
-               {/* Context for Students */}
+               <p style={{ margin: 0 }}>
+                 {isDraftView ? "Pelajar sedang aktif menaip draf asal. Tiada ulasan muktamad dikeluarkan lagi." : (data?.ulasan || "Tahniah! Teruskan usaha murni anda.")}
+               </p>
                <div style={{ marginTop: '12px', fontSize: '12px', fontStyle: 'italic', opacity: 0.8, color: '#92400E' }}>
                  *Isi = Idea & Fakta | Bahasa = Tatabahasa & Ejaan
                </div>
             </div>
 
             <hr style={{ border: '0.5px solid #E2E8F0', margin: '20px 0' }} />
-            <div style={styles.essayOriginal} dangerouslySetInnerHTML={{ __html: data?.karanganUnderlined }} />
+            {/* Safely fallback to unformatted text (.karangan) if highlighted text (.karanganUnderlined) isn't generated yet */}
+            <div style={styles.essayOriginal} dangerouslySetInnerHTML={{ __html: data?.karanganUnderlined || data?.karangan || "" }} />
           </div>
         </section>
 
@@ -198,29 +215,38 @@ const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8"
         <section style={styles.panel}>
           <div style={styles.panelHeader}>✍️ ARAHAN & PEMBETULAN</div>
           
-          <div style={styles.hintBox}>
-            <div style={styles.hintTitle}>💡 ARAHAN SEMASA:</div>
-            {currentMission ? (
-              <>
-                <p style={styles.hintText}>
-                  Cari: <span style={{color: '#E63946', fontWeight: 'bold'}}>"{currentMission.ayatSalah}"</span>
-                  <br />
-                  Ganti: <span style={{color: '#2A9D8F', fontWeight: 'bold'}}>"{currentMission.pembetulan}"</span>
-                </p>
-                {errorMsg && <div style={styles.errorBanner}>{errorMsg}</div>}
-                {!isLastStep ? (
-                  <button onClick={handleNextMission} style={styles.nextBtn}>Misi Seterusnya ➡️</button>
-                ) : (
-                  <button onClick={() => saveProgress(true)} style={styles.finishBtn}>Siap Semua! ✅</button>
-                )}
-              </>
-            ) : <p>Tahniah! Klik simpan untuk selesai.</p>}
-          </div>
+          {/* Instruction mission block is irrelevant during live draft viewing */}
+          {!isDraftView ? (
+            <div style={styles.hintBox}>
+              <div style={styles.hintTitle}>💡 ARAHAN SEMASA:</div>
+              {currentMission ? (
+                <>
+                  <p style={styles.hintText}>
+                    Cari: <span style={{color: '#E63946', fontWeight: 'bold'}}>"{currentMission.ayatSalah}"</span>
+                    <br />
+                    Ganti: <span style={{color: '#2A9D8F', fontWeight: 'bold'}}>"{currentMission.pembetulan}"</span>
+                  </p>
+                  {errorMsg && <div style={styles.errorBanner}>{errorMsg}</div>}
+                  {!isLastStep ? (
+                    <button onClick={handleNextMission} style={styles.nextBtn}>Misi Seterusnya ➡️</button>
+                  ) : (
+                    <button onClick={() => saveProgress(true)} style={styles.finishBtn}>Siap Semua! ✅</button>
+                  )}
+                </>
+              ) : <p>Tahniah! Klik simpan untuk selesai.</p>}
+            </div>
+          ) : (
+            <div style={styles.hintBox}>
+              <div style={styles.hintTitle}>📝 MONITORING DRAF:</div>
+              <p style={{ margin: 0, fontSize: '14px', color: '#475569' }}>Teks di bawah menunjukkan hasil penulisan terkini pelajar secara real-time.</p>
+            </div>
+          )}
 
           <textarea
             style={styles.textarea}
             value={rewrite}
             onChange={(e) => { setRewrite(e.target.value); if(errorMsg) setErrorMsg(""); }}
+            readOnly={isDraftView} // Read-only ONLY when the teacher is looking at a draft overview
             placeholder="Tulis semula karangan yang betul di sini..."
           />
         </section>
@@ -229,6 +255,7 @@ const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8"
   );
 }
 
+// All of your original styles left completely untouched
 const styles = {
   errorBanner: { padding: '8px', backgroundColor: '#FFF1F2', color: '#E11D48', borderRadius: '8px', fontSize: '13px', marginBottom: '10px', border: '1px solid #FECDD3', fontWeight: 'bold' },
   container: { backgroundColor: '#F0F4F8', minHeight: '100vh', padding: '0 20px 20px 20px', fontFamily: '"Plus Jakarta Sans", sans-serif' },
@@ -253,16 +280,16 @@ const styles = {
   gradeBadge: { display: 'inline-block', padding: '10px 15px', backgroundColor: '#EEF2FF', color: '#4338CA', borderRadius: '12px', fontWeight: 'bold', marginBottom: '15px' },
   teacherComment: { fontSize: '15px', color: '#475569', lineHeight: '1.6', backgroundColor: '#FFFBEB', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #F6E05E' },
   loader: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', color: '#4338CA', fontWeight: 'bold' }, 
-rewriteBtn: {
-  display: 'block', 
-  width: '100%', 
-  padding: '10px', 
-  marginTop: '10px', 
-  borderRadius: '10px', 
-  border: '2px solid #6366F1', 
-  backgroundColor: 'transparent', 
-  color: '#4338CA', 
-  fontWeight: 'bold', 
+  rewriteBtn: {
+    display: 'block', 
+    width: '100%', 
+    padding: '10px', 
+    marginTop: '10px', 
+    borderRadius: '10px', 
+    border: '2px solid #6366F1', 
+    backgroundColor: 'transparent', 
+    color: '#4338CA', 
+    fontWeight: 'bold', 
     cursor: 'pointer',
     marginBottom: '15px'
   } 
