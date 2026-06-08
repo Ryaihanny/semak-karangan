@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import Head from 'next/head';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -11,16 +11,9 @@ export default function AssignmentTracker() {
   const { id: assignmentId, classId } = router.query;
 
   const [assignment, setAssignment] = useState(null);
+  const [studentStatuses, setStudentStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [classNameDisplay, setClassNameDisplay] = useState('');
-  
-  // Base collection states fed by real-time listeners
-  const [students, setStudents] = useState([]);
-  const [results, setResults] = useState([]);
-  const [drafts, setDrafts] = useState([]);
-  
-  // The processed UI state mapped from real-time streams
-  const [studentStatuses, setStudentStatuses] = useState([]);
 
   // --- NEW STATES FOR PDF OPTIONS ---
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,112 +26,73 @@ export default function AssignmentTracker() {
     ulasanKeseluruhan: true
   });
 
-  // 1. Manage Static & Live Subscriptions
   useEffect(() => {
-    if (!assignmentId || !classId) return;
-
-    setLoading(true);
-
-    // Fetch static metadata once
-    getDoc(doc(db, 'classes', classId)).then(cSnap => {
-      if (cSnap.exists()) setClassNameDisplay(cSnap.data().className || classId);
-    });
-
-    getDoc(doc(db, 'assignments', assignmentId)).then(aSnap => {
-      if (aSnap.exists()) setAssignment(aSnap.data());
-    });
-
-    // Real-time listener: Students enrolled in the class
-    const qStudents = query(collection(db, 'students'), where('enrolledClasses', 'array-contains', classId));
-    const unsubscribeStudents = onSnapshot(qStudents, (snapshot) => {
-      const studentList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setStudents(studentList);
-    }, (err) => console.error("Students Listener Error:", err));
-
-    // Real-time listener: Assignment submission final results
-    const qResults = query(collection(db, 'karanganResults'), where('taskId', '==', assignmentId));
-    const unsubscribeResults = onSnapshot(qResults, (snapshot) => {
-      const resultList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setResults(resultList);
-    }, (err) => console.error("Results Listener Error:", err));
-
-    // Real-time listener: Live composition drafts
-    const qDrafts = query(collection(db, 'drafts'), where('assignmentId', '==', assignmentId));
-    const unsubscribeDrafts = onSnapshot(qDrafts, (snapshot) => {
-      const draftList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setDrafts(draftList);
-      setLoading(false); // Stop loader as soon as primary streams attach
-    }, (err) => { console.error("Drafts Listener Error:", err); setLoading(false); });
-
-    // Cleanup listeners when unmounting or parameters change
-    return () => {
-      unsubscribeStudents();
-      unsubscribeResults();
-      unsubscribeDrafts();
-    };
+    if (assignmentId && classId) { fetchTrackerData(); }
   }, [assignmentId, classId]);
 
-  // 2. Compute Layout Derivations Reactively
-  useEffect(() => {
-    if (students.length === 0) {
-      setStudentStatuses([]);
-      return;
-    }
+  const fetchTrackerData = async () => {
+    try {
+      setLoading(true);
+      const cSnap = await getDoc(doc(db, 'classes', classId));
+      if (cSnap.exists()) setClassNameDisplay(cSnap.data().className || classId);
 
-    const statusMap = students.map(student => {
-      const result = results.find(r => r.studentId === student.id);
-      const draft = drafts.find(d => d.studentId === student.id);
-      
-      const totalMissions = result?.kesalahanBahasa?.length || 0;
-      const solvedMissions = result?.solvedMissions?.length || 0;
-      
-      let status = 'Belum Hantar';
-      let progress = 0;
+      const aSnap = await getDoc(doc(db, 'assignments', assignmentId));
+      if (!aSnap.exists()) return;
+      setAssignment(aSnap.data());
 
-      if (result) {
-        if (result.status === 'murni_completed') {
-          status = 'Selesai';
-          progress = 100;
-        } else {
-          status = 'Sedang Baiki';
-          progress = totalMissions > 0 ? Math.round((solvedMissions / totalMissions) * 100) : 50;
+      const sSnap = await getDocs(query(collection(db, 'students'), where('enrolledClasses', 'array-contains', classId)));
+      const allStudents = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const rSnap = await getDocs(query(collection(db, 'karanganResults'), where('taskId', '==', assignmentId)));
+      const allResults = rSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const statusMap = allStudents.map(student => {
+        const result = allResults.find(r => r.studentId === student.id);
+        
+        const totalMissions = result?.kesalahanBahasa?.length || 0;
+        const solvedMissions = result?.solvedMissions?.length || 0;
+        
+        let status = 'Belum Hantar';
+        let progress = 0;
+
+        if (result) {
+          if (result.status === 'murni_completed') {
+            status = 'Selesai';
+            progress = 100;
+          } else {
+            status = 'Sedang Baiki';
+            progress = totalMissions > 0 ? Math.round((solvedMissions / totalMissions) * 100) : 50;
+          }
         }
-      } 
-      else if (draft) {
-        status = 'Sedang Menulis';
-        progress = 25; 
-      }
 
-      const mIsi = result?.pemarkahan?.isi || 0;
-      const mBahasa = result?.pemarkahan?.bahasa || 0;
-      const mTotal = result?.pemarkahan?.jumlah || 0;
-      
-      const isHighLevel = ['P5', 'P6'].includes(student.level);
-      const maxIsi = isHighLevel ? 20 : 8;
-      const maxBahasa = isHighLevel ? 20 : 7;
-      const maxTotal = isHighLevel ? 40 : 15;
+        const mIsi = result?.pemarkahan?.isi || 0;
+        const mBahasa = result?.pemarkahan?.bahasa || 0;
+        const mTotal = result?.pemarkahan?.jumlah || 0;
+        
+        const isHighLevel = ['P5', 'P6'].includes(student.level);
+        const maxIsi = isHighLevel ? 20 : 8;
+        const maxBahasa = isHighLevel ? 20 : 7;
+        const maxTotal = isHighLevel ? 40 : 15;
 
-      const activeSubmissionId = result?.id || draft?.id || null;
+        return {
+          ...student,
+          checked: false,
+          submissionId: result?.id || null,
+          result: result || null,
+          markahIsi: mIsi,
+          markahBahasa: mBahasa,
+          score: mTotal,
+          maxIsi,
+          maxBahasa,
+          maxTotal,
+          progress,
+          status
+        };
+      }).sort((a, b) => b.progress - a.progress);
 
-      return {
-        ...student,
-        checked: false,
-        submissionId: activeSubmissionId, 
-        result: result || draft || null, 
-        isDraftOnly: !result && !!draft, 
-        markahIsi: mIsi,
-        markahBahasa: mBahasa,
-        score: mTotal,
-        maxIsi,
-        maxBahasa,
-        maxTotal,
-        progress,
-        status
-      };
-    }).sort((a, b) => b.progress - a.progress);
-
-    setStudentStatuses(statusMap);
-  }, [students, results, drafts]);
+      setStudentStatuses(statusMap);
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
 
   const generatePDF = () => {
     const selectedStudents = studentStatuses.filter(s => s.checked && s.result);
@@ -206,6 +160,7 @@ export default function AssignmentTracker() {
 
       y += 8;
 
+      // --- CONDITIONAL: MARKAH ---
       if (pdfOptions.markah) {
         const isJunior = (item.level === 'P3' || item.level === 'P4');
         const maxIsi = isJunior ? 7 : 20;
@@ -230,6 +185,7 @@ export default function AssignmentTracker() {
         y += 5;
       }
 
+      // --- CONDITIONAL: TEKS KARANGAN ---
       if (pdfOptions.karangan) {
         doc.setTextColor(0, 61, 64);
         doc.setFont("times", "bold");
@@ -260,6 +216,7 @@ export default function AssignmentTracker() {
         });
       }
 
+      // --- CONDITIONAL: ANALISIS KESALAHAN ---
       if (pdfOptions.analisis && item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
         y += 5;
         if (y > 230) { doc.addPage(); y = 20; }
@@ -283,6 +240,7 @@ export default function AssignmentTracker() {
         y = doc.lastAutoTable.finalY + 10;
       }
 
+      // --- CONDITIONAL: ULASAN BAHASA ---
       if (pdfOptions.ulasanBahasa && item.ulasanBahasa) {
         if (y > 250) { doc.addPage(); y = 20; }
         doc.setTextColor(0, 61, 64);
@@ -296,6 +254,7 @@ export default function AssignmentTracker() {
         y += (wrapped.length * 6) + 5;
       }
 
+      // --- CONDITIONAL: ULASAN ISI ---
       if (pdfOptions.ulasanIsi && item.ulasanIsi) {
         if (y > 250) { doc.addPage(); y = 20; }
         doc.setTextColor(0, 61, 64);
@@ -309,6 +268,7 @@ export default function AssignmentTracker() {
         y += (wrapped.length * 6) + 5;
       }
 
+      // --- CONDITIONAL: ULASAN KESELURUHAN ---
       if (pdfOptions.ulasanKeseluruhan) {
         if (y > 240) { doc.addPage(); y = 20; }
         doc.setFillColor(245, 250, 250);
@@ -359,6 +319,7 @@ export default function AssignmentTracker() {
                <h1>{assignment?.title}</h1>
             </div>
           </div>
+          {/* TRIGGER MODAL INSTEAD OF DIRECT PDF */}
           <button className="btn-main" onClick={() => setIsModalOpen(true)}>📥 Cetak Laporan PDF ({studentStatuses.filter(s => s.checked).length})</button>
         </div>
       </header>
@@ -399,14 +360,14 @@ export default function AssignmentTracker() {
                   <td>
                     <div className="status-progress-cell">
                       <div className="tag-row">
-                        <span className={`status-tag ${s.status === 'Selesai' ? 'done' : s.status === 'Sedang Baiki' || s.status === 'Sedang Menulis' ? 'work' : 'none'}`}>{s.status}</span>
+                        <span className={`status-tag ${s.status === 'Selesai' ? 'done' : s.status === 'Sedang Baiki' ? 'work' : 'none'}`}>{s.status}</span>
                         <span className="pct-text">{s.progress}%</span>
                       </div>
                       <div className="mini-progress-bg"><div className="mini-progress-fill" style={{ width: `${s.progress}%` }}></div></div>
                     </div>
                   </td>
                   <td>
-                    {s.submissionId && !s.isDraftOnly ? (
+                    {s.submissionId ? (
                       <div className="marks-grid">
                          <div className="mark-sub">Isi <b>{s.markahIsi}</b>/{s.maxIsi}</div>
                          <div className="mark-sub">Bhs <b>{s.markahBahasa}</b>/{s.maxBahasa}</div>
@@ -418,7 +379,7 @@ export default function AssignmentTracker() {
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       {s.submissionId && (
                         <>
-                          <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}${s.isDraftOnly ? '&type=draft' : ''}`)}>Lihat Analisis</button>
+                          <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
                         </>
                       )}
                     </div>
@@ -439,7 +400,7 @@ export default function AssignmentTracker() {
               <button className="close-x" onClick={() => setIsModalOpen(false)}>×</button>
             </div>
             <div className="modal-body">
-              <div style={{ display: 'flex', justifycontent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <p style={{ margin: 0 }}>Pilih bahagian yang ingin dimasukkan:</p>
                 <label style={{ fontSize: '0.85rem', color: '#48A6A7', cursor: 'pointer', fontWeight: 700 }}>
                   <input 
