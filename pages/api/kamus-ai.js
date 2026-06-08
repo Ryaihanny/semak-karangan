@@ -11,36 +11,45 @@ export default async function handler(req, res) {
   const { perkataan } = req.body;
   
   if (!perkataan) {
-    return res.status(400).json({ error: "Tiada perkataan yang diberikan" });
+    return res.status(400).json({ error: "Tiada perkataan atau soalan yang diberikan" });
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    // Force Gemini to always respond with valid JSON without needing markdown hacks
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: { responseMimeType: "application/json" }
+    });
 
     const prompt = `
-      You are an interactive bilingual dictionary tool for primary school students (Ages 9-12) in Singapore. Many users are English-dominant or non-Malay speakers.
-      User input (word or phrase): "${perkataan}"
-      
-      Detect if the input is English or Malay. Translate or explain it so a student who struggles with Malay can easily understand.
+      You are an interactive, smart bilingual conversational dictionary tool for primary school students (Ages 9-12) in Singapore. Many users are English-dominant or non-Malay speakers.
 
-      Return ONLY a JSON object matching this schema. Do not wrap it in markdown block tags like \`\`\`json:
+      The user input can be a single word (e.g., "excited", "gembira") OR a conversational question/phrase (e.g., "how to say excited in malay?", "what is the meaning of terpinga-pinga?", "help me with standard phrases for happy").
+
+      YOUR TASK:
+      1. Extract the core concept, word, or phrase the student is asking about.
+      2. Translate, explain, and extract it into the requested JSON schema below.
+      
+      User input: "${perkataan}"
+
+      Return ONLY a JSON object matching this schema:
       {
         "status": "success",
-        "malayWord": "The primary translated Malay word or phrase",
-        "englishWord": "The English equivalent",
-        "maksud": "A simple child-friendly meaning or definition written in clear English so they instantly know what it means",
+        "malayWord": "The target translated Malay word or phrase extracted from the student's query",
+        "englishWord": "The English equivalent of that target word/phrase",
+        "maksud": "A simple, child-friendly explanation or conversational answer to their question, written in clear English so they instantly understand.",
         "contohAyat": "One simple, high-scoring composition sentence in Malay Baku using the malayWord",
         "contohAyatEnglish": "The English translation of the contohAyat sentence",
         "bonusKosakata": ["Related high-scoring word or idiom 1 (with English in brackets)", "Related high-scoring word or idiom 2 (with English in brackets)"]
       }
 
-      If the input is gibberish or inappropriate, return ONLY:
+      If the input is complete gibberish or highly inappropriate, return exactly this structure:
       {
         "status": "error",
-        "message": "Alamak! Word not found. Try typing another word or check your spelling!"
+        "message": "Alamak! I couldn't understand that. Try typing a word or asking a question like 'how to say happy in Malay'!"
       }
 
-      RULES: Strictly no conversational filler. Keep text simple and concise. Use Malay Baku.
+      RULES: Be concise but highly helpful to a child struggling with Malay. Keep descriptions encouraging and easy to digest. Use Malay Baku. Do not wrap in markdown block tags.
     `;
 
     const result = await model.generateContent(prompt);
