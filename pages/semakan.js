@@ -192,7 +192,7 @@ export default function SemakanPage() {
   }, [taskId, studentId, studentName, overwrite, router.query.overwrite]); // Added router.query.overwrite for safety
 
 
-  // 1 & 2: Listen untuk Feedback & Data Real-time
+// Listen untuk Feedback & Live Essay Sync (For Teacher Real-time view)
   useEffect(() => {
     if (!activeId || !taskId) return;
     const draftRef = doc(db, 'drafts', `${activeId}_${taskId}`);
@@ -200,10 +200,14 @@ export default function SemakanPage() {
       if (snap.exists()) {
         const data = snap.data();
         if (data.feedbackGuru) setFeedback(data.feedbackGuru);
+        // If teacher is viewing, sync the student's essay progress onto the teacher's screen live
+        if (isTeacherMode && data.essay !== undefined) {
+          setEssay(data.essay);
+        }
       }
     });
     return () => unsub();
-  }, [activeId, taskId]);
+  }, [activeId, taskId, isTeacherMode]);
 
   useEffect(() => {
     if (taskId) {
@@ -214,17 +218,32 @@ export default function SemakanPage() {
     }
   }, [taskId]);
 
-  const handleSaveProgress = async () => {
+// Auto-save logic (Silently saves to Firestore without interrupting the student)
+  useEffect(() => {
     const finalId = activeId || auth.currentUser?.uid || studentId;
-    if (!finalId) return alert("ID tidak dikesan.");
-    if (!essay.trim()) return alert("Sila tulis karangan sebelum simpan.");
+    if (!finalId || !essay.trim()) return;
+
     setIsSaving(true);
-    try {
-      const draftRef = doc(db, 'drafts', `${finalId}_${taskId || 'umum'}`);
-      await setDoc(draftRef, { userId: finalId, taskId: taskId || 'umum', essay: essay, nama: studentName, updatedAt: serverTimestamp() });
-      alert("Progress berjaya disimpan! ✨");
-    } catch (err) { alert("Gagal menyimpan."); } finally { setIsSaving(false); }
-  };
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const draftRef = doc(db, 'drafts', `${finalId}_${taskId || 'umum'}`);
+        // Using setDoc with merge: true ensures we don't accidentally wipe out feedbackGuru if a teacher is writing it at the same time
+        await setDoc(draftRef, { 
+          userId: finalId, 
+          taskId: taskId || 'umum', 
+          essay: essay, 
+          nama: studentName, 
+          updatedAt: serverTimestamp() 
+        }, { merge: true });
+      } catch (err) { 
+        console.error("Auto-save failed:", err); 
+      } finally { 
+        setIsSaving(false); 
+      }
+    }, 1500); // Saves 1.5 seconds after the user stops typing
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [essay, activeId, taskId, studentName, studentId]);
 
   const handleSemak = async (e) => {
     if (e) e.preventDefault();
@@ -404,14 +423,15 @@ export default function SemakanPage() {
             <span style={styles.creditBadge}>💎 Kredit: {credits ?? '...'}</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={handleSaveProgress} disabled={isSaving} style={{ ...styles.submitBtn, backgroundColor: '#FFF', color: '#6C5CE7', border: '2px solid #6C5CE7', flex: 1 }}>{isSaving ? "⏳..." : "💾 Simpan Progress"}</button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ textAlign: 'center', fontSize: '12px', color: isSaving ? '#6C5CE7' : '#10B981', fontWeight: 'bold' }}>
+              {isSaving ? "⏳ Menyimpan auto..." : "✅ Semua perubahan disimpan secara automatik"}
+            </div>
             <button 
               onClick={handleSemak} 
               disabled={loading || !studentLevel} 
               style={{ 
                 ...styles.submitBtn, 
-                flex: 2, 
                 opacity: !studentLevel ? 0.6 : 1, 
                 cursor: !studentLevel ? 'not-allowed' : 'pointer' 
               }}
