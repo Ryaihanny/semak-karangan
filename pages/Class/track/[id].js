@@ -45,17 +45,19 @@ export default function AssignmentTracker() {
       const sSnap = await getDocs(query(collection(db, 'students'), where('enrolledClasses', 'array-contains', classId)));
       const allStudents = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // 3. Setup a LIVE snapshot listener on the results collection
+    // 3. Setup a LIVE snapshot listener on the results collection to capture live feedback states
       const resultsQuery = query(collection(db, 'karanganResults'), where('taskId', '==', assignmentId));
       
+      // Get the live drafts database state once to flag active sessions
+      const draftSnap = await getDocs(query(collection(db, 'drafts'), where('taskId', '==', assignmentId)));
+      const initialDrafts = draftSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
       unsubscribeResults = onSnapshot(resultsQuery, (snapshot) => {
         const allResults = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
         const statusMap = allStudents.map(student => {
           const result = allResults.find(r => r.studentId === student.id);
-          
-          const totalMissions = result?.kesalahanBahasa?.length || 0;
-          const solvedMissions = result?.solvedMissions?.length || 0;
+          const draft = initialDrafts.find(d => d.userId === student.id);
           
           let status = 'Belum Hantar';
           let progress = 0;
@@ -65,9 +67,14 @@ export default function AssignmentTracker() {
               status = 'Selesai';
               progress = 100;
             } else {
+              const totalMissions = result.kesalahanBahasa?.length || 0;
+              const solvedMissions = result.solvedMissions?.length || 0;
               status = 'Sedang Baiki';
               progress = totalMissions > 0 ? Math.round((solvedMissions / totalMissions) * 100) : 50;
             }
+          } else if (draft && draft.essay?.trim().length > 0) {
+            status = 'Sedang Menulis';
+            progress = Math.min(Math.round((draft.essay.length / 300) * 100), 95);
           }
 
           const isHighLevel = ['P5', 'P6'].includes(student.level);
@@ -94,18 +101,13 @@ export default function AssignmentTracker() {
         setStudentStatuses(statusMap);
         setLoading(false);
       });
+    }; // <-- Added this closing brace for setupLiveTracker
 
-    } catch (e) {
-      console.error(e);
-      setLoading(false);
-    }
-  };
+    setupLiveTracker();
 
-  setupLiveTracker();
-
-  // Clean up listener when the component unmounts or IDs change
-  return () => unsubscribeResults();
-}, [assignmentId, classId]);
+    // Clean up listener when the component unmounts or IDs change
+    return () => unsubscribeResults();
+  }, [assignmentId, classId]); // <-- Now this correctly closes the useEffect hook
 
 
   const generatePDF = () => {
@@ -349,7 +351,12 @@ export default function AssignmentTracker() {
           <table>
             <thead>
               <tr>
-                <th width="40"><input type="checkbox" onChange={(e) => setStudentStatuses(prev => prev.map(s => ({...s, checked: s.submissionId ? e.target.checked : false})))} /></th>
+                <th width="40">
+  <input 
+    type="checkbox" 
+    onChange={(e) => setStudentStatuses(prev => prev.map(s => s.submissionId ? { ...s, checked: e.target.checked } : s))} 
+  />
+</th>
                 <th>Nama Pelajar</th>
                 <th>Status & Progres Misi</th>
                 <th>Markah (Isi/Bhs/Jml)</th>
@@ -359,7 +366,14 @@ export default function AssignmentTracker() {
             <tbody>
               {studentStatuses.map((s, idx) => (
                 <tr key={s.id} className={s.status === 'Selesai' ? 'row-done' : ''}>
-                  <td><input type="checkbox" checked={s.checked} disabled={!s.submissionId} onChange={(e) => { const u = [...studentStatuses]; u[idx].checked = e.target.checked; setStudentStatuses(u); }} /></td>
+                 <td>
+  <input 
+    type="checkbox" 
+    checked={s.checked} 
+    disabled={!s.submissionId} // Keep disabled for PDF printing if no final structural evaluation score exists
+    onChange={(e) => { const u = [...studentStatuses]; u[idx].checked = e.target.checked; setStudentStatuses(u); }} 
+  />
+</td>
                   <td>
                     <div className="name-cell">
                       <span className="student-name">{s.nama || s.name}</span>
@@ -369,7 +383,13 @@ export default function AssignmentTracker() {
                   <td>
                     <div className="status-progress-cell">
                       <div className="tag-row">
-                        <span className={`status-tag ${s.status === 'Selesai' ? 'done' : s.status === 'Sedang Baiki' ? 'work' : 'none'}`}>{s.status}</span>
+                        <span className={`status-tag ${
+  s.status === 'Selesai' ? 'done' : 
+  s.status === 'Sedang Baiki' ? 'work' : 
+  s.status === 'Sedang Menulis' ? 'writing' : 'none'
+}`}>
+  {s.status}
+</span>
                         <span className="pct-text">{s.progress}%</span>
                       </div>
                       <div className="mini-progress-bg"><div className="mini-progress-fill" style={{ width: `${s.progress}%` }}></div></div>
@@ -385,14 +405,29 @@ export default function AssignmentTracker() {
                     ) : <span className="no-data">—</span>}
                   </td>
                   <td align="right">
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                      {s.submissionId && (
-                        <>
-                          <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
-                        </>
-                      )}
-                    </div>
-                  </td>
+  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+    {/* 1. View Progress Button (Shows up if student has an active/saved draft) */}
+    {s.id && (
+      <button 
+        className="btn-detail" 
+        style={{ borderColor: '#48A6A7', color: '#48A6A7' }}
+        onClick={() => router.push(`/semakan?taskId=${assignmentId}&classId=${classId}&studentId=${s.id}&nama=${encodeURIComponent(s.nama || s.name)}&mode=teacher`)}
+      >
+        Lihat Progres Live
+      </button>
+    )}
+
+    {/* 2. Analysis Report Button (Shows up once student clicks submit and generates a score) */}
+    {s.submissionId && (
+      <button 
+        className="btn-detail" 
+        onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}
+      >
+        Lihat Analisis
+      </button>
+    )}
+  </div>
+</td>
                 </tr>
               ))}
             </tbody>
@@ -483,8 +518,9 @@ export default function AssignmentTracker() {
         .pct-text { font-size: 0.75rem; font-weight: 800; color: #003D40; }
         .status-tag { padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; width: fit-content; }
         .status-tag.done { background: #E6F4F4; color: #00767B; }
-        .status-tag.work { background: #FFF7ED; color: #D97706; }
-        .status-tag.none { background: #F5F6F7; color: #B2BEC3; }
+.status-tag.work { background: #FFF7ED; color: #D97706; }
+        .status-tag.writing { background: #E0E7FF; color: #4338CA; } 
+.status-tag.none { background: #F5F6F7; color: #B2BEC3; }
         .mini-progress-bg { width: 100%; height: 6px; background: #F0F2F2; border-radius: 10px; overflow: hidden; }
         .mini-progress-fill { height: 100%; background: #48A6A7; transition: width 0.5s ease; }
         .marks-grid { display: flex; gap: 12px; align-items: center; font-size: 0.9rem; color: #636E72; }
