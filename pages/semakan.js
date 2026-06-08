@@ -554,8 +554,8 @@ const styles = {
   inputHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontWeight: 'bold' },
   wordCount: { color: '#6C5CE7' },
   
-  writingContainer: { display: 'flex', gap: '15px', width: '100%', alignItems: 'stretch', marginBottom: '10px', flexWrap: 'wrap' },
-  textarea: { flex: 1, height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
+  writingContainer: { display: 'flex', gap: '15px', width: '100%', alignItems: 'stretch', marginBottom: '10px' },
+  textarea: { flex: 1, minWidth: '50%', height: '420px', borderRadius: '10px', border: '2px solid #EEE', padding: '15px', fontSize: '17px', outline: 'none', resize: 'none', boxSizing: 'border-box' },
   sideCoachPanel: { width: '50%', minWidth: '260px', backgroundColor: '#F8FAFC', borderRadius: '15px', border: '2px solid #E2E8F0', display: 'flex', flexDirection: 'column', height: '420px', boxSizing: 'border-box' },
   
   sideCoachHeader: { padding: '12px', background: '#6C5CE7', color: 'white', borderRadius: '12px 12px 0 0', fontWeight: 'bold', fontSize: '14px', display: 'flex', justifyContent: 'space-between' },

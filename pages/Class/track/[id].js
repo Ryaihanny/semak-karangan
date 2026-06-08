@@ -8,8 +8,7 @@ import autoTable from 'jspdf-autotable';
 
 export default function AssignmentTracker() {
   const router = useRouter();
-  // DIKEMAS KINI: Mengikut struktur fail Class/track/id
-  const { track: assignmentId, class: classId } = router.query;
+  const { id: assignmentId, classId } = router.query;
 
   const [assignment, setAssignment] = useState(null);
   const [studentStatuses, setStudentStatuses] = useState([]);
@@ -380,8 +379,7 @@ export default function AssignmentTracker() {
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       {s.submissionId && (
                         <>
-                          {/* DIKEMAS KINI: Menghala ke semakan.js dengan query parameter */}
-                          <button className="btn-detail" onClick={() => router.push(`/semakan?id=${s.submissionId}&mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
+                          <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
                         </>
                       )}
                     </div>
