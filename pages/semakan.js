@@ -61,6 +61,7 @@ const [studentLevel, setStudentLevel] = useState(null);
   };
 
   const getAICoachHelp = async () => {
+    // 1. Check word count (needs at least 5 words)
     if (essay.trim().split(/\s+/).filter(Boolean).length < 5) {
       return alert("Tulis sekurang-kurangnya 5 patah perkataan untuk dibantu! ✍️");
     }
@@ -77,10 +78,26 @@ const [studentLevel, setStudentLevel] = useState(null);
           taskTitle: taskData?.title 
         }),
       });
+
+      // 2. Catch HTTP errors (e.g., 400, 500) so they don't fail silently
+      if (!res.ok) {
+        const errorData = await res.text();
+        throw new Error(`Ralat Server (${res.status}): ${errorData}`);
+      }
+
       const data = await res.json();
-      setCoachSuggestion(data.suggestion);
+      
+      // 3. Make sure the API actually returned a suggestion
+      if (data && data.suggestion) {
+        setCoachSuggestion(data.suggestion);
+      } else {
+        throw new Error("Format respons dari AI tidak lengkap.");
+      }
+      
     } catch (err) {
-      alert("Maaf, Cikgu AI sedang berehat.");
+      // 4. Log the real error to the console for debugging
+      console.error("Ralat Cikgu AI:", err);
+      alert(`Maaf, Cikgu AI sedang berehat. ${err.message ? `Maklumat: ${err.message}` : ''}`);
     } finally {
       setIsCoaching(false);
     }
