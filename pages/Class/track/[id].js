@@ -126,6 +126,9 @@ export default function AssignmentTracker() {
         markahIsi: student.markahIsi || 0,
         markahBahasa: student.markahBahasa || 0,
         markahKeseluruhan: student.score || 0,
+        maxIsi: student.maxIsi,
+        maxBahasa: student.maxBahasa,
+        maxTotal: student.maxTotal,
         karangan: student.result?.karangan || student.result?.karanganAsal || "",
         kesalahanBahasa: student.result?.kesalahanBahasa || [],
         ulasanBahasa: student.result?.ulasanBahasa || "",
@@ -160,20 +163,15 @@ export default function AssignmentTracker() {
 
       y += 8;
 
-      // --- CONDITIONAL: MARKAH ---
+      // --- FIX: USE ACCURATE LIVE DB METRICS INSTEAD OF JUNIOR HARDCODING ---
       if (pdfOptions.markah) {
-        const isJunior = (item.level === 'P3' || item.level === 'P4');
-        const maxIsi = isJunior ? 7 : 20;
-        const maxBhs = isJunior ? 8 : 20;
-        const totalMax = isJunior ? 15 : 40;
-
         autoTable(doc, {
           startY: y,
           head: [['KRITERIA', 'MARKAH']],
           body: [
-            ['Isi & Huraian', `${item.markahIsi} / ${maxIsi}`],
-            ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${maxBhs}`],
-            ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${totalMax}`],
+            ['Isi & Huraian', `${item.markahIsi} / ${item.maxIsi}`],
+            ['Bahasa & Tatabahasa', `${item.markahBahasa} / ${item.maxBahasa}`],
+            ['JUMLAH KESELURUHAN', `${item.markahKeseluruhan} / ${item.maxTotal}`],
           ],
           theme: 'grid',
           headStyles: { fillColor: [0, 61, 64], textColor: [255, 255, 255] },
@@ -302,6 +300,8 @@ export default function AssignmentTracker() {
     });
   };
 
+  const isAllChecked = studentStatuses.length > 0 && studentStatuses.filter(s => s.submissionId).every(s => s.checked);
+
   if (loading) return <div style={{padding:'50px', textAlign:'center'}}>Memuat naik data...</div>;
 
   return (
@@ -319,7 +319,6 @@ export default function AssignmentTracker() {
                <h1>{assignment?.title}</h1>
             </div>
           </div>
-          {/* TRIGGER MODAL INSTEAD OF DIRECT PDF */}
           <button className="btn-main" onClick={() => setIsModalOpen(true)}>📥 Cetak Laporan PDF ({studentStatuses.filter(s => s.checked).length})</button>
         </div>
       </header>
@@ -340,7 +339,13 @@ export default function AssignmentTracker() {
           <table>
             <thead>
               <tr>
-                <th width="40"><input type="checkbox" onChange={(e) => setStudentStatuses(prev => prev.map(s => ({...s, checked: s.submissionId ? e.target.checked : false})))} /></th>
+                <th width="40">
+                  <input 
+                    type="checkbox" 
+                    checked={isAllChecked}
+                    onChange={(e) => setStudentStatuses(prev => prev.map(s => ({...s, checked: s.submissionId ? e.target.checked : false})))} 
+                  />
+                </th>
                 <th>Nama Pelajar</th>
                 <th>Status & Progres Misi</th>
                 <th>Markah (Isi/Bhs/Jml)</th>
@@ -350,7 +355,14 @@ export default function AssignmentTracker() {
             <tbody>
               {studentStatuses.map((s, idx) => (
                 <tr key={s.id} className={s.status === 'Selesai' ? 'row-done' : ''}>
-                  <td><input type="checkbox" checked={s.checked} disabled={!s.submissionId} onChange={(e) => { const u = [...studentStatuses]; u[idx].checked = e.target.checked; setStudentStatuses(u); }} /></td>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      checked={s.checked} 
+                      disabled={!s.submissionId} 
+                      onChange={(e) => { const u = [...studentStatuses]; u[idx].checked = e.target.checked; setStudentStatuses(u); }} 
+                    />
+                  </td>
                   <td>
                     <div className="name-cell">
                       <span className="student-name">{s.nama || s.name}</span>
@@ -377,10 +389,16 @@ export default function AssignmentTracker() {
                   </td>
                   <td align="right">
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      {/* REDIRECTS DIRECTLY TO THE LIVE WRITING INTERFACE FOR BROADCAST FEEDBACK */}
+                      <button 
+                        className="btn-live-editor" 
+                        onClick={() => router.push(`/semakan?mode=teacher&taskId=${assignmentId}&classId=${classId || 'umum'}&studentId=${s.id}&nama=${encodeURIComponent(s.nama || s.name)}`)}
+                      >
+                        ✍️ Buka Dokumen Murid
+                      </button>
+                      
                       {s.submissionId && (
-                        <>
-                          <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
-                        </>
+                        <button className="btn-detail" onClick={() => router.push(`/analisis/${s.submissionId}?mode=teacher&classId=${classId}`)}>Lihat Analisis</button>
                       )}
                     </div>
                   </td>
@@ -481,6 +499,8 @@ export default function AssignmentTracker() {
         .marks-grid { display: flex; gap: 12px; align-items: center; font-size: 0.9rem; color: #636E72; }
         .marks-grid b { color: #003D40; }
         .mark-total { background: #F0F9F9; padding: 4px 10px; border-radius: 6px; color: #003D40; border: 1px solid #D1E7E8; }
+        .btn-live-editor { background: #6C5CE7; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+        .btn-live-editor:hover { background: #5649c0; }
         .btn-detail { background: white; border: 1px solid #E2E8F0; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
         .btn-detail:hover { background: #003D40; color: white; border-color: #003D40; }
         .no-data { color: #DFE6E9; font-weight: 800; }
