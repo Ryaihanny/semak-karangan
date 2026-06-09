@@ -53,7 +53,7 @@ export default async function handler(req, res) {
     
     const results = [];
 
-// 5. Process Question Image (Shared stimulus - handles JPEG, PNG, and PDF)
+    // 5. Process Question Image (Shared stimulus - handles JPEG, PNG, and PDF)
     let questionImagePart = null;
     const qFile = files.questionImage ? (Array.isArray(files.questionImage) ? files.questionImage[0] : files.questionImage) : null;
     
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 6. Process Individual Pupils
+    // 6. Process Individual Pupils (Pristine and Unchanged)
     for (const pupil of pupils) {
       const { id, nama, level, karangan, mode, pictureDescription } = pupil;
       
