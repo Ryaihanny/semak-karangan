@@ -52,12 +52,21 @@ export default async function handler(req, res) {
     
     const results = [];
 
-    // 5. Process Question Image (Shared stimulus)
+// 5. Process Question Image (Shared stimulus - handles JPEG, PNG, and PDF)
     let questionImagePart = null;
     const qFile = files.questionImage ? (Array.isArray(files.questionImage) ? files.questionImage[0] : files.questionImage) : null;
     if (qFile) {
-      const qBuffer = await sharp(fs.readFileSync(qFile.filepath)).jpeg({ quality: 70 }).toBuffer();
-      questionImagePart = fileToGenerativePart(qBuffer, "image/jpeg");
+      // Check if the teacher uploaded a PDF document as the question stimulus
+      if (qFile.mimetype === 'application/pdf' || qFile.originalFilename?.endsWith('.pdf')) {
+        const qBuffer = fs.readFileSync(qFile.filepath);
+        questionImagePart = fileToGenerativePart(qBuffer, "application/pdf");
+      } else {
+        // It's a normal image (PNG/JPG), compress with sharp as usual
+        const qBuffer = await sharp(fs.readFileSync(qFile.filepath))
+          .jpeg({ quality: 70 })
+          .toBuffer();
+        questionImagePart = fileToGenerativePart(qBuffer, "image/jpeg");
+      }
     }
 
     // 6. Process Individual Pupils
