@@ -1,10 +1,9 @@
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
-import { db } from '@/lib/firebase';
+import { useEffect, useState, useRef } from 'react';
+import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import confetti from 'canvas-confetti';
-import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import confetti from 'canvas-confetti';
 
 export default function RetypeCorrection() {
   const router = useRouter();
@@ -15,21 +14,22 @@ export default function RetypeCorrection() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null);
+  
+  // Tracking localized student attempt per mission
+  const [studentAttempt, setStudentAttempt] = useState("");
+  const textareaRef = useRef(null);
 
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    if (!currentUser) {
-      // Only redirect to login if there is no studentUser in localStorage either
-      if (!localStorage.getItem("studentUser")) {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser && !localStorage.getItem("studentUser")) {
         router.replace('/');
+      } else {
+        setUser(currentUser);
       }
-    } else {
-      setUser(currentUser);
-    }
-  });
-  return () => unsubscribe();
-}, [router]);
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     if (id) {
@@ -38,118 +38,160 @@ useEffect(() => {
           const fetchedData = snap.data();
           setData(fetchedData);
           setRewrite(fetchedData.lastRewrite || fetchedData.karanganAsal || "");
-          setCurrentStep(fetchedData.solvedMissions?.length || 0);
+          
+          const activeStep = fetchedData.solvedMissions?.length || 0;
+          setCurrentStep(activeStep);
+          
+          // Seed the localized focus area input with the original error phrase
+          const targetMission = fetchedData.kesalahanBahasa?.[activeStep];
+          if (targetMission) {
+            setStudentAttempt(targetMission.ayatSalah || "");
+          }
         }
         setLoading(false);
       });
     }
   }, [id]);
 
+  const currentMission = data?.kesalahanBahasa?.[currentStep];
+
+  // Sync localized input when step moves forward
+  useEffect(() => {
+    if (currentMission) {
+      setStudentAttempt(currentMission.ayatSalah || "");
+      setErrorMsg("");
+    }
+  }, [currentStep, currentMission]);
+
   const checkCorrection = () => {
-    const target = data?.kesalahanBahasa[currentStep]?.pembetulan?.toLowerCase().trim();
-    const currentWork = rewrite.toLowerCase();
-    if (!target) return true;
-    if (!currentWork.includes(target)) {
-      setErrorMsg(`Ops! Pastikan anda telah memasukkan pembetulan: "${target}"`);
+    if (!currentMission) return true;
+    
+    const targetFix = currentMission.pembetulan.toLowerCase().trim();
+    const cleanAttempt = studentAttempt.toLowerCase().trim();
+
+    // Educational Check: Did they change it? Did it hit the target phrase?
+    if (cleanAttempt === currentMission.ayatSalah.toLowerCase().trim()) {
+      setErrorMsg("✏️ Anda belum membuat sebarang pembetulan pada ayat ini.");
       return false;
     }
+
+    if (!cleanAttempt.includes(targetFix)) {
+      setErrorMsg(`💡 Hampir tepat! Pastikan perkataan "${currentMission.pembetulan}" dimasukkan dalam ayat baru anda.`);
+      return false;
+    }
+
     setErrorMsg("");
     return true;
   };
 
+  const applyCorrectionToMasterText = () => {
+    if (!currentMission) return rewrite;
+    
+    const originalText = rewrite;
+    const findPhrase = currentMission.ayatSalah;
+    
+    // Replace current mistake snippet in master copy if layout maps nicely
+    if (originalText.includes(findPhrase)) {
+      return originalText.replace(findPhrase, studentAttempt);
+    }
+    
+    return originalText;
+  };
+
   const saveProgress = async (isFinal = false) => {
-    if (isFinal && !checkCorrection()) return;
+    if (!isFinal && !checkCorrection()) return false;
+    
     setIsSaving(true);
+    const updatedMasterText = applyCorrectionToMasterText();
+    setRewrite(updatedMasterText);
+
     try {
-      const solvedUntilNow = Array.from({ length: isFinal ? data?.kesalahanBahasa?.length : currentStep + 1 }, (_, i) => i);
+      const solvedUntilNow = Array.from(
+        { length: isFinal ? data?.kesalahanBahasa?.length : currentStep + 1 }, 
+        (_, i) => i
+      );
+      
       await updateDoc(doc(db, 'karanganResults', id), {
-        lastRewrite: rewrite,
+        lastRewrite: updatedMasterText,
         solvedMissions: solvedUntilNow,
         status: isFinal ? 'murni_completed' : 'murni_in_progress',
         lastUpdated: new Date().toISOString()
       });
+
       if (isFinal) {
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#6366F1', '#10B981', '#FFD93D'] });
         setTimeout(() => { handleExitOnly(); }, 2000);
       }
+      return true;
     } catch (err) {
       console.error("Firestore Error:", err);
       alert("Gagal menyimpan.");
+      return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-const handleRewrite = () => {
-  if (window.confirm("Adakah anda pasti? Semua progress pembetulan semasa akan hilang dan anda akan bermula dengan kertas kosong.")) {
-    router.push({
-      pathname: '/semakan',
-      query: { 
-        taskId: data?.taskId, 
-        classId: classId || data?.classId,
-        studentId: data?.studentId,
-        overwrite: 'true' // This tells semakan.js to clear the essay
-      }
-    });
-  }
-};
+  const handleNextMission = async () => {
+    const success = await saveProgress(false);
+    if (success && currentStep < (data?.kesalahanBahasa?.length - 1)) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
 
-// --- UPDATED EXIT LOGIC ---
-const handleExitOnly = () => {
-  const targetClass = classId || data?.classId;
-  const targetAssignment = data?.taskId; 
+  const handleRewrite = () => {
+    if (window.confirm("Adakah anda pasti? Semua progress pembetulan semasa akan hilang.")) {
+      router.push({
+        pathname: '/semakan',
+        query: { 
+          taskId: data?.taskId, 
+          classId: classId || data?.classId,
+          studentId: data?.studentId,
+          overwrite: 'true' 
+        }
+      });
+    }
+  };
 
-  // Check if current user is a teacher via Firebase Auth or the URL mode
-  const isTeacherMode = mode === 'teacher' || auth.currentUser !== null;
+  const handleExitOnly = () => {
+    const targetClass = classId || data?.classId;
+    const targetAssignment = data?.taskId; 
+    const isTeacherMode = mode === 'teacher' || auth.currentUser !== null;
 
-  if (isTeacherMode && targetAssignment && targetClass) {
-    router.push(`/Class/track/${targetAssignment}?classId=${targetClass}`);
-  } else if (isTeacherMode && targetClass) {
-    router.push(`/Class/${targetClass}`);
-  } else {
-    router.push('/student-dashboard');
-  }
-};
-
-  const handleNextMission = () => {
-    if (checkCorrection()) {
-      saveProgress(false); 
-      if (currentStep < (data?.kesalahanBahasa?.length - 1)) {
-        setCurrentStep(currentStep + 1);
-      }
+    if (isTeacherMode && targetAssignment && targetClass) {
+      router.push(`/Class/track/${targetAssignment}?classId=${targetClass}`);
+    } else if (isTeacherMode && targetClass) {
+      router.push(`/Class/${targetClass}`);
+    } else {
+      router.push('/student-dashboard');
     }
   };
 
   if (loading) return <div style={styles.loader}>Menyediakan Meja Tulis... ✍️</div>;
 
   const missions = data?.kesalahanBahasa || [];
-  const currentMission = missions[currentStep];
   const isLastStep = currentStep >= missions.length - 1;
 
-  // UPDATED MARKAH LOGIC
+  // GRADING SYSTEM CALCULATIONS RETAINED FROM ORIGINAL SOURCE
   const studentLevel = data?.level?.toString().toUpperCase() || "P4";
-const isHighLevel = studentLevel === 'P5' || studentLevel === 'P6' || studentLevel === '5' || studentLevel === '6';
+  const isHighLevel = studentLevel === 'P5' || studentLevel === 'P6' || studentLevel === '5' || studentLevel === '6';
 
-const totalMax = isHighLevel ? 40 : 15;
-const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8";
+  const totalMax = isHighLevel ? 40 : 15;
+  const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8";
 
   return (
     <div style={styles.container}>
- <nav style={styles.nav}>
-  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-    <button onClick={() => saveProgress(true)} style={styles.backBtn} disabled={isSaving}>
-      {isSaving ? "⏳ Menyimpan..." : (mode === 'teacher' ? "🏠 Simpan & Kembali" : "🏠 Simpan & Dashboard")}
-    </button>
-    
-    <button onClick={handleExitOnly} style={styles.exitBtn}>🚪 Keluar</button>
-    
-    <button onClick={handleRewrite} style={{...styles.exitBtn, backgroundColor: '#FEF2F2', color: '#EF4444', borderColor: '#FECACA'}}>
-      🔄 Tulis Semula
-    </button>
-  </div>
-  {/* Ensure there is NO stray button here before the progressContainer starts */}
-  <div style={styles.progressContainer}>
-
+      <nav style={styles.nav}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button onClick={() => saveProgress(true)} style={styles.backBtn} disabled={isSaving}>
+            {isSaving ? "⏳ Menyimpan..." : (mode === 'teacher' ? "🏠 Simpan & Kembali" : "🏠 Simpan & Dashboard")}
+          </button>
+          <button onClick={handleExitOnly} style={styles.exitBtn}>🚪 Keluar</button>
+          <button onClick={handleRewrite} style={styles.rewriteActionBtn}>
+            🔄 Tulis Semula
+          </button>
+        </div>
+        <div style={styles.progressContainer}>
           <div style={styles.progressText}>Misi Pembetulan: {currentStep + 1} / {missions.length}</div>
           <div style={styles.progressBar}>
             <div style={{...styles.progressFill, width: `${((currentStep + 1)/missions.length)*100}%`}} />
@@ -158,32 +200,36 @@ const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8"
       </nav>
 
       <div style={styles.layout}>
-{/* LEFT PANEL */}
+        {/* LEFT PANEL: CONTEXTUAL REFERENCE */}
         <section style={styles.panel}>
           <div style={styles.panelHeader}>📜 RUJUKAN & ULASAN</div>
           <div style={styles.scrollArea}>
             
-
-            {/* Detailed Grade Badge */}
+            {/* Dynamic Grade Badge Container */}
             <div style={styles.gradeBadge}>
               <div style={{ fontSize: '20px', marginBottom: '8px' }}>
                 Jumlah Markah: <b>{data?.markah || 0} / {totalMax}</b>
               </div>
-              <div style={{ display: 'flex', gap: '15px', fontSize: '14px', borderTop: '1px solid #C7D2FE', paddingTop: '8px' }}>
-                <span>📝 Isi: <b>{data?.pemarkahan?.isi || 0}</b></span>
-                <span>✍️ Bahasa: <b>{data?.pemarkahan?.bahasa || 0}</b></span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #C7D2FE', paddingTop: '8px' }}>
+                <div style={{ display: 'flex', gap: '15px', fontSize: '14px' }}>
+                  <span>📝 Isi: <b>{data?.pemarkahan?.isi || 0}</b></span>
+                  <span>✍️ Bahasa: <b>{data?.pemarkahan?.bahasa || 0}</b></span>
+                </div>
+                {/* Explicitly surfaces the maximum allowable points dynamically */}
+                <div style={{ fontSize: '11px', color: '#4338CA', opacity: 0.8, fontWeight: '600' }}>
+                  📋 Skema Pembahagian ({breakdownLabel})
+                </div>
               </div>
             </div>
 
-<button onClick={handleRewrite} style={styles.rewriteBtn}>
-  🔄 Tulis Semula (Mula Baru)
-</button>
+            <button onClick={handleRewrite} style={styles.rewriteBtn}>
+              🔄 Tulis Semula (Mula Baru)
+            </button>
 
             <div style={styles.teacherComment}>
                <div style={{ marginBottom: '8px', color: '#92400E', fontWeight: '800', fontSize: '13px' }}>💬 ULASAN CIKGU AI:</div>
                <p style={{ margin: 0 }}>{data?.ulasan || "Tahniah! Teruskan usaha murni anda."}</p>
                
-               {/* Context for Students */}
                <div style={{ marginTop: '12px', fontSize: '12px', fontStyle: 'italic', opacity: 0.8, color: '#92400E' }}>
                  *Isi = Idea & Fakta | Bahasa = Tatabahasa & Ejaan
                </div>
@@ -194,35 +240,57 @@ const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8"
           </div>
         </section>
 
-        {/* RIGHT PANEL */}
+        {/* RIGHT PANEL: INTERACTIVE LAB ENVIRONMENT */}
         <section style={styles.panel}>
           <div style={styles.panelHeader}>✍️ ARAHAN & PEMBETULAN</div>
           
-          <div style={styles.hintBox}>
-            <div style={styles.hintTitle}>💡 ARAHAN SEMASA:</div>
-            {currentMission ? (
-              <>
-                <p style={styles.hintText}>
-                  Cari: <span style={{color: '#E63946', fontWeight: 'bold'}}>"{currentMission.ayatSalah}"</span>
-                  <br />
-                  Ganti: <span style={{color: '#2A9D8F', fontWeight: 'bold'}}>"{currentMission.pembetulan}"</span>
-                </p>
+          {currentMission ? (
+            <div style={styles.interactiveCorrectionWorkspace}>
+              <div style={styles.missionCard}>
+                <div style={styles.metaRow}>
+                  <span style={styles.badgeDanger}>⚠️ Jumpa Kesalahan</span>
+                  <span style={styles.badgeSuccess}>🎯 Target Pembetulan</span>
+                </div>
+                
+                <div style={styles.comparisonGrid}>
+                  <div style={styles.comparisonBoxRed}>
+                    <div style={styles.boxLabel}>Ayat Asal:</div>
+                    <div style={styles.boxContent}>"{currentMission.ayatSalah}"</div>
+                  </div>
+                  <div style={styles.comparisonBoxGreen}>
+                    <div style={styles.boxLabel}>Gantikan Dengan Perkataan:</div>
+                    <div style={styles.boxContent}><b>{currentMission.pembetulan}</b></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.interactiveArea}>
+                <label style={styles.inputLabel}>✍️ Baiki ayat di dalam kotak ini:</label>
+                <textarea
+                  ref={textareaRef}
+                  style={styles.focusedTextarea}
+                  value={studentAttempt}
+                  onChange={(e) => { setStudentAttempt(e.target.value); if(errorMsg) setErrorMsg(""); }}
+                  placeholder="Sunting ayat salah di sini supaya menjadi betul..."
+                />
                 {errorMsg && <div style={styles.errorBanner}>{errorMsg}</div>}
+              </div>
+
+              <div style={styles.actionBlock}>
                 {!isLastStep ? (
                   <button onClick={handleNextMission} style={styles.nextBtn}>Misi Seterusnya ➡️</button>
                 ) : (
                   <button onClick={() => saveProgress(true)} style={styles.finishBtn}>Siap Semua! ✅</button>
                 )}
-              </>
-            ) : <p>Tahniah! Klik simpan untuk selesai.</p>}
-          </div>
-
-          <textarea
-            style={styles.textarea}
-            value={rewrite}
-            onChange={(e) => { setRewrite(e.target.value); if(errorMsg) setErrorMsg(""); }}
-            placeholder="Tulis semula karangan yang betul di sini..."
-          />
+              </div>
+            </div>
+          ) : (
+            <div style={styles.completedState}>
+              <h3>🎉 Hebat! Semua pembetulan selesai!</h3>
+              <p>Klik butang di bawah untuk menyimpan dan kembali.</p>
+              <button onClick={() => saveProgress(true)} style={styles.finishBtn}>Simpan & Selesai</button>
+            </div>
+          )}
         </section>
       </div>
     </div>
@@ -230,11 +298,11 @@ const breakdownLabel = isHighLevel ? "Isi: 20, Bahasa: 20" : "Isi: 7, Bahasa: 8"
 }
 
 const styles = {
-  errorBanner: { padding: '8px', backgroundColor: '#FFF1F2', color: '#E11D48', borderRadius: '8px', fontSize: '13px', marginBottom: '10px', border: '1px solid #FECDD3', fontWeight: 'bold' },
   container: { backgroundColor: '#F0F4F8', minHeight: '100vh', padding: '0 20px 20px 20px', fontFamily: '"Plus Jakarta Sans", sans-serif' },
   nav: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 0', maxWidth: '1400px', margin: '0 auto' },
   backBtn: { padding: '12px 24px', borderRadius: '12px', border: 'none', backgroundColor: '#4338CA', color: '#FFF', fontWeight: 'bold', cursor: 'pointer' },
   exitBtn: { padding: '12px 24px', borderRadius: '12px', border: '1px solid #CBD5E1', backgroundColor: '#FFF', color: '#64748B', fontWeight: 'bold', cursor: 'pointer' },
+  rewriteActionBtn: { padding: '12px 24px', borderRadius: '12px', border: '1px solid #FECACA', backgroundColor: '#FEF2F2', color: '#EF4444', fontWeight: 'bold', cursor: 'pointer' },
   progressContainer: { width: '350px' },
   progressText: { fontSize: '12px', fontWeight: 'bold', marginBottom: '6px', textAlign: 'right', color: '#475569' },
   progressBar: { width: '100%', height: '10px', backgroundColor: '#E2E8F0', borderRadius: '10px', overflow: 'hidden' },
@@ -244,26 +312,30 @@ const styles = {
   panelHeader: { padding: '15px 25px', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '12px', fontWeight: '800', color: '#94A3B8', letterSpacing: '1px' },
   scrollArea: { padding: '30px', flex: 1, overflowY: 'auto', backgroundColor: '#FAFAFA' },
   essayOriginal: { fontSize: '18px', lineHeight: '2.2', color: '#334155' },
-  textarea: { flex: 1, padding: '30px', fontSize: '19px', lineHeight: '2.2', border: 'none', outline: 'none', resize: 'none', color: '#1E293B' },
-  hintBox: { padding: '20px', backgroundColor: '#F5F7FF', borderBottom: '1px solid #E2E8F0' },
-  hintTitle: { fontWeight: '800', color: '#4338CA', marginBottom: '8px', fontSize: '13px' },
-  hintText: { fontSize: '15px', color: '#1E293B', marginBottom: '10px' },
+  
+  // Interactive Workspace Focus Layout Styles
+  interactiveCorrectionWorkspace: { display: 'flex', flexDirection: 'column', flex: 1, padding: '24px', gap: '20px', backgroundColor: '#FAFAFA' },
+  missionCard: { backgroundColor: '#FFF', borderRadius: '12px', padding: '16px', border: '1px solid #E2E8F0' },
+  metaRow: { display: 'flex', gap: '10px', marginBottom: '12px' },
+  badgeDanger: { padding: '4px 8px', backgroundColor: '#FFE4E6', color: '#E11D48', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' },
+  badgeSuccess: { padding: '4px 8px', backgroundColor: '#D1FAE5', color: '#059669', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' },
+  comparisonGrid: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  comparisonBoxRed: { padding: '12px', backgroundColor: '#FFF1F2', borderRadius: '8px', borderLeft: '4px solid #F43F5E' },
+  comparisonBoxGreen: { padding: '12px', backgroundColor: '#F0FDF4', borderRadius: '8px', borderLeft: '4px solid #10B981' },
+  boxLabel: { fontSize: '11px', fontWeight: 'bold', color: '#64748B', marginBottom: '2px' },
+  boxContent: { fontSize: '14px', color: '#1E293B' },
+  
+  interactiveArea: { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' },
+  inputLabel: { fontSize: '13px', fontWeight: '700', color: '#334155' },
+  focusedTextarea: { flex: 1, width: '100%', minHeight: '120px', padding: '20px', fontSize: '18px', lineHeight: '1.8', borderRadius: '12px', border: '2px solid #6366F1', outline: 'none', resize: 'none', fontFamily: 'inherit', color: '#1E293B', backgroundColor: '#FFF' },
+  errorBanner: { padding: '8px', backgroundColor: '#FFF1F2', color: '#E11D48', borderRadius: '8px', fontSize: '13px', border: '1px solid #FECDD3', fontWeight: 'bold' },
+  actionBlock: { marginTop: 'auto' },
+  
   nextBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#6366F1', color: '#FFF', fontWeight: 'bold', cursor: 'pointer' },
   finishBtn: { width: '100%', padding: '12px', borderRadius: '10px', border: 'none', backgroundColor: '#10B981', color: '#FFF', fontWeight: 'bold', cursor: 'pointer' },
   gradeBadge: { display: 'inline-block', padding: '10px 15px', backgroundColor: '#EEF2FF', color: '#4338CA', borderRadius: '12px', fontWeight: 'bold', marginBottom: '15px' },
   teacherComment: { fontSize: '15px', color: '#475569', lineHeight: '1.6', backgroundColor: '#FFFBEB', padding: '15px', borderRadius: '12px', borderLeft: '4px solid #F6E05E' },
+  completedState: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '40px', textAlign: 'center', color: '#334155' },
   loader: { height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', color: '#4338CA', fontWeight: 'bold' }, 
-rewriteBtn: {
-  display: 'block', 
-  width: '100%', 
-  padding: '10px', 
-  marginTop: '10px', 
-  borderRadius: '10px', 
-  border: '2px solid #6366F1', 
-  backgroundColor: 'transparent', 
-  color: '#4338CA', 
-  fontWeight: 'bold', 
-    cursor: 'pointer',
-    marginBottom: '15px'
-  } 
+  rewriteBtn: { display: 'block', width: '100%', padding: '10px', marginTop: '10px', borderRadius: '10px', border: '2px solid #6366F1', backgroundColor: 'transparent', color: '#4338CA', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' } 
 };
