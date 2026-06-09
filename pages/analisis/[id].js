@@ -286,7 +286,6 @@ export default function RetypeCorrection() {
                   </div>
                 </div>
 
-                {/* AI Linguistic Analysis Rule block integrated from prompt conditions */}
                 {currentMission.penjelasan && (
                   <div style={styles.analysisBox}>
                     <div style={styles.analysisLabel}>💡 ANALISIS KESALAHAN GURU:</div>
@@ -317,9 +316,32 @@ export default function RetypeCorrection() {
             </div>
           ) : (
             <div style={styles.completedState}>
-              <h3>🎉 Hebat! Semua pembetulan selesai!</h3>
-              <p>Klik butang di bawah untuk menyimpan dan kembali.</p>
-              <button onClick={() => saveProgress(true)} style={styles.finishBtn}>Simpan & Selesai</button>
+              <div style={{ fontSize: '40px', marginBottom: '10px' }}>🎉</div>
+              <h3 style={{ margin: '0 0 10px 0', color: '#10B981' }}>Hebat! Semua Pembetulan Selesai!</h3>
+              <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>
+                Tahniah! Anda telah memurnikan keseluruhan karangan. Sila baca hasil akhir yang mantap di bawah:
+              </p>
+
+              <div style={{ 
+                textAlign: 'left', 
+                backgroundColor: '#F0FDF4', 
+                border: '1px solid #BBF7D0', 
+                borderRadius: '12px', 
+                padding: '20px', 
+                maxHeight: '250px', 
+                overflowY: 'auto',
+                fontSize: '15px',
+                lineHeight: '1.8',
+                color: '#166534',
+                marginBottom: '24px',
+                fontStyle: 'italic'
+              }}>
+                {rewrite}
+              </div>
+
+              <button onClick={() => saveProgress(true)} style={styles.finishBtn}>
+                Simpan & Balik Ke Menu Utama 🏠
+              </button>
             </div>
           )}
         </section>
