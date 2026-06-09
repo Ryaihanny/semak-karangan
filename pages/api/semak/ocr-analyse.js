@@ -44,13 +44,21 @@ export default async function handler(req, res) {
 
       if (!safeKarangan.trim()) return res.status(400).json({ error: 'No text extracted from uploaded images.' });
 
+      // Build the exact input array architecture that your shared library needs
+      const studentContent = [];
+      if (safePictureDescription) {
+        studentContent.push(`Konteks soalan: ${safePictureDescription}`);
+      }
+      studentContent.push(`Teks Karangan Murid: ${safeKarangan}`);
+
+      // Call AI Analysis matching your exact shared function parameters
       const analysis = await analyseKarangan({
         nama: safeNama,
-        karangan: safeKarangan,
-        pictureDescription: safePictureDescription,
-        pictureUrl: safePictureUrl,
+        studentContent: studentContent, // Correct payload array mapping
+        stimulus: safePictureUrl         // Correct structural mapping for URL
       });
 
+      // These two lines are now perfectly preserved untouched!
       analysis.karanganUnderlined = safeKarangan;
       analysis.ulasan.keseluruhan = generateUlasan(analysis.markahIsi, analysis.markahBahasa);
 
