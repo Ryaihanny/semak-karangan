@@ -42,7 +42,6 @@ export default function RetypeCorrection() {
           const activeStep = fetchedData.solvedMissions?.length || 0;
           setCurrentStep(activeStep);
           
-          // Seed the localized focus area input with the original error phrase
           const targetMission = fetchedData.kesalahanBahasa?.[activeStep];
           if (targetMission) {
             setStudentAttempt(targetMission.ayatSalah || "");
@@ -69,7 +68,6 @@ export default function RetypeCorrection() {
     const targetFix = currentMission.pembetulan.toLowerCase().trim();
     const cleanAttempt = studentAttempt.toLowerCase().trim();
 
-    // Educational Check: Did they change it? Did it hit the target phrase?
     if (cleanAttempt === currentMission.ayatSalah.toLowerCase().trim()) {
       setErrorMsg("✏️ Anda belum membuat sebarang pembetulan pada ayat ini.");
       return false;
@@ -90,7 +88,6 @@ export default function RetypeCorrection() {
     const originalText = rewrite;
     const findPhrase = currentMission.ayatSalah;
     
-    // Replace current mistake snippet in master copy if layout maps nicely
     if (originalText.includes(findPhrase)) {
       return originalText.replace(findPhrase, studentAttempt);
     }
@@ -167,12 +164,33 @@ export default function RetypeCorrection() {
     }
   };
 
+  /**
+   * Generates a dynamic layout string featuring a highlighted active background 
+   * for the current mission sentence inside the Left Preview Panel.
+   */
+  const getHighlightedEssayHtml = () => {
+    let baseHtml = data?.karanganUnderlined || "";
+    if (!currentMission || !currentMission.ayatSalah) return baseHtml;
+
+    const targetedPhrase = currentMission.ayatSalah;
+    
+    // Inject custom styling around the active target phrase
+    if (baseHtml.includes(targetedPhrase)) {
+      const activeHighlightStyle = `background-color: #FEF08A; color: #1E293B; font-weight: 600; padding: 2px 4px; border-radius: 4px; border-bottom: 2px dashed #EAB308;`;
+      return baseHtml.replace(
+        targetedPhrase,
+        `<span style="${activeHighlightStyle}">${targetedPhrase}</span>`
+      );
+    }
+    return baseHtml;
+  };
+
   if (loading) return <div style={styles.loader}>Menyediakan Meja Tulis... ✍️</div>;
 
   const missions = data?.kesalahanBahasa || [];
   const isLastStep = currentStep >= missions.length - 1;
 
-  // GRADING SYSTEM CALCULATIONS RETAINED FROM ORIGINAL SOURCE
+  // GRADING SYSTEM CONFIGURATIONS
   const studentLevel = data?.level?.toString().toUpperCase() || "P4";
   const isHighLevel = studentLevel === 'P5' || studentLevel === 'P6' || studentLevel === '5' || studentLevel === '6';
 
@@ -200,12 +218,11 @@ export default function RetypeCorrection() {
       </nav>
 
       <div style={styles.layout}>
-        {/* LEFT PANEL: CONTEXTUAL REFERENCE */}
+        {/* LEFT PANEL: CONTEXTUAL REFERENCE WITH LIVE HIGHLIGHT ENGINE */}
         <section style={styles.panel}>
           <div style={styles.panelHeader}>📜 RUJUKAN & ULASAN</div>
           <div style={styles.scrollArea}>
             
-            {/* Dynamic Grade Badge Container */}
             <div style={styles.gradeBadge}>
               <div style={{ fontSize: '20px', marginBottom: '8px' }}>
                 Jumlah Markah: <b>{data?.markah || 0} / {totalMax}</b>
@@ -215,7 +232,6 @@ export default function RetypeCorrection() {
                   <span>📝 Isi: <b>{data?.pemarkahan?.isi || 0}</b></span>
                   <span>✍️ Bahasa: <b>{data?.pemarkahan?.bahasa || 0}</b></span>
                 </div>
-                {/* Explicitly surfaces the maximum allowable points dynamically */}
                 <div style={{ fontSize: '11px', color: '#4338CA', opacity: 0.8, fontWeight: '600' }}>
                   📋 Skema Pembahagian ({breakdownLabel})
                 </div>
@@ -236,11 +252,14 @@ export default function RetypeCorrection() {
             </div>
 
             <hr style={{ border: '0.5px solid #E2E8F0', margin: '20px 0' }} />
-            <div style={styles.essayOriginal} dangerouslySetInnerHTML={{ __html: data?.karanganUnderlined }} />
+            <div style={styles.essayViewContainer}>
+              <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#64748B', marginBottom: '10px' }}>📄 PRATONTON KARANGAN:</div>
+              <div style={styles.essayOriginal} dangerouslySetInnerHTML={{ __html: getHighlightedEssayHtml() }} />
+            </div>
           </div>
         </section>
 
-        {/* RIGHT PANEL: INTERACTIVE LAB ENVIRONMENT */}
+        {/* RIGHT PANEL: INTERACTIVE WORKSPACE LOADED WITH AI ERROR ANALYSIS METADATA */}
         <section style={styles.panel}>
           <div style={styles.panelHeader}>✍️ ARAHAN & PEMBETULAN</div>
           
@@ -250,6 +269,10 @@ export default function RetypeCorrection() {
                 <div style={styles.metaRow}>
                   <span style={styles.badgeDanger}>⚠️ Jumpa Kesalahan</span>
                   <span style={styles.badgeSuccess}>🎯 Target Pembetulan</span>
+                  {/* Dynamic Error Category Token imported via the AI output framework */}
+                  {currentMission.kategori && (
+                    <span style={styles.badgeCategory}>🏷️ {currentMission.kategori}</span>
+                  )}
                 </div>
                 
                 <div style={styles.comparisonGrid}>
@@ -262,6 +285,14 @@ export default function RetypeCorrection() {
                     <div style={styles.boxContent}><b>{currentMission.pembetulan}</b></div>
                   </div>
                 </div>
+
+                {/* AI Linguistic Analysis Rule block integrated from prompt conditions */}
+                {currentMission.penjelasan && (
+                  <div style={styles.analysisBox}>
+                    <div style={styles.analysisLabel}>💡 ANALISIS KESALAHAN GURU:</div>
+                    <div style={styles.analysisText}>{currentMission.penjelasan}</div>
+                  </div>
+                )}
               </div>
 
               <div style={styles.interactiveArea}>
@@ -311,19 +342,24 @@ const styles = {
   panel: { backgroundColor: '#FFF', borderRadius: '24px', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #E2E8F0' },
   panelHeader: { padding: '15px 25px', backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '12px', fontWeight: '800', color: '#94A3B8', letterSpacing: '1px' },
   scrollArea: { padding: '30px', flex: 1, overflowY: 'auto', backgroundColor: '#FAFAFA' },
+  essayViewContainer: { border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px', backgroundColor: '#FFF' },
   essayOriginal: { fontSize: '18px', lineHeight: '2.2', color: '#334155' },
   
-  // Interactive Workspace Focus Layout Styles
   interactiveCorrectionWorkspace: { display: 'flex', flexDirection: 'column', flex: 1, padding: '24px', gap: '20px', backgroundColor: '#FAFAFA' },
-  missionCard: { backgroundColor: '#FFF', borderRadius: '12px', padding: '16px', border: '1px solid #E2E8F0' },
-  metaRow: { display: 'flex', gap: '10px', marginBottom: '12px' },
+  missionCard: { backgroundColor: '#FFF', borderRadius: '12px', padding: '16px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '12px' },
+  metaRow: { display: 'flex', gap: '8px', flexWrap: 'wrap' },
   badgeDanger: { padding: '4px 8px', backgroundColor: '#FFE4E6', color: '#E11D48', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' },
   badgeSuccess: { padding: '4px 8px', backgroundColor: '#D1FAE5', color: '#059669', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' },
+  badgeCategory: { padding: '4px 8px', backgroundColor: '#EFF6FF', color: '#1D4ED8', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', border: '1px solid #BFDBFE' },
   comparisonGrid: { display: 'flex', flexDirection: 'column', gap: '10px' },
   comparisonBoxRed: { padding: '12px', backgroundColor: '#FFF1F2', borderRadius: '8px', borderLeft: '4px solid #F43F5E' },
   comparisonBoxGreen: { padding: '12px', backgroundColor: '#F0FDF4', borderRadius: '8px', borderLeft: '4px solid #10B981' },
   boxLabel: { fontSize: '11px', fontWeight: 'bold', color: '#64748B', marginBottom: '2px' },
   boxContent: { fontSize: '14px', color: '#1E293B' },
+
+  analysisBox: { padding: '12px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px dashed #CBD5E1', marginTop: '4px' },
+  analysisLabel: { fontSize: '11px', fontWeight: '800', color: '#475569', marginBottom: '4px', letterSpacing: '0.02em' },
+  analysisText: { fontSize: '13px', color: '#475569', lineHeight: '1.5' },
   
   interactiveArea: { flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' },
   inputLabel: { fontSize: '13px', fontWeight: '700', color: '#334155' },
