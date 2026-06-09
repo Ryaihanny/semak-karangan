@@ -45,19 +45,19 @@ export default function AssignmentTracker() {
       const sSnap = await getDocs(query(collection(db, 'students'), where('enrolledClasses', 'array-contains', classId)));
       const allStudents = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // 3. Setup a LIVE snapshot listener on the results collection to capture live feedback states
+   // 3. Setup a LIVE snapshot listener on the results collection to capture live feedback states
       const resultsQuery = query(collection(db, 'karanganResults'), where('taskId', '==', assignmentId));
-      
-      // Get the live drafts database state once to flag active sessions
-      const draftSnap = await getDocs(query(collection(db, 'drafts'), where('taskId', '==', assignmentId)));
-      const initialDrafts = draftSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      unsubscribeResults = onSnapshot(resultsQuery, (snapshot) => {
+      unsubscribeResults = onSnapshot(resultsQuery, async (snapshot) => {
         const allResults = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Refetch latest drafts whenever results stream a change to keep them aligned
+        const draftSnap = await getDocs(query(collection(db, 'drafts'), where('taskId', '==', assignmentId)));
+        const latestDrafts = draftSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
         const statusMap = allStudents.map(student => {
           const result = allResults.find(r => r.studentId === student.id);
-          const draft = initialDrafts.find(d => d.userId === student.id);
+          const draft = latestDrafts.find(d => d.userId === student.id);
           
           let status = 'Belum Hantar';
           let progress = 0;
@@ -143,7 +143,7 @@ export default function AssignmentTracker() {
         markahBahasa: student.markahBahasa || 0,
         markahKeseluruhan: student.score || 0,
         karangan: student.result?.karangan || student.result?.karanganAsal || "",
-        kesalahanBahasa: student.result?.kesalahanBahasa || [],
+        kesalahanBahasa: Array.isArray(student.result?.kesalahanBahasa) ? student.result.kesalahanBahasa : [],
         ulasanBahasa: student.result?.ulasanBahasa || "",
         ulasanIsi: student.result?.ulasanIsi || "",
         ulasanKeseluruhan: student.result?.ulasanKeseluruhan || student.result?.ulasan?.keseluruhan || student.result?.ulasan || "Tiada ulasan."
@@ -206,25 +206,26 @@ export default function AssignmentTracker() {
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(11);
 
-        const rawKarangan = cleanText(item.karangan);
-        const lines = doc.splitTextToSize(rawKarangan, usableWidth);
-        lines.forEach((line) => {
-          if (y > 275) { doc.addPage(); y = 20; }
-          doc.text(line, margin, y);
-          if (item.kesalahanBahasa) {
-            item.kesalahanBahasa.forEach((error) => {
-              const phrase = error.ayatSalah;
-              if (phrase && line.includes(phrase)) {
-                const startX = margin + doc.getTextWidth(line.substring(0, line.indexOf(phrase)));
-                const phraseWidth = doc.getTextWidth(phrase);
-                doc.setDrawColor(200, 0, 0);
-                doc.setLineWidth(0.2);
-                doc.line(startX, y + 1, startX + phraseWidth, y + 1);
-              }
-            });
-          }
-          y += 7;
-        });
+const rawKarangan = cleanText(item.karangan);
+const lines = doc.splitTextToSize(rawKarangan, usableWidth);
+lines.forEach((line) => {
+  if (y > 275) { doc.addPage(); y = 20; }
+  doc.text(line, margin, y);
+  if (item.kesalahanBahasa && item.kesalahanBahasa.length > 0) {
+    item.kesalahanBahasa.forEach((error) => {
+      const phrase = cleanText(error.ayatSalah);
+      if (phrase && phrase.trim() !== "" && line.toLowerCase().includes(phrase.toLowerCase())) {
+        const lineIdx = line.toLowerCase().indexOf(phrase.toLowerCase());
+        const startX = margin + doc.getTextWidth(line.substring(0, lineIdx));
+        const phraseWidth = doc.getTextWidth(line.substring(lineIdx, lineIdx + phrase.length));
+        doc.setDrawColor(200, 0, 0);
+        doc.setLineWidth(0.2);
+        doc.line(startX, y + 1, startX + phraseWidth, y + 1);
+      }
+    });
+  }
+  y += 7;
+});
       }
 
       // --- CONDITIONAL: ANALISIS KESALAHAN ---
@@ -351,10 +352,11 @@ export default function AssignmentTracker() {
           <table>
             <thead>
               <tr>
-                <th width="40">
+<th width="40">
   <input 
     type="checkbox" 
-    onChange={(e) => setStudentStatuses(prev => prev.map(s => s.submissionId ? { ...s, checked: e.target.checked } : s))} 
+    checked={studentStatuses.length > 0 && studentStatuses.filter(s => s.submissionId).length > 0 && studentStatuses.filter(s => s.submissionId).every(s => s.checked)}
+    onChange={(e) => setStudentStatuses(prev => prev.map(s => s.submissionId ? { ...s, checked: e.target.checked } : s))}  
   />
 </th>
                 <th>Nama Pelajar</th>
