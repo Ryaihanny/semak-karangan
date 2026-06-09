@@ -369,16 +369,16 @@ export default function SemakanPage() {
             </div>
           )}
 
-          {/* Teacher Controls */}
+ {/* Teacher Controls */}
           {isTeacherMode && (
             <div style={styles.teacherControlPanel}>
               <textarea 
                 value={feedback} 
                 onChange={(e) => setFeedback(e.target.value)}
                 placeholder="Tulis maklum balas untuk murid..."
-                style={styles.textarea}
+                style={styles.teacherTextarea}
               />
-              <button onClick={handleSendFeedback} style={styles.submitBtn}>Hantar Maklum Balas</button>
+              <button onClick={handleSendFeedback} style={styles.teacherSubmitBtn}>Hantar Maklum Balas 📢</button>
             </div>
           )}
 
@@ -592,8 +592,10 @@ const styles = {
   kamusInput: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', marginBottom: '8px', boxSizing: 'border-box' },
   searchBtn: { width: '100%', padding: '8px', background: '#6C5CE7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
   kamusBody: { padding: '15px', maxHeight: '320px', overflowY: 'auto', borderTop: '1px solid #F1F5F9', backgroundColor: '#F8FAFC' },
-  feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
-  teacherControlPanel: { marginBottom: '20px', padding: '15px', border: '2px dashed #6C5CE7', borderRadius: '10px' },
+feedbackBanner: { padding: '15px', backgroundColor: '#FFF3CD', border: '1px solid #FFEBAA', borderRadius: '10px', marginBottom: '15px', color: '#856404' },
+  teacherControlPanel: { marginBottom: '20px', padding: '12px', border: '2px dashed #10B981', borderRadius: '10px', backgroundColor: '#F0FDF4', display: 'flex', flexDirection: 'column', gap: '8px' },
+  teacherTextarea: { width: '100%', height: '80px', borderRadius: '8px', border: '1px solid #10B981', padding: '10px', fontSize: '14px', outline: 'none', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
+  teacherSubmitBtn: { width: '100%', padding: '10px', borderRadius: '8px', border: 'none', backgroundColor: '#10B981', color: 'white', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s' },
   overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255, 255, 255, 0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, backdropFilter: 'blur(5px)' },
   loaderBox: { textAlign: 'center', padding: '40px', backgroundColor: '#fff', borderRadius: '24px', boxSizing: 'box-sizing', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', maxWidth: '400px' },
   spinner: { width: '50px', height: '50px', border: '5px solid #E2E8F0', borderTop: '5px solid #6366F1', borderRadius: '50%', margin: '0 auto 20px auto', animation: 'spin 1s linear infinite' },
