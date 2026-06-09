@@ -3,6 +3,7 @@ import fs from 'fs';
 import sharp from 'sharp';
 import admin, { db } from "../../../lib/firebaseAdmin";
 import { analyseKarangan } from '@/lib/analyseKarangan';
+import pdfImgConvert from 'pdf-img-convert'; // Add this at the top of bulk.js
 
 // Next.js config to disable body parser for Formidable
 export const config = { api: { bodyParser: false } };
@@ -57,14 +58,14 @@ export default async function handler(req, res) {
     const qFile = files.questionImage ? (Array.isArray(files.questionImage) ? files.questionImage[0] : files.questionImage) : null;
     
     if (qFile) {
-      const isPdf = qFile.mimetype === 'application/pdf' || qFile.originalFilename?.endsWith('.pdf');
+      const isPdf = qFile.mimetype === 'application/pdf' || qFile.originalFilename?.toLowerCase().endsWith('.pdf');
 
       if (isPdf) {
-        // A. Convert PDF pages to an array of high-quality image buffers
+        // A. Convert PDF pages to high-quality image buffers using our newly compiled system packages
         const pdfBuffer = fs.readFileSync(qFile.filepath);
-        const convertedPages = await pdfImgConvert.convert(pdfBuffer, { width: 1200 }); // Scale to clear desktop width
+        const convertedPages = await pdfImgConvert.convert(pdfBuffer, { width: 1200 });
         
-        // Take the first page of the teacher's PDF and compress it safely with sharp
+        // Take the first page of the teacher's PDF and optimize it safely with sharp
         if (convertedPages && convertedPages.length > 0) {
           const firstPageBuffer = Buffer.from(convertedPages[0]);
           const optimizedBuffer = await sharp(firstPageBuffer)
