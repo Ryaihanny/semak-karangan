@@ -9,7 +9,7 @@ const LEVEL_SETTINGS = {
 };
 
 async function deductCredits(userId, amount) {
-  const userRef = db.collection('students').doc(userId); // <--- Changed to students
+  const userRef = db.collection('students').doc(userId); 
   return db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) return 0;
@@ -20,6 +20,7 @@ async function deductCredits(userId, amount) {
     return newTotal;
   });
 }
+
 export const config = {
   api: {
     bodyParser: {
@@ -49,9 +50,9 @@ export default async function handler(req, res) {
     let userSnap, taskSnap;
     try {
       [userSnap, taskSnap] = await Promise.all([
-  db.collection('students').doc(studentId).get(), // <--- Changed to students
-  (taskId && taskId !== 'umum') ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
-]);
+        db.collection('students').doc(studentId).get(), 
+        (taskId && taskId !== 'umum') ? db.collection('assignments').doc(taskId).get() : Promise.resolve({ exists: false })
+      ]);
     } catch (dbErr) {
       console.error("Firestore Fetch Error:", dbErr);
       throw new Error("Gagal menyambung ke pangkalan data.");
@@ -59,17 +60,17 @@ export default async function handler(req, res) {
 
     const userData = userSnap.exists ? userSnap.data() : {};
     const effectiveName = providedName || userData.name || "Pelajar";
-    const effectiveLevel = studentLevel || userData.level || 'P6'; // Default to P6 if missing
+    const effectiveLevel = studentLevel || userData.level || 'P6'; 
     const taskData = taskSnap.exists ? taskSnap.data() : { title: 'Misi Karangan' };
     const config = LEVEL_SETTINGS[effectiveLevel] || LEVEL_SETTINGS['P6'];
 
-    // 3. AI ANALYSIS (Synced with dynamic stimulus detection)
+    // 3. AI ANALYSIS (Synced with pristine stimulus key fields)
     const analysis = await analyseKarangan({
       nama: effectiveName,
       studentContent: [`Karangan murid: ${essay}`],
       level: effectiveLevel,
-      // Check all possible fields where the stimulus might be stored
-      stimulus: taskData.imageUrl || taskData.attachmentUrl || taskData.fileUrl || null
+      // ✨ FIXED: Added taskData.pictureUrl and taskData.stimulus to align with the database schema
+      stimulus: taskData.pictureUrl || taskData.stimulus || taskData.imageUrl || taskData.attachmentUrl || taskData.fileUrl || null
     });
 
     // 4. PREPARE PAYLOAD
@@ -103,40 +104,41 @@ export default async function handler(req, res) {
       timestamp: admin.firestore.FieldValue.serverTimestamp()
     };
 
-// 5. SAVE & DEDUCT
-const resultsRef = db.collection('karanganResults');
-let docId = submissionId && submissionId !== "undefined" ? submissionId : null;
+    // 5. SAVE & DEDUCT
+    const resultsRef = db.collection('karanganResults');
+    let docId = submissionId && submissionId !== "undefined" ? submissionId : null;
 
-const { isOverwrite } = req.body;
+    const { isOverwrite } = req.body;
 
-if (isOverwrite) {
-  // Reset rewrite progress for the new version
-  finalPayload.lastRewrite = ""; 
-  finalPayload.solvedMissions = [];
-  finalPayload.status = "completed"; // Reset from 'murni_completed' to fresh 'completed'
+    if (isOverwrite) {
+      // Reset rewrite progress for the new version
+      finalPayload.lastRewrite = ""; 
+      finalPayload.solvedMissions = [];
+      finalPayload.status = "completed"; 
 
-  const existing = await resultsRef
-    .where('studentId', '==', studentId)
-    .where('taskId', '==', taskId || 'umum')
-    .limit(1)
-    .get();
+      const existing = await resultsRef
+        .where('studentId', '==', studentId)
+        .where('taskId', '==', taskId || 'umum')
+        .limit(1)
+        .get();
 
-  if (!existing.empty) {
-    docId = existing.docs[0].id;
-    await resultsRef.doc(docId).set(finalPayload); 
-  } else {
-    const newDoc = await resultsRef.add(finalPayload);
-    docId = newDoc.id;
-  }
-} else if (docId) {
-  // Normal update/merge
-  await resultsRef.doc(docId).set(finalPayload, { merge: true });
-} else {
-  // Brand new submission
-  const newDoc = await resultsRef.add(finalPayload);
-  docId = newDoc.id;
-}
-    // Try to deduct credits but don't crash if it fails (optional safety)
+      if (!existing.empty) {
+        docId = existing.docs[0].id;
+        await resultsRef.doc(docId).set(finalPayload); 
+      } else {
+        const newDoc = await resultsRef.add(finalPayload);
+        docId = newDoc.id;
+      }
+    } else if (docId) {
+      // Normal update/merge
+      await resultsRef.doc(docId).set(finalPayload, { merge: true });
+    } else {
+      // Brand new submission
+      const newDoc = await resultsRef.add(finalPayload);
+      docId = newDoc.id;
+    }
+
+    // Try to deduct credits but don't crash if it fails
     let remaining = 0;
     try {
       remaining = await deductCredits(studentId, 1);
