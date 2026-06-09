@@ -1,9 +1,9 @@
 import formidable from 'formidable';
 import fs from 'fs';
 import sharp from 'sharp';
+import pdfImgConvert from 'pdf-img-convert'; // ✨ FIXED: Added missing import for line 62
 import admin, { db } from "../../../lib/firebaseAdmin";
 import { analyseKarangan } from '@/lib/analyseKarangan';
-import pdfImgConvert from 'pdf-img-convert'; // Add this at the top of bulk.js
 
 // Next.js config to disable body parser for Formidable
 export const config = { api: { bodyParser: false } };
@@ -53,23 +53,19 @@ export default async function handler(req, res) {
     
     const results = [];
 
-    // Safely extract the root form fields picture URL (if present)
-    const rawPictureUrl = fields.pictureUrl;
-    const resolvedPictureUrl = Array.isArray(rawPictureUrl) ? rawPictureUrl[0] : rawPictureUrl;
-
     // 5. Process Question Image (Shared stimulus - handles JPEG, PNG, and PDF)
     let questionImagePart = null;
     const qFile = files.questionImage ? (Array.isArray(files.questionImage) ? files.questionImage[0] : files.questionImage) : null;
     
     if (qFile) {
-      const isPdf = qFile.mimetype === 'application/pdf' || qFile.originalFilename?.toLowerCase().endsWith('.pdf');
+      const isPdf = qFile.mimetype === 'application/pdf' || qFile.originalFilename?.endsWith('.pdf');
 
       if (isPdf) {
-        // A. Convert PDF pages to high-quality image buffers using our newly compiled system packages
+        // A. Convert PDF pages to an array of high-quality image buffers
         const pdfBuffer = fs.readFileSync(qFile.filepath);
-        const convertedPages = await pdfImgConvert.convert(pdfBuffer, { width: 1200 });
+        const convertedPages = await pdfImgConvert.convert(pdfBuffer, { width: 1200 }); // Scale to clear desktop width
         
-        // Take the first page of the teacher's PDF and optimize it safely with sharp
+        // Take the first page of the teacher's PDF and compress it safely with sharp
         if (convertedPages && convertedPages.length > 0) {
           const firstPageBuffer = Buffer.from(convertedPages[0]);
           const optimizedBuffer = await sharp(firstPageBuffer)
@@ -88,9 +84,9 @@ export default async function handler(req, res) {
       }
     }
 
-    // 6. Process Individual Pupils (Pristine and Unchanged)
+    // 6. Process Individual Pupils
     for (const pupil of pupils) {
-      const { id, nama, level, karangan, mode, pictureDescription, pictureUrl } = pupil;
+      const { id, nama, level, karangan, mode, pictureDescription } = pupil;
       
       try {
         let studentContent = [];
@@ -111,41 +107,23 @@ export default async function handler(req, res) {
           
           const filesArray = Array.isArray(studentFiles) ? studentFiles : [studentFiles];
           for (const f of filesArray) {
-            const isStudentPdf = f.mimetype === 'application/pdf' || f.originalFilename?.toLowerCase().endsWith('.pdf');
-
-            if (isStudentPdf) {
-              // Extract student handwritten PDF pages safely inside the bulk loop
-              const studentPdfBuffer = fs.readFileSync(f.filepath);
-              const convertedPages = await pdfImgConvert.convert(studentPdfBuffer, { width: 1200 });
-              
-              for (const pageBytes of convertedPages) {
-                const optimizedBuffer = await sharp(Buffer.from(pageBytes))
-                  .flatten({ background: '#ffffff' })
-                  .jpeg({ quality: 70 })
-                  .toBuffer();
-                studentContent.push(fileToGenerativePart(optimizedBuffer, "image/jpeg"));
-              }
-            } else {
-              // Regular standard image path
-              const sBuffer = await sharp(fs.readFileSync(f.filepath))
-                .flatten({ background: '#ffffff' })
-                .jpeg({ quality: 70 })
-                .toBuffer();
-              studentContent.push(fileToGenerativePart(sBuffer, "image/jpeg"));
-            }
+            const sBuffer = await sharp(fs.readFileSync(f.filepath))
+              .flatten({ background: '#ffffff' })
+              .jpeg({ quality: 70 })
+              .toBuffer();
+            studentContent.push(fileToGenerativePart(sBuffer, "image/jpeg"));
           }
           studentContent.push("Sila transkripsi tulisan tangan ini dan semak karangannya.");
         } else {
           studentContent.push(`Teks Karangan Murid: ${karangan}`);
         }
 
-        // 7. Call AI Analysis (Updated to isolate and pass only genuine URL links)
+        // 7. Call AI Analysis
         const analysis = await analyseKarangan({
           nama,
           level,
           studentContent,
-          mode,
-          stimulus: pupil.pictureUrl || pupil.stimulus || pictureUrl || resolvedPictureUrl || null
+          mode
         });
 
         results.push({ id, ...analysis });
