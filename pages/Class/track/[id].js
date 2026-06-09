@@ -98,12 +98,16 @@ export default function AssignmentTracker() {
           };
         }).sort((a, b) => b.progress - a.progress);
 
-        setStudentStatuses(statusMap);
+setStudentStatuses(statusMap);
         setLoading(false);
       });
-    }; // <-- Added this closing brace for setupLiveTracker
+    } catch (error) {
+      console.error("Error setting up live tracker:", error);
+      setLoading(false);
+    }
+  };
 
-    setupLiveTracker();
+  setupLiveTracker();
 
     // Clean up listener when the component unmounts or IDs change
     return () => unsubscribeResults();
