@@ -55,16 +55,30 @@ export default async function handler(req, res) {
 // 5. Process Question Image (Shared stimulus - handles JPEG, PNG, and PDF)
     let questionImagePart = null;
     const qFile = files.questionImage ? (Array.isArray(files.questionImage) ? files.questionImage[0] : files.questionImage) : null;
+    
     if (qFile) {
-      // Check if the teacher uploaded a PDF document as the question stimulus
-      if (qFile.mimetype === 'application/pdf' || qFile.originalFilename?.endsWith('.pdf')) {
-        const qBuffer = fs.readFileSync(qFile.filepath);
-        questionImagePart = fileToGenerativePart(qBuffer, "application/pdf");
+      const isPdf = qFile.mimetype === 'application/pdf' || qFile.originalFilename?.endsWith('.pdf');
+
+      if (isPdf) {
+        // A. Convert PDF pages to an array of high-quality image buffers
+        const pdfBuffer = fs.readFileSync(qFile.filepath);
+        const convertedPages = await pdfImgConvert.convert(pdfBuffer, { width: 1200 }); // Scale to clear desktop width
+        
+        // Take the first page of the teacher's PDF and compress it safely with sharp
+        if (convertedPages && convertedPages.length > 0) {
+          const firstPageBuffer = Buffer.from(convertedPages[0]);
+          const optimizedBuffer = await sharp(firstPageBuffer)
+            .jpeg({ quality: 70 })
+            .toBuffer();
+            
+          questionImagePart = fileToGenerativePart(optimizedBuffer, "image/jpeg");
+        }
       } else {
-        // It's a normal image (PNG/JPG), compress with sharp as usual
+        // B. It's a standard image file (PNG/JPG), process with sharp as normal
         const qBuffer = await sharp(fs.readFileSync(qFile.filepath))
           .jpeg({ quality: 70 })
           .toBuffer();
+          
         questionImagePart = fileToGenerativePart(qBuffer, "image/jpeg");
       }
     }
