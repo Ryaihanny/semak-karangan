@@ -53,6 +53,10 @@ export default async function handler(req, res) {
     
     const results = [];
 
+    // Safely extract the root form fields picture URL (if present)
+    const rawPictureUrl = fields.pictureUrl;
+    const resolvedPictureUrl = Array.isArray(rawPictureUrl) ? rawPictureUrl[0] : rawPictureUrl;
+
     // 5. Process Question Image (Shared stimulus - handles JPEG, PNG, and PDF)
     let questionImagePart = null;
     const qFile = files.questionImage ? (Array.isArray(files.questionImage) ? files.questionImage[0] : files.questionImage) : null;
@@ -86,7 +90,7 @@ export default async function handler(req, res) {
 
     // 6. Process Individual Pupils (Pristine and Unchanged)
     for (const pupil of pupils) {
-      const { id, nama, level, karangan, mode, pictureDescription } = pupil;
+      const { id, nama, level, karangan, mode, pictureDescription, pictureUrl } = pupil;
       
       try {
         let studentContent = [];
@@ -107,23 +111,41 @@ export default async function handler(req, res) {
           
           const filesArray = Array.isArray(studentFiles) ? studentFiles : [studentFiles];
           for (const f of filesArray) {
-            const sBuffer = await sharp(fs.readFileSync(f.filepath))
-              .flatten({ background: '#ffffff' })
-              .jpeg({ quality: 70 })
-              .toBuffer();
-            studentContent.push(fileToGenerativePart(sBuffer, "image/jpeg"));
+            const isStudentPdf = f.mimetype === 'application/pdf' || f.originalFilename?.toLowerCase().endsWith('.pdf');
+
+            if (isStudentPdf) {
+              // Extract student handwritten PDF pages safely inside the bulk loop
+              const studentPdfBuffer = fs.readFileSync(f.filepath);
+              const convertedPages = await pdfImgConvert.convert(studentPdfBuffer, { width: 1200 });
+              
+              for (const pageBytes of convertedPages) {
+                const optimizedBuffer = await sharp(Buffer.from(pageBytes))
+                  .flatten({ background: '#ffffff' })
+                  .jpeg({ quality: 70 })
+                  .toBuffer();
+                studentContent.push(fileToGenerativePart(optimizedBuffer, "image/jpeg"));
+              }
+            } else {
+              // Regular standard image path
+              const sBuffer = await sharp(fs.readFileSync(f.filepath))
+                .flatten({ background: '#ffffff' })
+                .jpeg({ quality: 70 })
+                .toBuffer();
+              studentContent.push(fileToGenerativePart(sBuffer, "image/jpeg"));
+            }
           }
           studentContent.push("Sila transkripsi tulisan tangan ini dan semak karangannya.");
         } else {
           studentContent.push(`Teks Karangan Murid: ${karangan}`);
         }
 
-        // 7. Call AI Analysis
+        // 7. Call AI Analysis (Updated to isolate and pass only genuine URL links)
         const analysis = await analyseKarangan({
           nama,
           level,
           studentContent,
-          mode
+          mode,
+          stimulus: pupil.pictureUrl || pupil.stimulus || pictureUrl || resolvedPictureUrl || null
         });
 
         results.push({ id, ...analysis });
