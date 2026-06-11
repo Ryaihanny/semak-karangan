@@ -414,7 +414,7 @@ export default function ClassManagement() {
                     <th>Tajuk Tugasan & Arahan</th>
                     <th>Tarikh Dihantar</th>
                     <th>Tarikh Tutup</th>
-                    <th>Konfigurasi Murid</th>
+                    <th>Berpandu (Bantuan untuk murid)</th>
                     <th>Progres Semakan</th>
                     <th style={{textAlign: 'right'}}>Tindakan</th>
                   </tr>
@@ -472,7 +472,7 @@ export default function ClassManagement() {
                           <td>
                             <div className="config-pill-group">
                               <span className="badge-config">
-                                👤 {task.studentConfig ? Object.keys(task.studentConfig).length : 0} Diatur
+                                👤 {task.studentConfig ? Object.keys(task.studentConfig).length : 0} Berpandu
                               </span>
                             </div>
                           </td>
