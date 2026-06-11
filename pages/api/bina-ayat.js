@@ -1,6 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'; // Error fix: changed GoogleGenAI to GoogleGenerativeAI
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize using the correct legacy library class name
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
@@ -15,20 +14,24 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Idea is required' });
     }
 
-    // Call using the correct model layout schema for @google/generative-ai
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     
-    const prompt = `Anda adalah Cikgu AI Bahasa Melayu. Berdasarkan idea mentah murid ini: "${idea}", bina satu ayat yang betul, gramatis, dan lengkap mengikut struktur (Subjek + Predikat). Sediakan output dalam format JSON tulen yang mengandungi struktur perkataan cerai untuk permainan susun ayat. 
-    Tahap murid: ${studentLevel || 'Umum'}. 
-    Tajuk: ${taskTitle || 'Tiada'}. 
-    Konteks: ${taskStimulus || 'Tiada'}.
+    // Updated Prompt to handle typos, English, mixed phrases and translate subtitle metadata labels
+    const prompt = `Anda adalah Cikgu AI Bahasa Melayu yang penyayang untuk sekolah rendah. 
+    Murid memasukkan idea mentah ini: "${idea}". 
+    
+    TUGASAN ANDA:
+    1. Fahami maksud tersirat murid walaupun ada kesilapan ejaan (typo), tatabahasa rosak, atau jika mereka menaip sepenuhnya dalam Bahasa Inggeris/Manglish.
+    2. Bina satu ayat tunggal/majmuk Bahasa Melayu yang betul, sangat gramatis, bersih, sesuai dengan Tahap Sekolah Rendah (${studentLevel || 'Umum'}).
+    3. Cerai-cerai ayat lengkap tersebut menjadi beberapa blok perkataan/frasa ringkas (Wajib menghasilkan LEBIH daripada 2 blok, selalunya 4 hingga 7 blok kata kunci bergantung panjang ayat) supaya mereka boleh bermain game susun suai.
+    4. Untuk setiap blok kepingan perkataan ("kataKunci"), berikan label bantuan terjemahan bahasa Inggeris di bawahnya supaya murid faham maknanya. Contoh: Jika perkataannya "Kucing itu", letakkan label "The cat (Subjek)". Jika "sedang mengejar", letakkan label "is chasing (Predikat)".
 
     Format JSON wajib mengikut skema ini secara tepat:
     {
       "ayatPenuh": "Ayat lengkap yang betul di sini",
       "kataKunci": [
-        { "id": "w1", "teks": "Perkataan1", "jenis": "kata-nama", "label": "Subjek" },
-        { "id": "w2", "teks": "Perkataan2", "jenis": "kata-kerja", "label": "Predikat" }
+        { "id": "w1", "teks": "Perkataan1", "jenis": "kata-nama", "label": "English translation + Structure description" },
+        { "id": "w2", "teks": "Perkataan2", "jenis": "kata-kerja", "label": "English translation + Structure description" }
       ],
       "susunanBetul": ["w1", "w2"]
     }`;
@@ -36,7 +39,6 @@ export default async function handler(req, res) {
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     
-    // Clean up markdown block wraps if returned by the AI
     const cleanJson = responseText.replace(/```json|```/g, '').trim();
     const data = JSON.parse(cleanJson);
 

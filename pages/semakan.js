@@ -38,6 +38,7 @@ export default function SemakanPage() {
   const [isGameWon, setIsGameWon] = useState(false);
 
   const totalPictures = ['P3', 'P4'].includes(studentLevel) ? 4 : ['P5', 'P6'].includes(studentLevel) ? 6 : 0;
+  // Requirement 1: True only if student matches specific scaffold criteria
   const isDifferentiatedStudent = ['P3', 'P4', 'P5', 'P6'].includes(studentLevel);
 
   const [feedback, setFeedback] = useState("");
@@ -97,13 +98,11 @@ export default function SemakanPage() {
       }
 
       const data = await res.json();
-      
       if (data && data.suggestion) {
         setCoachSuggestion(data.suggestion);
       } else {
         throw new Error("Format respons dari AI tidak lengkap.");
       }
-      
     } catch (err) {
       console.error("Ralat Cikgu AI:", err);
       alert(`Maaf, Cikgu AI sedang berehat. ${err.message ? `Maklumat: ${err.message}` : ''}`);
@@ -428,6 +427,7 @@ export default function SemakanPage() {
             </div>
           )}
 
+          {/* Requirement 1: Hidden to students who are not chosen as scaffolded */}
           {isDifferentiatedStudent && (
             <button onClick={() => setIsBuilderOpen(true)} style={styles.openBuilderBtn}>
               🧩 Main Game Susun Ayat Pintar (Gambar 1-{totalPictures}) ✨
@@ -565,133 +565,155 @@ export default function SemakanPage() {
       {/* THE GAME SCALED STORYBOARD SCATTER BUILDER POPUP MODAL */}
       {isBuilderOpen && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
+          {/* Requirement 2: Expanded width layout to place the picture panel side by side */}
+          <div style={{ ...styles.modalContent, maxWidth: '1100px', width: '95%' }}>
             <div style={styles.modalHeader}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <h2 style={{ margin: 0, fontSize: '20px' }}>🧩 Permainan Susun Ayat Ajaib</h2>
-                <span style={{ fontSize: '12px', opacity: 0.9 }}>Bina ayat lengkap berpandukan struktur asas (Subjek + Predikat)</span>
+                <span style={{ fontSize: '12px', opacity: 0.9 }}>Rujuk gambar di sebelah kiri untuk bantu menaip idea anda</span>
               </div>
               <button onClick={() => setIsBuilderOpen(false)} style={styles.modalCloseX}>✖</button>
             </div>
 
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <label style={styles.sectionLabel}>🎯 Pilih Gambar Sasaran Anda:</label>
-                <div style={styles.milestoneContainer}>
-                  {Array.from({ length: totalPictures }, (_, i) => i + 1).map((idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setSelectedPictureIndex(idx);
-                        setBuilderResult(null);
-                      }}
-                      style={{
-                        ...styles.milestoneNode,
-                        backgroundColor: selectedPictureIndex === idx ? '#6C5CE7' : '#F1F5F9',
-                        color: selectedPictureIndex === idx ? '#FFF' : '#475569',
-                        borderColor: selectedPictureIndex === idx ? '#5A4AD1' : '#CBD5E1'
-                      }}
-                    >
-                      Gambar {idx}
-                    </button>
-                  ))}
-                </div>
+            <div style={styles.modalBodyLayout}>
+              {/* Requirement 2: Side Picture reference viewer so students can look and type directly */}
+              <div style={styles.modalImagePanel}>
+                <h4 style={{ margin: '0 0 10px 0', color: '#1E293B' }}>🖼️ Rujukan Gambar Karangan:</h4>
+                {taskData?.imageUrl ? (
+                  taskData.imageUrl.split('?')[0].toLowerCase().endsWith('.pdf') ? (
+                    <iframe
+                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(taskData.imageUrl)}&embedded=true`}
+                      style={{ width: '100%', height: '100%', minHeight: '350px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
+                      frameBorder="0"
+                    />
+                  ) : (
+                    <img src={taskData.imageUrl} alt="Reference Panel" style={styles.modalInlineImg} />
+                  )
+                ) : (
+                  <div style={styles.noImagePlaceholder}>Tiada gambar dimuat naik untuk tugasan ini.</div>
+                )}
               </div>
 
-              <div style={styles.scaffoldFormBox}>
-                <div style={{ marginBottom: '10px' }}>
-                  <span style={{ fontSize: '12px', color: '#4A5568', fontWeight: 'bold' }}>
-                    💡 Langkah 1: Masukkan idea pendek / perkataan rawak untuk Gambar {selectedPictureIndex}:
-                  </span>
-                  <p style={{ margin: '4px 0 10px 0', fontSize: '11px', color: '#718096' }}>
-                    Contoh: "saya nampak budak tolong kawan jatuh basikal" atau "dua orang cuci longkang"
-                  </p>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <input value={builderQuery} onChange={(e) => setBuilderQuery(e.target.value)} placeholder="Tulis idea ringkas atau broken words anda di sini..." style={styles.scaffoldInput} />
-                  <button onClick={handleBuildSentence} disabled={isBuilding || !builderQuery.trim()} style={styles.scaffoldActionBtn}>
-                    {isBuilding ? "Menyusun Kata..." : "Tukar Ke Game 🪄"}
-                  </button>
-                </div>
-              </div>
-
-              {builderResult && (
-                <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
-                      🚀 Langkah 2: Seret (drag) kad perkataan di bawah ke dalam kotak binaan putih:
-                    </span>
-                  </div>
-
-                  <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropBackToPool} style={styles.cardPoolContainer}>
-                    {shuffledBlocks.map((block) => (
-                      <div
-                        key={block.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, block.id)}
-                        style={{
-                          ...styles.draggableWordCard,
-                          backgroundColor: block.jenis === 'kata-kerja' ? '#FEE2E2' : block.jenis === 'kata-nama' ? '#DBEAFE' : '#FEF3C7',
-                          borderColor: block.jenis === 'kata-kerja' ? '#FCA5A5' : block.jenis === 'kata-nama' ? '#93C5FD' : '#FDE68A',
-                          color: block.jenis === 'kata-kerja' ? '#991B1B' : block.jenis === 'kata-nama' ? '#1E40AF' : '#92400E'
-                        }}
-                      >
-                        <span style={styles.cardMetaLabel}>{block.label}</span>
-                        <strong style={{ fontSize: '14px' }}>{block.teks}</strong>
-                      </div>
-                    ))}
-                    {shuffledBlocks.length === 0 && placedBlocks.length === 0 && (
-                      <p style={{ margin: 'auto', fontSize: '12px', color: '#94A3B8' }}>Tiada perkataan dimuatkan.</p>
-                    )}
-                  </div>
-
-                  <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropOnTrack} style={{ ...styles.dropTargetTrack, backgroundColor: isGameWon ? '#ECFDF5' : '#FFF', borderColor: isGameWon ? '#10B981' : '#6C5CE7' }}>
-                    {placedBlocks.length === 0 && (
-                      <div style={{ margin: 'auto', color: '#94A3B8', fontSize: '13px', textAlign: 'center' }}>
-                        📥 Seret kad perkataan dan susun di sini mengikut hukum <strong>(Subjek + Predikat)</strong>
-                      </div>
-                    )}
-                    
-                    {placedBlocks.map((block) => (
-                      <div
-                        key={block.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, block.id)}
-                        style={{
-                          ...styles.draggableWordCard,
-                          backgroundColor: block.jenis === 'kata-kerja' ? '#FEE2E2' : block.jenis === 'kata-nama' ? '#DBEAFE' : '#FEF3C7',
-                          borderColor: block.jenis === 'kata-kerja' ? '#FCA5A5' : block.jenis === 'kata-nama' ? '#93C5FD' : '#FDE68A',
-                          color: block.jenis === 'kata-kerja' ? '#991B1B' : block.jenis === 'kata-nama' ? '#1E40AF' : '#92400E'
-                        }}
-                      >
-                        <span style={styles.cardMetaLabel}>{block.label}</span>
-                        <strong>{block.teks}</strong>
-                      </div>
-                    ))}
-                  </div>
-
-                  {isGameWon && (
-                    <div style={styles.victoryContainer}>
-                      <div style={{ fontSize: '15px', color: '#065F46', fontWeight: 'bold', marginBottom: '8px' }}>
-                        🎉 Syabas! Susunan ayat anda sangat tepat, gramatis dan mantap!
-                      </div>
+              {/* Game interaction panel */}
+              <div style={styles.modalGamePanel}>
+                <div>
+                  <label style={styles.sectionLabel}>🎯 Pilih Gambar Sasaran Anda:</label>
+                  <div style={styles.milestoneContainer}>
+                    {Array.from({ length: totalPictures }, (_, i) => i + 1).map((idx) => (
                       <button
+                        key={idx}
                         onClick={() => {
-                          const completeSentence = placedBlocks.map(b => b.teks).join(" ");
-                          setEssay(prev => prev ? prev + " " + completeSentence : completeSentence);
-                          setIsBuilderOpen(false);
+                          setSelectedPictureIndex(idx);
                           setBuilderResult(null);
-                          setBuilderQuery("");
                         }}
-                        style={styles.insertSentenceToEssayBtn}
+                        style={{
+                          ...styles.milestoneNode,
+                          backgroundColor: selectedPictureIndex === idx ? '#6C5CE7' : '#F1F5F9',
+                          color: selectedPictureIndex === idx ? '#FFF' : '#475569',
+                          borderColor: selectedPictureIndex === idx ? '#5A4AD1' : '#CBD5E1'
+                        }}
                       >
-                        📥 Masukkan Ayat Sempurna Ini ke Karangan Saya
+                        Gambar {idx}
                       </button>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
-              )}
+
+                <div style={styles.scaffoldFormBox}>
+                  <div style={{ marginBottom: '10px' }}>
+                    <span style={{ fontSize: '12px', color: '#4A5568', fontWeight: 'bold' }}>
+                      💡 Masukkan apa sahaja perkataan / frasa (Boleh campur English / Melayu / Typo):
+                    </span>
+                    <p style={{ margin: '4px 0 10px 0', fontSize: '11px', color: '#718096' }}>
+                      Contoh: "boy run because cat chase" atau "dua orang cleaning longkang"
+                    </p>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input value={builderQuery} onChange={(e) => setBuilderQuery(e.target.value)} placeholder="Taip idea anda di sini..." style={styles.scaffoldInput} />
+                    <button onClick={handleBuildSentence} disabled={isBuilding || !builderQuery.trim()} style={styles.scaffoldActionBtn}>
+                      {isBuilding ? "Menjana Kata..." : "Tukar Ke Game 🪄"}
+                    </button>
+                  </div>
+                </div>
+
+                {builderResult && (
+                  <div style={{ animation: 'fadeIn 0.3s ease-out', marginTop: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
+                        🚀 Seret (drag) kad perkataan di bawah ke dalam kotak binaan untuk menyusun ayat:
+                      </span>
+                    </div>
+
+                    <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropBackToPool} style={styles.cardPoolContainer}>
+                      {shuffledBlocks.map((block) => (
+                        <div
+                          key={block.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, block.id)}
+                          style={{
+                            ...styles.draggableWordCard,
+                            backgroundColor: block.jenis === 'kata-kerja' ? '#FEE2E2' : block.jenis === 'kata-nama' ? '#DBEAFE' : '#FEF3C7',
+                            borderColor: block.jenis === 'kata-kerja' ? '#FCA5A5' : block.jenis === 'kata-nama' ? '#93C5FD' : '#FDE68A',
+                            color: block.jenis === 'kata-kerja' ? '#991B1B' : block.jenis === 'kata-nama' ? '#1E40AF' : '#92400E'
+                          }}
+                        >
+                          <span style={styles.cardMetaLabel}>{block.label}</span>
+                          <strong style={{ fontSize: '14px' }}>{block.teks}</strong>
+                        </div>
+                      ))}
+                      {shuffledBlocks.length === 0 && placedBlocks.length === 0 && (
+                        <p style={{ margin: 'auto', fontSize: '12px', color: '#94A3B8' }}>Tiada perkataan dimuatkan.</p>
+                      )}
+                    </div>
+
+                    <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropOnTrack} style={{ ...styles.dropTargetTrack, backgroundColor: isGameWon ? '#ECFDF5' : '#FFF', borderColor: isGameWon ? '#10B981' : '#6C5CE7' }}>
+                      {placedBlocks.length === 0 && (
+                        <div style={{ margin: 'auto', color: '#94A3B8', fontSize: '13px', textAlign: 'center' }}>
+                          📥 Susun kad perkataan anda di sini
+                        </div>
+                      )}
+                      
+                      {placedBlocks.map((block) => (
+                        <div
+                          key={block.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, block.id)}
+                          style={{
+                            ...styles.draggableWordCard,
+                            backgroundColor: block.jenis === 'kata-kerja' ? '#FEE2E2' : block.jenis === 'kata-nama' ? '#DBEAFE' : '#FEF3C7',
+                            borderColor: block.jenis === 'kata-kerja' ? '#FCA5A5' : block.jenis === 'kata-nama' ? '#93C5FD' : '#FDE68A',
+                            color: block.jenis === 'kata-kerja' ? '#991B1B' : block.jenis === 'kata-nama' ? '#1E40AF' : '#92400E'
+                          }}
+                        >
+                          <span style={styles.cardMetaLabel}>{block.label}</span>
+                          <strong>{block.teks}</strong>
+                        </div>
+                      ))}
+                    </div>
+
+                    {isGameWon && (
+                      <div style={styles.victoryContainer}>
+                        <div style={{ fontSize: '14px', color: '#065F46', fontWeight: 'bold', marginBottom: '8px' }}>
+                          🎉 Hebat! Susunan ayat anda betul & gramatis!
+                        </div>
+                        <button
+                          onClick={() => {
+                            const completeSentence = placedBlocks.map(b => b.teks).join(" ");
+                            setEssay(prev => prev ? prev + " " + completeSentence : completeSentence);
+                            setIsBuilderOpen(false);
+                            setBuilderResult(null);
+                            setBuilderQuery("");
+                          }}
+                          style={styles.insertSentenceToEssayBtn}
+                        >
+                          📥 Masukkan Ayat Sempurna Ini ke Karangan Saya
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -777,9 +799,17 @@ const styles = {
   miniCopyBtn: { padding: '4px 10px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#6C5CE7', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', whiteSpace: 'nowrap' },
   openBuilderBtn: { width: '100%', padding: '14px', marginBottom: '12px', borderRadius: '12px', border: 'none', backgroundColor: '#10B981', color: 'white', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(16, 185, 129, 0.2)', transition: 'transform 0.2s' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 5000, backdropFilter: 'blur(4px)' },
-  modalContent: { width: '90%', maxWidth: '650px', backgroundColor: '#FFF', borderRadius: '20px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden', animation: 'slideUp 0.3s ease-out' },
+  modalContent: { backgroundColor: '#FFF', borderRadius: '20px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden', animation: 'slideUp 0.3s ease-out' },
   modalHeader: { padding: '16px 20px', background: '#6C5CE7', color: '#FFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   modalCloseX: { background: 'transparent', border: 'none', color: '#FFF', fontSize: '18px', cursor: 'pointer', opacity: 0.8 },
+  
+  // Side-by-side splits for Modal images
+  modalBodyLayout: { display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '20px', padding: '20px', maxHeight: '80vh', overflowY: 'auto' },
+  modalImagePanel: { borderRight: '1px solid #E2E8F0', paddingRight: '20px', display: 'flex', flexDirection: 'column' },
+  modalInlineImg: { width: '100%', objectFit: 'contain', borderRadius: '8px', maxHeight: '450px', border: '1px solid #CBD5E1' },
+  noImagePlaceholder: { padding: '40px', background: '#F8FAFC', color: '#94A3B8', borderRadius: '8px', textAlign: 'center', fontSize: '13px' },
+  modalGamePanel: { display: 'flex', flexDirection: 'column', gap: '15px' },
+
   sectionLabel: { fontSize: '13px', fontWeight: 'bold', color: '#334155', display: 'block', marginBottom: '6px' },
   milestoneContainer: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' },
   milestoneNode: { padding: '8px 16px', borderRadius: '20px', border: '2px solid', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' },
@@ -789,7 +819,7 @@ const styles = {
   cardPoolContainer: { background: '#F1F5F9', padding: '14px', borderRadius: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap', minHeight: '75px', border: '2px dashed #CBD5E1', marginBottom: '15px' },
   dropTargetTrack: { padding: '18px', borderRadius: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', minHeight: '90px', alignItems: 'center', borderWidth: '2px', borderStyle: 'solid', transition: 'all 0.2s' },
   draggableWordCard: { padding: '10px 14px', borderRadius: '10px', borderWidth: '2px', borderStyle: 'solid', cursor: 'grab', userSelect: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', transition: 'transform 0.1s' },
-  cardMetaLabel: { fontSize: '10px', opacity: 0.8, marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  cardMetaLabel: { fontSize: '10px', opacity: 0.8, marginBottom: '2px', textTransform: 'lowercase', letterSpacing: '0.5px' },
   victoryContainer: { marginTop: '15px', textAlign: 'center', padding: '15px', background: '#D1FAE5', borderRadius: '12px', border: '1px solid #A7F3D0' },
   insertSentenceToEssayBtn: { padding: '12px 20px', background: '#059669', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', boxShadow: '0 4px 6px rgba(5, 150, 105, 0.2)' }
 };
