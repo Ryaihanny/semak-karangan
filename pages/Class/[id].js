@@ -52,16 +52,14 @@ export default function ClassManagement() {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [lookupSearch, setLookupSearch] = useState(''); 
 
-  // FIXED: Next.js Router Guard Hydration Check
   useEffect(() => {
-    if (router.isReady && classId) {
+    if (classId) {
       fetchData();
     }
-  }, [router.isReady, classId]);
+  }, [classId]);
 
   const fetchData = async () => {
     try {
-      setLoading(true);
       // 1. Fetch Class & Teacher Data
       const cSnap = await getDoc(doc(db, 'classes', classId));
       if (!cSnap.exists()) return;
@@ -423,8 +421,7 @@ export default function ClassManagement() {
               {assignments.map(task => (
                 <div key={task.id} className="set-card" onClick={() => router.push(`/Class/track/${task.id}?classId=${classId}`)}>
                   <div className="set-info">
-                    {/* FIXED: 'justifyValue' typo fixed to 'justifyContent' */}
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <div style={{display:'flex', justifyValue:'space-between', alignItems:'center'}}>
                         <span className="date-badge">📅 {task.dueDate || 'Tiada Tarikh'}</span>
                         <button className="btn-reset" onClick={(e) => handleDeleteTask(task.id, e)}>Padam</button>
                     </div>
@@ -538,6 +535,7 @@ export default function ClassManagement() {
                 <input type="text" placeholder="Contoh: Karangan Berkelah" onChange={e => setNewTask({...newTask, title: e.target.value})} />
             </div>
 
+            {/* UI/UX REPOSITORY DESIGN INTEGRATION */}
             <div className="form-group">
                 <label>Bahan Rangsangan (Stimulus)</label>
                 {newTask.existingUrl ? (
@@ -698,13 +696,28 @@ export default function ClassManagement() {
         .student-diff-list { max-height: 140px; overflow-y: auto; border: 2px solid #E2E8F0; border-radius: 12px; padding: 5px; background: #f8fafc; }
         .student-diff-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #edf2f7; }
         .btn-mode-toggle { padding: 4px 10px; border-radius: 15px; border: 1px solid #cbd5e1; background: white; font-size: 0.7rem; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .btn-mode-toggle.is-scaffold { background: #003D40; color: white; border-color: #003D40; }
-        .vault-list-container { max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 10px; }
-        .vault-item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f1f5f9; }
-        .vault-item-name { font-size: 0.85rem; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .btn-vault-select { background: #00767B; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; }
-        .btn-vault-trigger { width: 100%; background: #f8fafc; border: 2px dashed #cbd5e1; padding: 10px; border-radius: 8px; color: #475569; font-weight: 600; font-size: 0.85rem; cursor: pointer; }
-        .btn-vault-trigger:hover { background: #f1f5f9; border-color: #94a3b8; }
+        .btn-mode-toggle.is-scaffold { background: #00767B; color: white; border-color: #00767B; }
+        .modal-content { background: white; padding: 35px; border-radius: 30px; width: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        .modal-content.large { width: 600px; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.9rem; color: #002d2f; }
+        input, textarea, select { width: 100%; padding: 12px; border: 2px solid #E2E8F0; border-radius: 12px; font-family: inherit; }
+        textarea.small-text { height: 70px; }
+        textarea { height: 220px; resize: none; }
+        .hint { font-size: 0.78rem; color: #64748B; margin-bottom: 12px; display: block; line-height: 1.3; }
+        .modal-btns { display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px; }
+        .btn-cancel { background: #F1F5F9; border: none; padding: 12px 25px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+        .confirm { background: #003D40; color: white; border: none; padding: 12px 25px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+        
+        /* REPOSITORY COMPONENT STYLING */
+        .btn-vault-trigger { background: #F0FDF4; border: 2px dashed #48A6A7; color: #00767B; padding: 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; cursor: pointer; width: 100%; transition: 0.2s; }
+        .btn-vault-trigger:hover { background: #E6F4F4; }
+        .selected-vault-file { display: flex; justify-content: space-between; align-items: center; background: #E6F4F4; border: 2px solid #00767B; padding: 10px 15px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; color: #003D40; }
+        .btn-remove-file { background: #FFF5F5; color: #C53030; border: 1px solid #FEB2B2; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; font-weight: bold; }
+        .vault-list-container { max-height: 200px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; }
+        .vault-item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #F1F5F9; }
+        .vault-item-name { font-size: 0.8rem; font-weight: 600; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+        .btn-vault-select { background: #003D40; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
       `}</style>
     </div>
   );
