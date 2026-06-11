@@ -33,7 +33,7 @@ export default function ClassManagement() {
     dueDate: '', 
     targetClasses: [], 
     file: null,
-    existingUrl: '', // Track selected asset from user locker repository
+    existingUrl: '', 
     studentConfig: {} 
   });
 
@@ -60,7 +60,6 @@ export default function ClassManagement() {
 
   const fetchData = async () => {
     try {
-      // 1. Fetch Class & Teacher Data
       const cSnap = await getDoc(doc(db, 'classes', classId));
       if (!cSnap.exists()) return;
       const cData = cSnap.data();
@@ -73,7 +72,6 @@ export default function ClassManagement() {
       const classesSnap = await getDocs(classesQuery);
       setTeacherClasses(classesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      // 2. Fetch Students and Sync Credits
       const sQuery = query(collection(db, 'students'), where('enrolledClasses', 'array-contains', classId));
       const sSnap = await getDocs(sQuery);
       const studentList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -84,7 +82,6 @@ export default function ClassManagement() {
       }));
       setStudents(enrichedStudentList);
 
-      // 3. Fetch Assignments & Calculate Progress
       const aQuery = query(collection(db, 'assignments'), where('classId', '==', classId));
       const aSnap = await getDocs(aQuery);
       const assignmentList = aSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -103,7 +100,6 @@ export default function ClassManagement() {
         return { ...task, completedCount, progressPercent };
       });
 
-      // UI/UX FIX: Chronological Sorting Sequence (Newest First)
       const sortedAssignments = enrichedAssignments.sort((a, b) => {
         const dateA = a.createdAt?.seconds ? a.createdAt.seconds : 0;
         const dateB = b.createdAt?.seconds ? b.createdAt.seconds : 0;
@@ -118,7 +114,6 @@ export default function ClassManagement() {
     }
   };
 
-  // UI/UX REPOSITORY FUNCTION: Fetch teacher's specific storage folder 
   const fetchTeacherVault = async () => {
     if (!classData?.teacherId) return;
     setVaultLoading(true);
@@ -146,20 +141,14 @@ export default function ClassManagement() {
     try {
       let fileUrl = newTask.existingUrl || "";
       
-      // 1. File Repository Save Routine (Only if uploading a fresh file)
       if (newTask.file && !newTask.existingUrl) {
-        console.log("Uploading fresh asset...", newTask.file.name);
         const fileName = `${Date.now()}_${newTask.file.name.replace(/\s+/g, '_')}`;
-        // Automatically route file into user isolated folder hierarchy path framework
         const fileRef = ref(storage, `teachers/${classData.teacherId}/stimulus/${fileName}`);
-        
         const uploadResult = await uploadBytes(fileRef, newTask.file);
         fileUrl = await getDownloadURL(uploadResult.ref);
       }
 
-      // 2. Batch write across multiple classes targets
       const batch = writeBatch(db);
-      
       for (const targetId of newTask.targetClasses) {
         const newTaskRef = doc(collection(db, 'assignments'));
         batch.set(newTaskRef, {
@@ -171,7 +160,7 @@ export default function ClassManagement() {
           teacherId: classData.teacherId,
           createdAt: serverTimestamp(),
           status: 'active',
-          studentConfig: newTask.studentConfig // Persisted target for differentiation mapping arrays
+          studentConfig: newTask.studentConfig 
         });
       }
 
@@ -205,7 +194,6 @@ export default function ClassManagement() {
       
       if (taskSnap.exists()) {
         const taskData = taskSnap.data();
-        // UX Logic Note: Only remove items from cloud storage if they aren't part of the shared repository references
         if (taskData.attachmentUrl && !taskData.attachmentUrl.includes('/stimulus%2F')) {
           try {
             const fileRef = ref(storage, taskData.attachmentUrl);
@@ -417,27 +405,100 @@ export default function ClassManagement() {
             <div className="action-row">
                 <button className="btn-primary" onClick={() => setShowTaskModal(true)}>+ Bina Tugasan Baru</button>
             </div>
-            <div className="sets-grid">
-              {assignments.map(task => (
-                <div key={task.id} className="set-card" onClick={() => router.push(`/Class/track/${task.id}?classId=${classId}`)}>
-                  <div className="set-info">
-                    <div style={{display:'flex', justifyValue:'space-between', alignItems:'center'}}>
-                        <span className="date-badge">📅 {task.dueDate || 'Tiada Tarikh'}</span>
-                        <button className="btn-reset" onClick={(e) => handleDeleteTask(task.id, e)}>Padam</button>
-                    </div>
-                    <h3>{task.title}</h3>
-                  </div>
-                  <div className="progress-zone">
-                    <div className="progress-text">
-                        <span>Progres Kelas</span>
-                        <span>{task.completedCount}/{students.length} Selesai</span>
-                    </div>
-                    <div className="track-bar-bg">
-                        <div className="track-fill" style={{width: `${task.progressPercent}%`}}></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            
+            {/* NEW UX REMODEL: Organized Structural List Table Representation */}
+            <div className="table-container">
+              <table className="assignment-list-table">
+                <thead>
+                  <tr>
+                    <th>Tajuk Tugasan & Arahan</th>
+                    <th>Tarikh Tutup</th>
+                    <th>Bahan Rangsangan</th>
+                    <th>Konfigurasi Murid</th>
+                    <th>Progres Semakan</th>
+                    <th style={{textAlign: 'right'}}>Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignments.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" style={{textAlign: 'center', padding: '40px', color: '#94a3b8'}}>
+                        Tiada tugasan dijumpai untuk kelas ini. Sila bina tugasan baharu.
+                      </td>
+                    </tr>
+                  ) : (
+                    assignments.map(task => (
+                      <tr key={task.id} className="task-row-item" onClick={() => router.push(`/Class/track/${task.id}?classId=${classId}`)}>
+                        
+                        {/* Title & Instructions Subtext */}
+                        <td>
+                          <div className="task-meta-cell">
+                            <span className="task-title-text">{task.title}</span>
+                            {task.instructions && (
+                              <p className="task-instructions-snippet" title={task.instructions}>
+                                {task.instructions}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Due Date Indicator */}
+                        <td>
+                          <span className={`date-pill ${task.dueDate ? 'has-date' : 'no-date'}`}>
+                            📅 {task.dueDate || 'Tiada Tarikh'}
+                          </span>
+                        </td>
+
+                        {/* Direct Cloud File Quick-Look Integration */}
+                        <td>
+                          {task.attachmentUrl ? (
+                            <a 
+                              href={task.attachmentUrl} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              className="btn-quick-look"
+                              onClick={(e) => e.stopPropagation()} 
+                            >
+                              👁️ Lihat Fail
+                            </a>
+                          ) : (
+                            <span className="no-file-text">Tiada Fail</span>
+                          )}
+                        </td>
+
+                        {/* Target Configuration Metric View */}
+                        <td>
+                          <div className="config-pill-group">
+                            <span className="badge-config">
+                              👤 {task.studentConfig ? Object.keys(task.studentConfig).length : 0} Diatur
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Progress and Visual Completion Indicators */}
+                        <td>
+                          <div className="table-progress-zone">
+                            <div className="table-progress-text">
+                              <strong>{task.completedCount}/{students.length}</strong> Selesai
+                            </div>
+                            <div className="table-track-bg">
+                              <div className="table-track-fill" style={{width: `${task.progressPercent}%`}}></div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Actions Control Deck */}
+                        <td style={{textAlign: 'right'}} onClick={(e) => e.stopPropagation()}>
+                          <button className="btn-reset btn-danger" onClick={(e) => handleDeleteTask(task.id, e)}>
+                            Padam
+                          </button>
+                        </td>
+
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </section>
         ) : (
@@ -535,7 +596,6 @@ export default function ClassManagement() {
                 <input type="text" placeholder="Contoh: Karangan Berkelah" onChange={e => setNewTask({...newTask, title: e.target.value})} />
             </div>
 
-            {/* UI/UX REPOSITORY DESIGN INTEGRATION */}
             <div className="form-group">
                 <label>Bahan Rangsangan (Stimulus)</label>
                 {newTask.existingUrl ? (
@@ -677,14 +737,38 @@ export default function ClassManagement() {
         .action-row { margin-bottom: 30px; }
         .btn-primary { background: #003D40; color: white; border: none; padding: 12px 25px; border-radius: 12px; font-weight: 700; cursor: pointer; }
         .btn-add { background: #00767B; color: white; border: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; }
-        .sets-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 25px; }
-        .set-card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); cursor: pointer; transition: 0.3s; border: 1px solid transparent; }
-        .set-card:hover { transform: translateY(-5px); border-color: #48A6A7; }
-        .date-badge { font-size: 0.75rem; color: #EF4444; font-weight: 700; }
-        .progress-zone { margin-top: 20px; }
-        .progress-text { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; color: #64748B; margin-bottom: 8px; }
-        .track-bar-bg { height: 10px; background: #E2E8F0; border-radius: 20px; overflow: hidden; }
-        .track-fill { height: 100%; background: #22C55E; border-radius: 20px; transition: 1s ease-in-out; }
+        
+        /* RE-ENGINEERED ASSIGNMENT LIST MODULE STYLES */
+        .table-container { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; }
+        .assignment-list-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .assignment-list-table th { background: #E6F4F4; padding: 18px 20px; color: #003D40; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+        
+        .task-row-item { cursor: pointer; transition: background 0.2s ease; border-bottom: 1px solid #f0f0f0; }
+        .task-row-item:hover { background: #f9fbfb; }
+        
+        .task-meta-cell { display: flex; flex-direction: column; gap: 4px; max-width: 320px; padding: 6px 0; }
+        .task-title-text { font-weight: 700; color: #003D40; font-size: 1rem; }
+        .task-instructions-snippet { margin: 0; font-size: 0.8rem; color: #64748B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .date-pill { font-size: 0.8rem; padding: 6px 12px; border-radius: 8px; font-weight: 600; display: inline-block; }
+        .date-pill.has-date { background: #FEF2F2; color: #EF4444; }
+        .date-pill.no-date { background: #F1F5F9; color: #94A3B8; }
+        
+        .btn-quick-look { display: inline-flex; align-items: center; background: #E0F2FE; color: #0369A1; padding: 6px 14px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; text-decoration: none; transition: background 0.2s; }
+        .btn-quick-look:hover { background: #BAE6FD; }
+        .no-file-text { font-size: 0.8rem; color: #94A3B8; font-style: italic; }
+        
+        .badge-config { background: #F3E8FF; color: #6B21A8; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; }
+        
+        .table-progress-zone { display: flex; flex-direction: column; gap: 6px; width: 140px; }
+        .table-progress-text { font-size: 0.75rem; color: #475569; }
+        .table-track-bg { height: 6px; background: #E2E8F0; border-radius: 10px; overflow: hidden; }
+        .table-track-fill { height: 100%; background: #22C55E; border-radius: 10px; }
+        
+        .btn-danger { background: #FFF5F5; color: #C53030; border: 1px solid #FEB2B2; padding: 6px 12px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+        .btn-danger:hover { background: #E53E3E; color: white; border-color: #E53E3E; }
+
+        /* NATIVE REUSE STYLES */
         .std-table { width: 100%; background: white; border-radius: 20px; border-collapse: collapse; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         .std-table th { background: #E6F4F4; text-align: left; padding: 18px; color: #003D40; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
         .std-table td { padding: 18px; border-bottom: 1px solid #f0f0f0; }
@@ -693,31 +777,33 @@ export default function ClassManagement() {
         .credit-badge { background: #F0FFF4; color: #2F855A; padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; }
         .btn-reset { background: #FFF5F5; color: #C53030; border: 1px solid #FEB2B2; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
         .modal { position: fixed; inset: 0; background: rgba(0,45,47,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+        .modal-content { background: white; padding: 30px; border-radius: 24px; width: 500px; max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-content.large { width: 650px; }
+        .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        .form-group label { font-weight: 700; color: #003D40; font-size: 0.9rem; }
+        .form-group input[type="text"], .form-group input[type="date"], .form-group select, .form-group textarea { padding: 12px; border: 2px solid #E2E8F0; border-radius: 12px; font-family: inherit; font-size: 0.95rem; outline: none; transition: 0.2s; }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #48A6A7; }
+        .form-group textarea { height: 100px; resize: none; }
+        .form-group textarea.small-text { height: 70px; }
+        .hint { font-size: 0.8rem; color: #64748B; margin-top: 2px; }
+        .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px; }
+        .btn-cancel { background: #F1F5F9; color: #475569; border: none; padding: 12px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+        .confirm { background: #003D40; color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+        .media-upload-options { border: 2px dashed #CBD5E1; padding: 15px; border-radius: 12px; background: #F8FAFC; }
+        .btn-vault-trigger { width: 100%; background: white; border: 1px solid #CBD5E1; padding: 10px; border-radius: 8px; font-weight: 600; color: #334155; cursor: pointer; transition: 0.2s; }
+        .btn-vault-trigger:hover { background: #F1F5F9; }
+        .selected-vault-file { display: flex; justify-content: space-between; align-items: center; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 12px; border-radius: 12px; color: #065F46; font-weight: 600; font-size: 0.9rem; }
+        .btn-remove-file { background: transparent; border: none; color: #991B1B; font-weight: 700; cursor: pointer; }
         .student-diff-list { max-height: 140px; overflow-y: auto; border: 2px solid #E2E8F0; border-radius: 12px; padding: 5px; background: #f8fafc; }
-        .student-diff-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #edf2f7; }
-        .btn-mode-toggle { padding: 4px 10px; border-radius: 15px; border: 1px solid #cbd5e1; background: white; font-size: 0.7rem; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .btn-mode-toggle.is-scaffold { background: #00767B; color: white; border-color: #00767B; }
-        .modal-content { background: white; padding: 35px; border-radius: 30px; width: 480px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
-        .modal-content.large { width: 600px; }
-        .form-group { margin-bottom: 18px; }
-        .form-group label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.9rem; color: #002d2f; }
-        input, textarea, select { width: 100%; padding: 12px; border: 2px solid #E2E8F0; border-radius: 12px; font-family: inherit; }
-        textarea.small-text { height: 70px; }
-        textarea { height: 220px; resize: none; }
-        .hint { font-size: 0.78rem; color: #64748B; margin-bottom: 12px; display: block; line-height: 1.3; }
-        .modal-btns { display: flex; justify-content: flex-end; gap: 15px; margin-top: 20px; }
-        .btn-cancel { background: #F1F5F9; border: none; padding: 12px 25px; border-radius: 12px; font-weight: 700; cursor: pointer; }
-        .confirm { background: #003D40; color: white; border: none; padding: 12px 25px; border-radius: 12px; font-weight: 700; cursor: pointer; }
-        
-        /* REPOSITORY COMPONENT STYLING */
-        .btn-vault-trigger { background: #F0FDF4; border: 2px dashed #48A6A7; color: #00767B; padding: 10px; border-radius: 12px; font-weight: 700; font-size: 0.8rem; cursor: pointer; width: 100%; transition: 0.2s; }
-        .btn-vault-trigger:hover { background: #E6F4F4; }
-        .selected-vault-file { display: flex; justify-content: space-between; align-items: center; background: #E6F4F4; border: 2px solid #00767B; padding: 10px 15px; border-radius: 12px; font-size: 0.85rem; font-weight: 700; color: #003D40; }
-        .btn-remove-file { background: #FFF5F5; color: #C53030; border: 1px solid #FEB2B2; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; font-weight: bold; }
-        .vault-list-container { max-height: 200px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; }
-        .vault-item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #F1F5F9; }
-        .vault-item-name { font-size: 0.8rem; font-weight: 600; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
-        .btn-vault-select { background: #003D40; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+        .student-diff-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #EDF2F7; font-size: 0.85rem; font-weight: 600; }
+        .btn-mode-toggle { border: 1px solid #CBD5E1; background: white; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; cursor: pointer; color: #64748B; }
+        .btn-mode-toggle.is-scaffold { background: #EFF6FF; border-color: #BFDBFE; color: #1D4ED8; }
+        .vault-list-container { max-height: 240px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 12px; }
+        .vault-item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid #F1F5F9; }
+        .vault-item-name { font-size: 0.85rem; font-weight: 600; color: #334155; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .btn-vault-select { background: #003D40; color: white; border: none; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+        .loader { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-weight: 700; color: #003D40; background: #f0f4f4; }
+        textarea { width: 100%; height: 150px; padding: 12px; border: 2px solid #E2E8F0; border-radius: 12px; font-family: inherit; resize: none; outline: none; }
       `}</style>
     </div>
   );
