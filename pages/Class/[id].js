@@ -653,10 +653,10 @@ export default function ClassManagement() {
         </div>
       )}
 
-      {/* SUB-MODAL: TEACHER PRIVATE STORAGE VAULT */}
+{/* SUB-MODAL: TEACHER PRIVATE STORAGE VAULT */}
       {showVaultBrowser && (
         <div className="modal" style={{zIndex: 110}}>
-          <div className="modal-content" style={{width: '450px', background: '#fdfdfd'}}>
+          <div className="modal-content" style={{width: '480px', background: '#fdfdfd'}}>
             <h3>Arkib Fail Peribadi Anda</h3>
             <p className="hint" style={{marginTop: '-5px'}}>Fail yang pernah anda muat naik sebelum ini:</p>
             
@@ -668,12 +668,35 @@ export default function ClassManagement() {
                   <p style={{textAlign: 'center', color: '#94a3b8', padding: '20px', fontSize: '0.85rem'}}>Tiada fail dijumpai. Sila muat naik fail baru menerusi komputer.</p>
                 ) : (
                   vaultFiles.map((file, i) => (
-                    <div key={i} className="vault-item-row">
-                      <span className="vault-item-name" title={file.name}>📄 {file.name}</span>
-                      <button type="button" className="btn-vault-select" onClick={() => {
-                        setNewTask({ ...newTask, existingUrl: file.url, title: file.name.split('_').slice(1).join('_') || newTask.title });
-                        setShowVaultBrowser(false);
-                      }}>Pilih</button>
+                    <div key={i} className="vault-item-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px' }}>
+                      <span className="vault-item-name" title={file.name} style={{ flex: 1, marginRight: '10px', minWidth: 0 }}>📄 {file.name}</span>
+                      <div style={{display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0}}>
+                        {/* High visibility text preview action link */}
+                        <a 
+                          href={file.url} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          className="btn-quick-look" 
+                          style={{
+                            padding: '6px 12px', 
+                            fontSize: '0.8rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: '#E0F2FE',
+                            color: '#0369A1',
+                            borderRadius: '6px',
+                            fontWeight: '700',
+                            textDecoration: 'none'
+                          }}
+                        >
+                          👁️ Lihat
+                        </a>
+                        <button type="button" className="btn-vault-select" onClick={() => {
+                          setNewTask({ ...newTask, existingUrl: file.url, title: file.name.split('_').slice(1).join('_') || newTask.title });
+                          setShowVaultBrowser(false);
+                        }}>Pilih</button>
+                      </div>
                     </div>
                   ))
                 )}
