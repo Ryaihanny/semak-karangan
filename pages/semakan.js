@@ -430,7 +430,7 @@ export default function SemakanPage() {
           {/* Requirement 1: Hidden to students who are not chosen as scaffolded */}
           {isDifferentiatedStudent && (
             <button onClick={() => setIsBuilderOpen(true)} style={styles.openBuilderBtn}>
-              🧩 Main Game Susun Ayat Pintar (Gambar 1-{totalPictures}) ✨
+              🧩 Susun Ayat Pintar (Gambar 1-{totalPictures}) ✨
             </button>
           )}
 
@@ -622,17 +622,17 @@ export default function SemakanPage() {
                 <div style={styles.scaffoldFormBox}>
                   <div style={{ marginBottom: '10px' }}>
                     <span style={{ fontSize: '12px', color: '#4A5568', fontWeight: 'bold' }}>
-                      💡 Masukkan apa sahaja perkataan / frasa (Boleh campur English / Melayu / Typo):
+                      💡 Masukkan apa sahaja perkataan / frasa:
                     </span>
                     <p style={{ margin: '4px 0 10px 0', fontSize: '11px', color: '#718096' }}>
-                      Contoh: "boy run because cat chase" atau "dua orang cleaning longkang"
+                      Contoh: "Budak lelaki hendak kejar kucing" 
                     </p>
                   </div>
                   
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <input value={builderQuery} onChange={(e) => setBuilderQuery(e.target.value)} placeholder="Taip idea anda di sini..." style={styles.scaffoldInput} />
                     <button onClick={handleBuildSentence} disabled={isBuilding || !builderQuery.trim()} style={styles.scaffoldActionBtn}>
-                      {isBuilding ? "Menjana Kata..." : "Tukar Ke Game 🪄"}
+                      {isBuilding ? "Menjana Kata..." : "Susun frasa 🪄"}
                     </button>
                   </div>
                 </div>

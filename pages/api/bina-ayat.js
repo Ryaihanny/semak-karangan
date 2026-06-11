@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, Type } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -25,31 +25,31 @@ export default async function handler(req, res) {
     3. Cerai-cerai ayat lengkap tersebut menjadi beberapa blok perkataan/frasa ringkas (Wajib menghasilkan LEBIH daripada 2 blok, selalunya 4 hingga 7 blok kata kunci bergantung panjang ayat) supaya mereka boleh bermain game susun suai.
     4. Untuk setiap blok kepingan perkataan ("kataKunci"), berikan label bantuan terjemahan bahasa Inggeris di bawahnya supaya murid faham maknanya. Contoh: Jika perkataannya "Kucing itu", letakkan label "The cat (Subjek)". Jika "sedang mengejar", letakkan label "is chasing (Predikat)".`;
 
-    // Enforce strict JSON structure via the SDK config schema to guarantee no conversational text breaks JSON.parse
+    // Enforce structure using pure string identifiers for the schema properties
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: "object",
           properties: {
-            ayatPenuh: { type: Type.STRING },
+            ayatPenuh: { type: "string" },
             kataKunci: {
-              type: Type.ARRAY,
+              type: "array",
               items: {
-                type: Type.OBJECT,
+                type: "object",
                 properties: {
-                  id: { type: Type.STRING },
-                  teks: { type: Type.STRING },
-                  jenis: { type: Type.STRING },
-                  label: { type: Type.STRING }
+                  id: { type: "string" },
+                  teks: { type: "string" },
+                  jenis: { type: "string" },
+                  label: { type: "string" }
                 },
                 required: ["id", "teks", "jenis", "label"]
               }
             },
             susunanBetul: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
+              type: "array",
+              items: { type: "string" }
             }
           },
           required: ["ayatPenuh", "kataKunci", "susunanBetul"]
