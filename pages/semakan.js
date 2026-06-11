@@ -27,18 +27,16 @@ export default function SemakanPage() {
   const [kamusHasil, setKamusHasil] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  // --- NEW PERSISTENT 5-SENTENCE WORKSPACE STATES ---
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [selectedPictureIndex, setSelectedPictureIndex] = useState(1); 
-  const [watakName, setWatakName] = useState(""); // Replaced builderQuery with character name
+  const [watakName, setWatakName] = useState("");
   const [isBuilding, setIsBuilding] = useState(false);
   const [builderResult, setBuilderResult] = useState(null);
 
-  const [shuffledBlocks, setShuffledBlocks] = useState([]); // Permanent word bank
-  const [placedBlocks, setPlacedBlocks] = useState([]); // Sentence track (can hold duplicates)
+  const [shuffledBlocks, setShuffledBlocks] = useState([]);
+  const [placedBlocks, setPlacedBlocks] = useState([]);
   const [isGameWon, setIsGameWon] = useState(false);
 
-  // Array to hold the 5 finalized sentences built by the student
   const [savedSentences, setSavedSentences] = useState(["", "", "", "", ""]);
   const [activeSentenceIndex, setActiveSentenceIndex] = useState(0);
 
@@ -51,7 +49,7 @@ export default function SemakanPage() {
   const speakSuggestion = (text) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
-      const utterance = new SynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(text); // Fixed syntax error here
       utterance.lang = 'ms-MY'; 
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
@@ -159,7 +157,6 @@ export default function SemakanPage() {
     return () => clearTimeout(delayDebounceFn);
   }, [essay, activeId, taskId]);
 
-  // --- NEW GENERATION ACTION ---
   const handleBuildSentence = async () => {
     if (!watakName.trim()) return alert("Sila masukkan nama watak terlebih dahulu!");
     setIsBuilding(true);
@@ -171,7 +168,7 @@ export default function SemakanPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          idea: watakName, // Sends character name to populate options
+          idea: watakName, 
           studentLevel: studentLevel,
           taskTitle: taskData?.title,
           taskStimulus: taskData?.instructions + ` [Fokus Gambar ${selectedPictureIndex}]`
@@ -181,16 +178,14 @@ export default function SemakanPage() {
       if (!res.ok) throw new Error("Gagal.");
       const data = await res.json();
       setBuilderResult(data);
-      // Top box holds the vocabulary cards permanently
       setShuffledBlocks(data.kataKunci);
-    </div> catch (err) {
+    } catch (err) { // Fixed stray structural HTML bracket layout here
       alert("Gagal menghubungi pembantu binaan ayat.");
     } finally {
       setIsBuilding(false);
     }
   };
 
-  // DRAG & DROP CLONING MECHANISM
   const handleDragStart = (e, blockId, sourceZone, instanceIndex = null) => {
     e.dataTransfer.setData("blockId", blockId);
     e.dataTransfer.setData("sourceZone", sourceZone);
@@ -205,11 +200,9 @@ export default function SemakanPage() {
     const sourceZone = e.dataTransfer.getData("sourceZone");
 
     if (sourceZone === "pool") {
-      // Find base card in top pool
       const originalBlock = shuffledBlocks.find(b => b.id === blockId);
       if (!originalBlock) return;
 
-      // CLONE: Generate a fresh unique instance so it stays in the top pool
       const newInstance = {
         ...originalBlock,
         uniqueInstanceId: `${blockId}_${Date.now()}_${Math.random()}`
@@ -219,7 +212,6 @@ export default function SemakanPage() {
   };
 
   const handleRemoveFromTrack = (indexToRemove) => {
-    // Remove individual clicked or dropped card instance from construction track
     setPlacedBlocks(placedBlocks.filter((_, idx) => idx !== indexToRemove));
     setIsGameWon(false);
   };
@@ -227,7 +219,6 @@ export default function SemakanPage() {
   const verifySentenceStructure = () => {
     if (!builderResult || placedBlocks.length === 0) return;
     
-    // Check if the IDs of elements placed match the sequence target array
     const userSequence = placedBlocks.map(b => b.id);
     const isCorrect = userSequence.length === builderResult.susunanBetul.length &&
                      userSequence.every((id, idx) => id === builderResult.susunanBetul[idx]);
@@ -253,7 +244,6 @@ export default function SemakanPage() {
     const totalText = savedSentences.filter(s => s.trim() !== "").join("\n");
     setEssay(prev => prev ? prev + "\n" + totalText : totalText);
     setIsBuilderOpen(false);
-    // Clear out session states
     setSavedSentences(["", "", "", "", ""]);
     setBuilderResult(null);
     setWatakName("");
@@ -300,7 +290,6 @@ export default function SemakanPage() {
         </div>
       </div>
 
-      {/* POPUP MODAL WORKSPACE */}
       {isBuilderOpen && (
         <div style={styles.modalOverlay}>
           <div style={{ ...styles.modalContent, maxWidth: '1200px', width: '95%' }}>
@@ -313,7 +302,6 @@ export default function SemakanPage() {
             </div>
 
             <div style={styles.modalBodyLayout}>
-              {/* Left Picture Reference */}
               <div style={styles.modalImagePanel}>
                 <h4 style={{ margin: '0 0 10px 0' }}>🖼️ Rujukan Gambar Karangan:</h4>
                 {taskData?.imageUrl ? (
@@ -322,7 +310,6 @@ export default function SemakanPage() {
                   <div style={styles.noImagePlaceholder}>Tiada gambar rujukan.</div>
                 )}
                 
-                {/* Sentence Selector Grid */}
                 <h4 style={{ margin: '20px 0 10px 0' }}>📈 Kemajuan 5 Ayat Anda:</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
                   {savedSentences.map((sentence, idx) => (
@@ -350,7 +337,6 @@ export default function SemakanPage() {
                 </button>
               </div>
 
-              {/* Right Drag Area */}
               <div style={styles.modalGamePanel}>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <div>
@@ -363,7 +349,7 @@ export default function SemakanPage() {
                   </div>
 
                   <div style={{ flex: 1 }}>
-                    <label style={styles.sectionLabel}>👤 Masukkan Nama Watak (e.g. Ali, Siti, Dua orang murid):</label>
+                    <label style={styles.sectionLabel}>👤 Masukkan Nama Watak:</label>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <input value={watakName} onChange={(e) => setWatakName(e.target.value)} placeholder="Taip nama watak di sini..." style={styles.scaffoldInput} />
                       <button onClick={handleBuildSentence} disabled={isBuilding || !watakName.trim()} style={styles.scaffoldActionBtn}>
@@ -377,7 +363,6 @@ export default function SemakanPage() {
                   <div style={{ marginTop: '10px' }}>
                     <span style={styles.sectionLabel}>🌟 Bank Kata Kunci (Tarik kad dari sini - kad tidak akan hilang):</span>
                     
-                    {/* TOP BOX: Infinite Word Pool */}
                     <div 
                       onDragOver={(e) => e.preventDefault()} 
                       onDragEnter={(e) => e.preventDefault()}
@@ -403,7 +388,6 @@ export default function SemakanPage() {
 
                     <span style={styles.sectionLabel}>📥 Kotak Binaan Ayat {activeSentenceIndex + 1} (Klik kad untuk padam):</span>
                     
-                    {/* BOTTOM BOX: Construction Track */}
                     <div 
                       onDragOver={(e) => e.preventDefault()} 
                       onDragEnter={(e) => e.preventDefault()}
@@ -427,7 +411,6 @@ export default function SemakanPage() {
                             borderColor: block.jenis === 'kata-kerja' ? '#FCA5A5' : block.jenis === 'kata-nama' ? '#93C5FD' : '#FDE68A',
                             color: block.jenis === 'kata-kerja' ? '#991B1B' : block.jenis === 'kata-nama' ? '#1E40AF' : '#92400E'
                           }}
-                          title="Klik untuk buang"
                         >
                           <span style={styles.cardMetaLabel}>{block.label}</span>
                           <strong>{block.teks}</strong>
@@ -480,7 +463,6 @@ const styles = {
   textarea: { width: '100%', height: '400px', borderRadius: '10px', padding: '15px', fontSize: '17px', border: '2px solid #EEE', resize: 'none', outline: 'none' },
   submitBtn: { width: '100%', padding: '15px', borderRadius: '10px', border: 'none', backgroundColor: '#6C5CE7', color: 'white', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' },
   openBuilderBtn: { width: '100%', padding: '14px', marginBottom: '12px', borderRadius: '12px', border: 'none', backgroundColor: '#10B981', color: 'white', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' },
-  
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 5000, backdropFilter: 'blur(4px)' },
   modalContent: { backgroundColor: '#FFF', borderRadius: '20px', overflow: 'hidden' },
   modalHeader: { padding: '16px 20px', background: '#6C5CE7', color: '#FFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
@@ -490,15 +472,13 @@ const styles = {
   modalInlineImg: { width: '100%', borderRadius: '8px', maxHeight: '240px', objectFit: 'contain', border: '1px solid #CBD5E1' },
   noImagePlaceholder: { padding: '20px', background: '#F8FAFC', color: '#94A3B8', borderRadius: '8px', textAlign: 'center' },
   modalGamePanel: { display: 'flex', flexDirection: 'column', gap: '15px' },
-  
-  sentenceSlotRow: { padding: '10px', borderRadius: '8px', border: '2px solid', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px', transition: 'all 0.2s' },
+  sentenceSlotRow: { padding: '10px', borderRadius: '8px', border: '2px solid', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '2px' },
   sentenceSlotPreview: { fontSize: '13px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   transferAllBtn: { width: '100%', padding: '12px', marginTop: '15px', background: '#10B981', color: '#FFF', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' },
   customSelect: { padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFF', width: '130px' },
   sectionLabel: { fontSize: '13px', fontWeight: 'bold', color: '#334155', display: 'block' },
   scaffoldInput: { flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' },
   scaffoldActionBtn: { padding: '10px 16px', background: '#6C5CE7', color: '#FFF', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' },
-  
   cardPoolContainer: { background: '#F1F5F9', padding: '14px', borderRadius: '12px', display: 'flex', gap: '10px', flexWrap: 'wrap', minHeight: '75px', border: '2px dashed #CBD5E1' },
   dropTargetTrack: { padding: '18px', borderRadius: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', minHeight: '90px', alignItems: 'center', borderWidth: '2px', borderStyle: 'solid' },
   draggableWordCard: { padding: '8px 12px', borderRadius: '10px', borderWidth: '2px', borderStyle: 'solid', cursor: 'grab', userSelect: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#FFF' },
