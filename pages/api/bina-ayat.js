@@ -1,7 +1,7 @@
-import { GoogleGenAI } from '@google/generative-ai'; // Error fix: changed from @google/genai
+import { GoogleGenerativeAI } from '@google/generative-ai'; // Error fix: changed GoogleGenAI to GoogleGenerativeAI
 
-// Initialize using the correct legacy library syntax
-const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
+// Initialize using the correct legacy library class name
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
