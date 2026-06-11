@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     }
 
     // Call using the correct model layout schema for @google/generative-ai
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
     
     const prompt = `Anda adalah Cikgu AI Bahasa Melayu. Berdasarkan idea mentah murid ini: "${idea}", bina satu ayat yang betul, gramatis, dan lengkap mengikut struktur (Subjek + Predikat). Sediakan output dalam format JSON tulen yang mengandungi struktur perkataan cerai untuk permainan susun ayat. 
     Tahap murid: ${studentLevel || 'Umum'}. 
