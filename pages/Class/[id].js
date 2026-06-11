@@ -445,7 +445,7 @@ export default function ClassManagement() {
                           {/* Row Numbered Title & Instructions Subtext */}
                           <td>
                             <div className="task-meta-cell">
-                              <span className="task-title-text">No {index + 1} : {task.title}</span>
+                              <span className="task-title-text"> {index + 1} : {task.title}</span>
                               {task.instructions && (
                                 <p className="task-instructions-snippet" title={task.instructions}>
                                   {task.instructions}
