@@ -11,21 +11,22 @@ export default async function handler(req, res) {
     const { idea, studentLevel, taskTitle, taskStimulus } = req.body;
 
     if (!idea) {
-      return res.status(400).json({ message: 'Idea is required' });
+      return res.status(400).json({ message: 'Nama watak diperlukan' });
     }
 
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    const prompt = `Anda adalah Cikgu AI Bahasa Melayu yang penyayang untuk sekolah rendah.
-    Murid memasukkan idea mentah ini: "${idea}".
+    // Instructing AI to take the custom character name input (idea) and generate rich structural cards
+    const prompt = `Anda adalah Cikgu AI Bahasa Melayu Sekolah Rendah.
+    Murid memberikan nama watak / subjek fokus ini: "${idea}".
+    Konteks tugasan: ${taskStimulus || 'Tiada'}
     
     TUGASAN ANDA:
-    1. Fahami maksud tersirat murid walaupun ada kesilapan ejaan (typo), tatabahasa rosak, atau jika mereka menaip sepenuhnya dalam Bahasa Inggeris/Manglish.
-    2. Bina satu ayat tunggal/majmuk Bahasa Melayu yang betul, sangat gramatis, bersih, sesuai dengan Tahap Sekolah Rendah (${studentLevel || 'Umum'}).
-    3. Cerai-cerai ayat lengkap tersebut menjadi beberapa blok perkataan/frasa ringkas (Wajib menghasilkan LEBIH daripada 2 blok, selalunya 4 hingga 7 blok kata kunci bergantung panjang ayat) supaya mereka boleh bermain game susun suai.
-    4. Untuk setiap blok kepingan perkataan ("kataKunci"), berikan label bantuan terjemahan bahasa Inggeris di bawahnya supaya murid faham maknanya. Contoh: Jika perkataannya "Kucing itu", letakkan label "The cat (Subjek)". Jika "sedang mengejar", letakkan label "is chasing (Predikat)".`;
+    1. Bina satu ayat lengkap yang gramatis dan sangat bermutu tinggi untuk peringkat sekolah rendah (${studentLevel || 'Umum'}) bermula dengan atau berpusat pada subjek/watak "${idea}".
+    2. Pisahkan ayat tersebut menjadi 4 hingga 7 kepingan blok perkataan/frasa ringkas ("kataKunci") supaya murid boleh menyusunnya semula.
+    3. Untuk setiap kepingan kata kunci, berikan label terjemahan bahasa Inggeris berserta huraian pendek struktur tatabahasa (contoh: "Subject (Watak)", "Verb (Aktiviti)", "Object"). 
+    Semua string nilai teks kepingan mestilah tepat dan mencakupi keseluruhan susunan ayat asal.`;
 
-    // Enforce structure using pure string identifiers for the schema properties
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
