@@ -1,79 +1,48 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from '@google/generative-ai'; // Error fix: changed from @google/genai
 
-// Initialize your AI client (ensure your API key is in your .env file)
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize using the correct legacy library syntax
+const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
 
 export default async function handler(req, res) {
-  // CORS & method guard rails
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
-
-  // 1. DATA EXTRACTION (Matches what your front-end will send)
-  const { idea, studentLevel, taskTitle, taskStimulus } = req.body;
-
-  if (!idea || !idea.trim()) {
-    return res.status(400).json({ success: false, message: 'Idea kasar murid diperlukan.' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    // 2. CONSTRUCT SYSTEM PROMPT WITH FIRESTORE SCHEMA FIELDS
-    const systemPrompt = `
-      Anda adalah pakar bahasa Melayu KPM (Pedagogi Terbeza). Tugas anda adalah membantu murid yang lemah membina ayat berdasarkan tugasan atau bahan rangsangan yang diberikan oleh guru mereka.
+    const { idea, studentLevel, taskTitle, taskStimulus } = req.body;
 
-      KONTEKS TUGASAN DARIPADA FIREBASE (taskData):
-      - Tajuk Tugasan (taskData.title): "${taskTitle || 'Umum / Tiada Tajuk'}"
-      - Stimulus/Arahan Guru (taskData.stimulus): "${taskStimulus || 'Bina ayat bebas yang bersesuaian.'}"
+    if (!idea) {
+      return res.status(400).json({ message: 'Idea is required' });
+    }
 
-      INPUT DARIPADA MURID:
-      - Idea Kasar Murid: "${idea}"
-      - Tahap Akademik Murid (studentLevel): "${studentLevel || 'P6'}"
-
-      ARAHAN PEMPROSESAN AYAT:
-      1. Rujuk Tajuk dan Stimulus Guru untuk memahami batasan tema tugasan.
-      2. Ambil Idea Kasar murid, baiki kesalahan ejaan/tatabahasa, dan tingkatkan kualiti struktur sintaksisnya agar matang serta relevan secara langsung dengan tema tugasan guru. Jangan biarkan ayat lari daripada tema!
-      3. Pecahkan ayat lengkap yang telah disempurnakan itu kepada minimum 3 dan maksimum 5 blok frasa (tokens) supaya murid boleh menyusun semula frasa tersebut seperti permainan puzzle/kata.
-      4. Kelaskan setiap kelompok frasa kepada kategori ini SAHAJA: 'kata-nama', 'kata-kerja', atau 'kata-adjektif'.
-      5. Berikan label ringkas yang menunjukkan peranan perkataan tersebut (Contoh: "Subjek 🧑‍🤝‍🧑", "Perbuatan 🧼", "Sifat/Keadaan ✨", "Keterangan/Penerang 📍").
-      6. Sediakan susunan kunci ID yang betul di dalam array 'susunanBetul' (Contoh urutan: ["w1", "w2", "w3"]).
-
-      FORMAT RESPONS (WAJIB JSON TULEN):
-      Kembalikan respons dalam bentuk format JSON sahaja tanpa sebarang blok kod markdown (seperti \`\`\`json) atau teks luaran tambahan.
-
-      {
-        "tema": "Tema atau tajuk kecil ayat",
-        "ayatPenuh": "Teks ayat lengkap gubahan baharu yang sudah disempurnakan",
-        "kataKunci": [
-          { "id": "w1", "teks": "Frasa Pertama", "jenis": "kata-nama", "label": "Subjek 🧑‍🤝‍🧑" },
-          { "id": "w2", "teks": "Frasa Kedua", "jenis": "kata-kerja", "label": "Perbuatan 🧼" },
-          { "id": "w3", "teks": "Frasa Ketiga", "jenis": "kata-adjektif", "label": "Sifat ✨" }
-        ],
-        "susunanBetul": ["w1", "w2", "w3"]
-      }
-    `;
-
-    // 3. GENERATE DYNAMIC CONTENT WITH STRUCTURAL JSON ENFORCEMENT
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: systemPrompt,
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
-
-    const parsedData = JSON.parse(response.text);
+    // Call using the correct model layout schema for @google/generative-ai
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
-    return res.status(200).json(parsedData);
+    const prompt = `Anda adalah Cikgu AI Bahasa Melayu. Berdasarkan idea mentah murid ini: "${idea}", bina satu ayat yang betul, gramatis, dan lengkap mengikut struktur (Subjek + Predikat). Sediakan output dalam format JSON tulen yang mengandungi struktur perkataan cerai untuk permainan susun ayat. 
+    Tahap murid: ${studentLevel || 'Umum'}. 
+    Tajuk: ${taskTitle || 'Tiada'}. 
+    Konteks: ${taskStimulus || 'Tiada'}.
 
+    Format JSON wajib mengikut skema ini secara tepat:
+    {
+      "ayatPenuh": "Ayat lengkap yang betul di sini",
+      "kataKunci": [
+        { "id": "w1", "teks": "Perkataan1", "jenis": "kata-nama", "label": "Subjek" },
+        { "id": "w2", "teks": "Perkataan2", "jenis": "kata-kerja", "label": "Predikat" }
+      ],
+      "susunanBetul": ["w1", "w2"]
+    }`;
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    
+    // Clean up markdown block wraps if returned by the AI
+    const cleanJson = responseText.replace(/```json|```/g, '').trim();
+    const data = JSON.parse(cleanJson);
+
+    return res.status(200).json(data);
   } catch (error) {
-    console.error("Ralat inside api/bina-ayat:", error);
-    return res.status(500).json({ 
-      success: false, 
-      message: "Gagal memproses dan memecah struktur ayat game.",
-      details: error.message 
-    });
+    console.error("Bina Ayat API Error:", error);
+    return res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 }
