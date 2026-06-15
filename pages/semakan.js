@@ -690,27 +690,48 @@ export default function SemakanPage() {
                           <strong>{block.teks}</strong>
                         </div>
                       ))}
-                    </div>
 
-                    {isGameWon && (
-                      <div style={styles.victoryContainer}>
-                        <div style={{ fontSize: '14px', color: '#065F46', fontWeight: 'bold', marginBottom: '8px' }}>
-                          🎉 Hebat! Susunan ayat anda betul & gramatis!
+                    {/* === REPLACE FROM HERE === */}
+                    <div style={{ marginTop: '20px', marginBottom: '10px', textAlign: 'center' }}>
+                      {placedBlocks.length > 0 ? (
+                        <div>
+                          <button
+                            onClick={() => {
+                              const completeSentence = placedBlocks.map(b => b.teks).join(" ");
+                              setEssay(prev => prev ? prev + " " + completeSentence : completeSentence);
+                              setIsBuilderOpen(false);
+                              setBuilderResult(null);
+                              setBuilderQuery("");
+                            }}
+                            style={{
+                              backgroundColor: '#059669', // Emerald green color
+                              color: 'white',
+                              padding: '12px 24px',
+                              borderRadius: '8px',
+                              fontWeight: 'bold',
+                              fontSize: '15px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            }}
+                          >
+                            📥 Sahkan & Masukkan Ayat ke Karangan
+                          </button>
+
+                          {isGameWon && (
+                            <div style={{ fontSize: '14px', color: '#059669', fontWeight: 'bold', marginTop: '10px' }}>
+                              🎉 Syabas! Susunan anda telah disahkan tepat dan gramatis!
+                            </div>
+                          )}
                         </div>
-                        <button
-                          onClick={() => {
-                            const completeSentence = placedBlocks.map(b => b.teks).join(" ");
-                            setEssay(prev => prev ? prev + " " + completeSentence : completeSentence);
-                            setIsBuilderOpen(false);
-                            setBuilderResult(null);
-                            setBuilderQuery("");
-                          }}
-                          style={styles.insertSentenceToEssayBtn}
-                        >
-                          📥 Masukkan Ayat Sempurna Ini ke Karangan Saya
-                        </button>
-                      </div>
-                    )}
+                      ) : (
+                        <div style={{ color: '#94A3B8', fontSize: '14px', fontStyle: 'italic' }}>
+                          Sila seret kad perkataan di bawah ke dalam kotak binaan untuk menyusun ayat...
+                        </div>
+                      )}
+                    </div>
+                    {/* === TO HERE === */}
+
                   </div>
                 )}
               </div>
@@ -718,7 +739,7 @@ export default function SemakanPage() {
           </div>
         </div>
       )}
-
+                    
       {loading && (
         <div style={styles.overlay}>
           <div style={styles.loaderBox}>
