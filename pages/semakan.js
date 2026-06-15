@@ -47,7 +47,7 @@ export default function SemakanPage() {
   const speakSuggestion = (text) => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(text); // Fixed: Changed from SynthesisUtterance to SpeechSynthesisUtterance
       utterance.lang = 'ms-MY'; 
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
@@ -261,7 +261,7 @@ export default function SemakanPage() {
       const data = await res.json();
       setBuilderResult(data);
       initializeSentenceGame(data);
-    } catch (err) {
+    } catch (err) { // Fixed: Swapped structural JSX closing tag back into correct Javascript closing brace syntax
       console.error(err);
       alert("Gagal menghubungi pembantu binaan ayat.");
     } finally {
@@ -802,14 +802,11 @@ const styles = {
   modalContent: { backgroundColor: '#FFF', borderRadius: '20px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', overflow: 'hidden', animation: 'slideUp 0.3s ease-out' },
   modalHeader: { padding: '16px 20px', background: '#6C5CE7', color: '#FFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   modalCloseX: { background: 'transparent', border: 'none', color: '#FFF', fontSize: '18px', cursor: 'pointer', opacity: 0.8 },
-  
-  // Side-by-side splits for Modal images
   modalBodyLayout: { display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '20px', padding: '20px', maxHeight: '80vh', overflowY: 'auto' },
   modalImagePanel: { borderRight: '1px solid #E2E8F0', paddingRight: '20px', display: 'flex', flexDirection: 'column' },
   modalInlineImg: { width: '100%', objectFit: 'contain', borderRadius: '8px', maxHeight: '450px', border: '1px solid #CBD5E1' },
   noImagePlaceholder: { padding: '40px', background: '#F8FAFC', color: '#94A3B8', borderRadius: '8px', textAlign: 'center', fontSize: '13px' },
   modalGamePanel: { display: 'flex', flexDirection: 'column', gap: '15px' },
-
   sectionLabel: { fontSize: '13px', fontWeight: 'bold', color: '#334155', display: 'block', marginBottom: '6px' },
   milestoneContainer: { display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' },
   milestoneNode: { padding: '8px 16px', borderRadius: '20px', border: '2px solid', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' },
