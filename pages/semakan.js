@@ -629,9 +629,42 @@ export default function SemakanPage() {
                       Contoh: "Budak lelaki hendak kejar kucing" 
                     </p>
                   </div>
+
+                  {/* 🌟 NEW: Dynamic Quick Help Words for Weak Students */}
+                  <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#EFF6FF', borderRadius: '8px', border: '1px dashed #BFDBFE' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#1E40AF', display: 'block', marginBottom: '6px' }}>
+                      ⚡ Tak tahu nak taip apa? Klik pembantu idea di bawah:
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {selectedPictureIndex === 1 && (
+                        <>
+                          <button onClick={() => setBuilderQuery("Seorang budak lelaki mengejar seekor kucing menceras")} style={styles.helperChipBtn}>Budak kejar kucing 🐈</button>
+                          <button onClick={() => setBuilderQuery("Kucing itu berlari dengan sangat laju")} style={styles.helperChipBtn}>Kucing lari laju 🏃‍♂️</button>
+                        </>
+                      )}
+                      {selectedPictureIndex === 2 && (
+                        <>
+                          <button onClick={() => setBuilderQuery("Bapa sedang menyiram pokok bunga di taman")} style={styles.helperChipBtn}>Bapa siram pokok 🪴</button>
+                          <button onClick={() => setBuilderQuery("Pokok bunga itu tumbuh dengan subur")} style={styles.helperChipBtn}>Pokok bunga subur 🌸</button>
+                        </>
+                      )}
+                      {/* Fallback general support chips if index doesn't match predefined scenarios */}
+                      {selectedPictureIndex !== 1 && selectedPictureIndex !== 2 && (
+                        <>
+                          <button onClick={() => setBuilderQuery("Mereka bekerjasama membersihkan kawasan rumah")} style={styles.helperChipBtn}>Bergotong-royong 🧹</button>
+                          <button onClick={() => setBuilderQuery("Suasana di kawasan itu sangat riuh-rendah")} style={styles.helperChipBtn}>Suasana ceria ✨</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                   
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <input value={builderQuery} onChange={(e) => setBuilderQuery(e.target.value)} placeholder="Taip idea anda di sini..." style={styles.scaffoldInput} />
+                    <input 
+                      value={builderQuery} 
+                      onChange={(e) => setBuilderQuery(e.target.value)} 
+                      placeholder="Taip idea anda atau klik butang pembantu di atas..." 
+                      style={styles.scaffoldInput} 
+                    />
                     <button onClick={handleBuildSentence} disabled={isBuilding || !builderQuery.trim()} style={styles.scaffoldActionBtn}>
                       {isBuilding ? "Menjana Kata..." : "Tukar Ke Game 🪄"}
                     </button>
