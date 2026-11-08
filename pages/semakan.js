@@ -716,8 +716,6 @@ export default function SemakanPage() {
                         )}
                       </div>
                     </div>
-
-                  </div>
                     
                     <div style={{ background: '#FEE2E2', padding: '8px', borderRadius: '6px', border: '1px solid #FCA5A5' }}>
                       <strong style={{ color: '#991B1B', display: 'block', marginBottom: '4px' }}>⚡ Kata Kerja</strong>
