@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     Rujuk fail imej/PDF karangan berpandukan gambar ini. 
     Fokus HANYA pada petak nombor ${pictureIndex} sahaja (abaikan petak lain).
     Sila jana kosa kata ringkas yang sangat sesuai untuk murid lemah bagi petak nombor ${pictureIndex} ini.
-    Berikan jawapan dalam format JSON tulen mengikut struktur berikut:
+    Berikan jawapan dalam format JSON tulen mengikut struktur berikut tanpa sebarang teks tambahan:
     {
       "kataNama": ["perkataan1", "perkataan2", "perkataan3"],
       "kataKerja": ["perkataan1", "perkataan2", "perkataan3"],
@@ -48,12 +48,13 @@ export default async function handler(req, res) {
       ]
     });
 
-    const textOutput = response.text();
+    // ⚠️ PERHATIAN DI SINI: Guna `response.text` (bukan fungsi `response.text()`)
+    const textOutput = response.text;
     
     // Cuba ekstrak JSON daripada respons AI (membersihkan sebarang tag markdown jika ada)
     let parsedData;
     try {
-      const cleanJsonStr = textoutput.replace(/```json/g, '').replace(/```/g, '').trim();
+      const cleanJsonStr = textOutput.replace(/```json/g, '').replace(/```/g, '').trim();
       parsedData = JSON.parse(cleanJsonStr);
     } catch (parseError) {
       // Fallback jika bentuk teks biasa
