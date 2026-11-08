@@ -745,7 +745,7 @@ export default function SemakanPage() {
                         )}
                       </div>
                     </div>
-
+</div>
                   </div>
 
                 {/* 3. Kotak Menulis Subjek & Predikat (4 Baris) */}
