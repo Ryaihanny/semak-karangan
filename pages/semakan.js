@@ -660,14 +660,64 @@ export default function SemakanPage() {
                     </button>
                   </div>
                   
-                  {/* Paparan Jadual Kosa Kata (Kata Nama, Kata Kerja, Kata Adjektif) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '12px' }}>
-                    <div style={{ background: '#DBEAFE', padding: '8px', borderRadius: '6px', border: '1px solid #93C5FD' }}>
-                      <strong style={{ color: '#1E40AF', display: 'block', marginBottom: '4px' }}>📌 Kata Nama</strong>
-                      <div style={{ color: '#334155' }}>
-                        {builderResult?.kataNama ? builderResult.kataNama.join(', ') : <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>}
+                  {/* Paparan Senarai Kosa Kata Menegak (Satu frasa sebaris) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', fontSize: '12px' }}>
+                    
+                    {/* KOTA KATA NAMA */}
+                    <div style={{ background: '#DBEAFE', padding: '10px', borderRadius: '8px', border: '1px solid #93C5FD' }}>
+                      <strong style={{ color: '#1E40AF', display: 'block', marginBottom: '8px', borderBottom: '1px solid #BFDBFE', paddingBottom: '4px' }}>
+                        📌 Kata Nama
+                      </strong>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#334155' }}>
+                        {builderResult?.kataNama ? (
+                          builderResult.kataNama.map((item, idx) => (
+                            <div key={idx} style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #BFDBFE' }}>
+                              • {item}
+                            </div>
+                          ))
+                        ) : (
+                          <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>
+                        )}
                       </div>
                     </div>
+                    
+                    {/* KOTA KATA KERJA */}
+                    <div style={{ background: '#FEE2E2', padding: '10px', borderRadius: '8px', border: '1px solid #FCA5A5' }}>
+                      <strong style={{ color: '#991B1B', display: 'block', marginBottom: '8px', borderBottom: '1px solid #FECACA', paddingBottom: '4px' }}>
+                        ⚡ Kata Kerja
+                      </strong>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#334155' }}>
+                        {builderResult?.kataKerja ? (
+                          builderResult.kataKerja.map((item, idx) => (
+                            <div key={idx} style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #FECACA' }}>
+                              • {item}
+                            </div>
+                          ))
+                        ) : (
+                          <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* KOTA KATA ADJEKTIF */}
+                    <div style={{ background: '#FEF3C7', padding: '10px', borderRadius: '8px', border: '1px solid #FDE68A' }}>
+                      <strong style={{ color: '#92400E', display: 'block', marginBottom: '8px', borderBottom: '1px solid #FEF08A', paddingBottom: '4px' }}>
+                        ✨ Kata Adjektif
+                      </strong>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#334155' }}>
+                        {builderResult?.kataAdjektif ? (
+                          builderResult.kataAdjektif.map((item, idx) => (
+                            <div key={idx} style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #FEF08A' }}>
+                              • {item}
+                            </div>
+                          ))
+                        ) : (
+                          <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
                     
                     <div style={{ background: '#FEE2E2', padding: '8px', borderRadius: '6px', border: '1px solid #FCA5A5' }}>
                       <strong style={{ color: '#991B1B', display: 'block', marginBottom: '4px' }}>⚡ Kata Kerja</strong>
