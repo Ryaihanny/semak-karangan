@@ -716,20 +716,7 @@ export default function SemakanPage() {
                         )}
                       </div>
                     </div>
-                    
-                    <div style={{ background: '#FEE2E2', padding: '8px', borderRadius: '6px', border: '1px solid #FCA5A5' }}>
-                      <strong style={{ color: '#991B1B', display: 'block', marginBottom: '4px' }}>⚡ Kata Kerja</strong>
-                      <div style={{ color: '#334155' }}>
-                        {builderResult?.kataKerja ? builderResult.kataKerja.join(', ') : <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>}
-                      </div>
-                    </div>
-
-                    <div style={{ background: '#FEF3C7', padding: '8px', borderRadius: '6px', border: '1px solid #FDE68A' }}>
-                      <strong style={{ color: '#92400E', display: 'block', marginBottom: '4px' }}>✨ Kata Adjektif</strong>
-                      <div style={{ color: '#334155' }}>
-                        {builderResult?.kataAdjektif ? builderResult.kataAdjektif.join(', ') : <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>}
-                      </div>
-                    </div>
+    
                   </div>
                 </div>
 
