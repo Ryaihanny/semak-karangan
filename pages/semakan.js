@@ -566,18 +566,17 @@ export default function SemakanPage() {
       {isBuilderOpen && (
         <div style={styles.modalOverlay}>
           {/* Requirement 2: Expanded width layout to place the picture panel side by side */}
-          <div style={{ ...styles.modalContent, maxWidth: '1100px', width: '95%' }}>
+          <div style={{ ...styles.modalContent, maxWidth: '1100px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={styles.modalHeader}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h2 style={{ margin: 0, fontSize: '20px' }}>🧩 Permainan Susun Ayat Ajaib</h2>
-                <span style={{ fontSize: '12px', opacity: 0.9 }}>Rujuk gambar di sebelah kiri untuk bantu menaip idea anda</span>
+                <h2 style={{ margin: 0, fontSize: '20px' }}>🧩 Susun Ayat Pintar (Subjek & Predikat)</h2>
+                <span style={{ fontSize: '12px', opacity: 0.9 }}>Rujuk gambar di sebelah kiri untuk bantu murid membina 1 perenggan bagi setiap gambar</span>
               </div>
               <button onClick={() => setIsBuilderOpen(false)} style={styles.modalCloseX}>✖</button>
             </div>
 
             <div style={styles.modalBodyLayout}>
-              {/* Requirement 2: Side Picture reference viewer so students can look and type directly */}
-            {/* Requirement 2: Side Picture reference viewer so students can look and type directly */}
+              {/* Requirement 2: Side Picture reference viewer */}
               <div style={styles.modalImagePanel}>
                 <h4 style={{ margin: '0 0 10px 0', color: '#1E293B' }}>🖼️ Rujukan Gambar Karangan:</h4>
                 {taskData?.imageUrl ? (
@@ -595,164 +594,98 @@ export default function SemakanPage() {
                 )}
               </div>
 
-              {/* Game interaction panel */}
-              <div style={styles.modalGamePanel}>
-                <div>
-                  <label style={styles.sectionLabel}>🎯 Pilih Gambar Sasaran Anda:</label>
-                  <div style={styles.milestoneContainer}>
-                    {Array.from({ length: totalPictures }, (_, i) => i + 1).map((idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setSelectedPictureIndex(idx);
-                          setBuilderResult(null);
-                        }}
+              {/* Game interaction panel: Dynamic Subjek & Predikat based on totalPictures */}
+              <div style={{ ...styles.modalGamePanel, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', color: '#1E293B' }}>
+                    ✨ Bina Ayat Berpandukan Gambar (Jumlah: {totalPictures} Gambar)
+                  </h3>
+                  <span style={{ fontSize: '11px', background: '#EFF6FF', color: '#1D4ED8', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
+                    1 Perenggan / Gambar
+                  </span>
+                </div>
+
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
+                  Bimbing murid mengisi ruangan <strong>Subjek</strong> dan <strong>Predikat</strong> secara berperingkat untuk setiap gambar.
+                </p>
+
+                {/* Gelung dinamik mengikut totalPictures (P3/P4 = 4 gambar, P5/P6 = 6 gambar) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '4px' }}>
+                  {Array.from({ length: totalPictures }, (_, index) => {
+                    const pictureNumber = index + 1;
+                    return (
+                      <div 
+                        key={pictureNumber}
                         style={{
-                          ...styles.milestoneNode,
-                          backgroundColor: selectedPictureIndex === idx ? '#6C5CE7' : '#F1F5F9',
-                          color: selectedPictureIndex === idx ? '#FFF' : '#475569',
-                          borderColor: selectedPictureIndex === idx ? '#5A4AD1' : '#CBD5E1'
+                          background: '#F8FAFC',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
                         }}
                       >
-                        Gambar {idx}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={styles.scaffoldFormBox}>
-                  <div style={{ marginBottom: '10px' }}>
-                    <span style={{ fontSize: '12px', color: '#4A5568', fontWeight: 'bold' }}>
-                      💡 Masukkan apa sahaja perkataan / frasa:
-                    </span>
-                    <p style={{ margin: '4px 0 10px 0', fontSize: '11px', color: '#718096' }}>
-                      Contoh: "Budak lelaki hendak kejar kucing" 
-                    </p>
-                  </div>
-
-                  {/* 🌟 NEW: Dynamic Quick Help Words for Weak Students */}
-                  <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#EFF6FF', borderRadius: '8px', border: '1px dashed #BFDBFE' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#1E40AF', display: 'block', marginBottom: '6px' }}>
-                      ⚡ Tak tahu nak taip apa? Klik pembantu idea di bawah:
-                    </span>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {selectedPictureIndex === 1 && (
-                        <>
-                          <button onClick={() => setBuilderQuery("Seorang budak lelaki mengejar seekor kucing menceras")} style={styles.helperChipBtn}>Budak kejar kucing 🐈</button>
-                          <button onClick={() => setBuilderQuery("Kucing itu berlari dengan sangat laju")} style={styles.helperChipBtn}>Kucing lari laju 🏃‍♂️</button>
-                        </>
-                      )}
-                      {selectedPictureIndex === 2 && (
-                        <>
-                          <button onClick={() => setBuilderQuery("Bapa sedang menyiram pokok bunga di taman")} style={styles.helperChipBtn}>Bapa siram pokok 🪴</button>
-                          <button onClick={() => setBuilderQuery("Pokok bunga itu tumbuh dengan subur")} style={styles.helperChipBtn}>Pokok bunga subur 🌸</button>
-                        </>
-                      )}
-                      {/* Fallback general support chips if index doesn't match predefined scenarios */}
-                      {selectedPictureIndex !== 1 && selectedPictureIndex !== 2 && (
-                        <>
-                          <button onClick={() => setBuilderQuery("Mereka bekerjasama membersihkan kawasan rumah")} style={styles.helperChipBtn}>Bergotong-royong 🧹</button>
-                          <button onClick={() => setBuilderQuery("Suasana di kawasan itu sangat riuh-rendah")} style={styles.helperChipBtn}>Suasana ceria ✨</button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <input 
-                      value={builderQuery} 
-                      onChange={(e) => setBuilderQuery(e.target.value)} 
-                      placeholder="Taip idea anda atau klik butang pembantu di atas..." 
-                      style={styles.scaffoldInput} 
-                    />
-                    <button onClick={handleBuildSentence} disabled={isBuilding || !builderQuery.trim()} style={styles.scaffoldActionBtn}>
-                      {isBuilding ? "Menjana Kata..." : "Tukar Ke Game 🪄"}
-                    </button>
-                  </div>
-                </div>
-
-                {builderResult && (
-                  <div style={{ animation: 'fadeIn 0.3s ease-out', marginTop: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
-                        🚀 Seret (drag) kad perkataan di bawah ke dalam kotak binaan untuk menyusun ayat:
-                      </span>
-                    </div>
-
-                    <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropBackToPool} style={styles.cardPoolContainer}>
-                      {shuffledBlocks.map((block) => (
-                        <div
-                          key={block.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, block.id)}
-                          style={{
-                            ...styles.draggableWordCard,
-                            backgroundColor: block.jenis === 'kata-kerja' ? '#FEE2E2' : block.jenis === 'kata-nama' ? '#DBEAFE' : '#FEF3C7',
-                            borderColor: block.jenis === 'kata-kerja' ? '#FCA5A5' : block.jenis === 'kata-nama' ? '#93C5FD' : '#FDE68A',
-                            color: block.jenis === 'kata-kerja' ? '#991B1B' : block.jenis === 'kata-nama' ? '#1E40AF' : '#92400E'
-                          }}
-                        >
-                          <span style={styles.cardMetaLabel}>{block.label}</span>
-                          <strong style={{ fontSize: '14px' }}>{block.teks}</strong>
+                        <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155' }}>
+                          🖼️ Gambar {pictureNumber} dari {totalPictures} (Perenggan {pictureNumber})
                         </div>
-                      ))}
-                      {shuffledBlocks.length === 0 && placedBlocks.length === 0 && (
-                        <p style={{ margin: 'auto', fontSize: '12px', color: '#94A3B8' }}>Tiada perkataan dimuatkan.</p>
-                      )}
-                    </div>
 
-                    <div onDragOver={(e) => e.preventDefault()} onDrop={handleDropOnTrack} style={{ ...styles.dropTargetTrack, backgroundColor: isGameWon ? '#ECFDF5' : '#FFF', borderColor: isGameWon ? '#10B981' : '#6C5CE7' }}>
-                      {placedBlocks.length === 0 && (
-                        <div style={{ margin: 'auto', color: '#94A3B8', fontSize: '13px', textAlign: 'center' }}>
-                          📥 Susun kad perkataan anda di sini
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          <input
+                            type="text"
+                            placeholder={`Subjek ${pictureNumber} (Cth: Ali)`}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #CBD5E1',
+                              fontSize: '13px',
+                              background: 'white'
+                            }}
+                          />
+                          <input
+                            type="text"
+                            placeholder={`Predikat ${pictureNumber} (Cth: membaca buku)`}
+                            style={{
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #CBD5E1',
+                              fontSize: '13px',
+                              background: 'white'
+                            }}
+                          />
                         </div>
-                      )}
-                      
-                      {placedBlocks.map((block) => (
-                        <div
-                          key={block.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, block.id)}
-                          style={{
-                            ...styles.draggableWordCard,
-                            backgroundColor: block.jenis === 'kata-kerja' ? '#FEE2E2' : block.jenis === 'kata-nama' ? '#DBEAFE' : '#FEF3C7',
-                            borderColor: block.jenis === 'kata-kerja' ? '#FCA5A5' : block.jenis === 'kata-nama' ? '#93C5FD' : '#FDE68A',
-                            color: block.jenis === 'kata-kerja' ? '#991B1B' : block.jenis === 'kata-nama' ? '#1E40AF' : '#92400E'
-                          }}
-                        >
-                          <span style={styles.cardMetaLabel}>{block.label}</span>
-                          <strong>{block.teks}</strong>
-                        </div>
-                      ))}
-                    </div>
-
-                    {isGameWon && (
-                      <div style={styles.victoryContainer}>
-                        <div style={{ fontSize: '14px', color: '#065F46', fontWeight: 'bold', marginBottom: '8px' }}>
-                          🎉 Hebat! Susunan ayat anda betul & gramatis!
-                        </div>
-                        <button
-                          onClick={() => {
-                            const completeSentence = placedBlocks.map(b => b.teks).join(" ");
-                            setEssay(prev => prev ? prev + " " + completeSentence : completeSentence);
-                            setIsBuilderOpen(false);
-                            setBuilderResult(null);
-                            setBuilderQuery("");
-                          }}
-                          style={styles.insertSentenceToEssayBtn}
-                        >
-                          📥 Masukkan Ayat Sempurna Ini ke Karangan Saya
-                        </button>
                       </div>
-                    )}
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
+
+                {/* Butang Simpan / Selesai */}
+                <button
+                  onClick={() => {
+                    // Logik menyimpan atau menutup modal selepas siap
+                    setIsBuilderOpen(false);
+                  }}
+                  style={{
+                    marginTop: 'auto',
+                    padding: '10px',
+                    backgroundColor: '#2563EB',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '13px'
+                  }}
+                >
+                  📥 Simpan & Masukkan ke Karangan Saya
+                </button>
+
               </div>
             </div>
           </div>
         </div>
       )}
-
       {loading && (
         <div style={styles.overlay}>
           <div style={styles.loaderBox}>
