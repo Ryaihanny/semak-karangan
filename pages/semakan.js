@@ -634,7 +634,6 @@ export default function SemakanPage() {
                       onClick={async () => {
                         try {
                           setBuilderResult(null);
-                          // Memanggil API /pages/api/scaffold.js yang baru dibina
                           const res = await fetch('/api/scaffold', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -660,7 +659,7 @@ export default function SemakanPage() {
                     </button>
                   </div>
                   
-                  {/* Paparan Senarai Kosa Kata Menegak (Satu frasa sebaris) */}
+                  {/* Paparan Senarai Kosa Kata Menegak (Hanya 3 Kolom Saja: Kata Nama, Kata Kerja, Kata Adjektif) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', fontSize: '12px' }}>
                     
                     {/* KOTA KATA NAMA */}
@@ -716,7 +715,7 @@ export default function SemakanPage() {
                         )}
                       </div>
                     </div>
-    
+
                   </div>
                 </div>
 
