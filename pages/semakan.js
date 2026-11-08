@@ -659,7 +659,7 @@ export default function SemakanPage() {
                     </button>
                   </div>
                   
-                  {/* Paparan Senarai Kosa Kata Menegak (Hanya 3 Kolom Saja: Kata Nama, Kata Kerja, Kata Adjektif) */}
+                  {/* Paparan Senarai Kosa Kata Menegak dengan Terjemahan Inggeris (Hover/Tooltip) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', fontSize: '12px' }}>
                     
                     {/* KOTA KATA NAMA */}
@@ -669,11 +669,21 @@ export default function SemakanPage() {
                       </strong>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#334155' }}>
                         {builderResult?.kataNama ? (
-                          builderResult.kataNama.map((item, idx) => (
-                            <div key={idx} style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #BFDBFE' }}>
-                              • {item}
-                            </div>
-                          ))
+                          builderResult.kataNama.map((item, idx) => {
+                            const isObj = typeof item === 'object' && item !== null;
+                            const bmText = isObj ? item.bm : item;
+                            const biText = isObj ? item.bi : '';
+                            return (
+                              <div 
+                                key={idx} 
+                                title={biText ? `English: ${biText}` : ''}
+                                style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #BFDBFE', cursor: 'pointer' }}
+                              >
+                                <div style={{ fontWeight: 'bold' }}>• {bmText}</div>
+                                {biText && <div style={{ fontSize: '10px', color: '#64748B', fontStyle: 'italic', marginTop: '2px' }}>{biText}</div>}
+                              </div>
+                            );
+                          })
                         ) : (
                           <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>
                         )}
@@ -687,11 +697,21 @@ export default function SemakanPage() {
                       </strong>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#334155' }}>
                         {builderResult?.kataKerja ? (
-                          builderResult.kataKerja.map((item, idx) => (
-                            <div key={idx} style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #FECACA' }}>
-                              • {item}
-                            </div>
-                          ))
+                          builderResult.kataKerja.map((item, idx) => {
+                            const isObj = typeof item === 'object' && item !== null;
+                            const bmText = isObj ? item.bm : item;
+                            const biText = isObj ? item.bi : '';
+                            return (
+                              <div 
+                                key={idx} 
+                                title={biText ? `English: ${biText}` : ''}
+                                style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #FECACA', cursor: 'pointer' }}
+                              >
+                                <div style={{ fontWeight: 'bold' }}>• {bmText}</div>
+                                {biText && <div style={{ fontSize: '10px', color: '#64748B', fontStyle: 'italic', marginTop: '2px' }}>{biText}</div>}
+                              </div>
+                            );
+                          })
                         ) : (
                           <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>
                         )}
@@ -705,11 +725,21 @@ export default function SemakanPage() {
                       </strong>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#334155' }}>
                         {builderResult?.kataAdjektif ? (
-                          builderResult.kataAdjektif.map((item, idx) => (
-                            <div key={idx} style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #FEF08A' }}>
-                              • {item}
-                            </div>
-                          ))
+                          builderResult.kataAdjektif.map((item, idx) => {
+                            const isObj = typeof item === 'object' && item !== null;
+                            const bmText = isObj ? item.bm : item;
+                            const biText = isObj ? item.bi : '';
+                            return (
+                              <div 
+                                key={idx} 
+                                title={biText ? `English: ${biText}` : ''}
+                                style={{ background: '#FFF', padding: '6px 8px', borderRadius: '4px', border: '1px solid #FEF08A', cursor: 'pointer' }}
+                              >
+                                <div style={{ fontWeight: 'bold' }}>• {bmText}</div>
+                                {biText && <div style={{ fontSize: '10px', color: '#64748B', fontStyle: 'italic', marginTop: '2px' }}>{biText}</div>}
+                              </div>
+                            );
+                          })
                         ) : (
                           <span style={{ fontStyle: 'italic', color: '#64748B' }}>(Klik "Jana Kosa Kata AI")</span>
                         )}
@@ -717,7 +747,6 @@ export default function SemakanPage() {
                     </div>
 
                   </div>
-                </div>
 
                 {/* 3. Kotak Menulis Subjek & Predikat (4 Baris) */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

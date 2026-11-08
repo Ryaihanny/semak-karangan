@@ -28,18 +28,26 @@ export default async function handler(req, res) {
     Fokus HANYA pada petak nombor ${pictureIndex} sahaja (abaikan petak lain).
     
     Sila jana senarai kosa kata dan frasa yang kaya untuk murid lemah dengan syarat ketat berikut:
-    1. Berikan **sekurang-kurangnya 5 hingga 6 pilihan** bagi setiap kategori (Kata Nama, Kata Kerja, Kata Adjektif).
-    2. Sediakan campuran perkataan tunggal dan **frasa yang lebih panjang** (contoh: "mengulang kaji pelajaran di meja belajar").
+    1. Berikan **sekurang-kurangnya 5 hingga 6 pilihan** bagi setiap kategori (Kata Nama, Kata Kerja, Kata Adjektif) yang **BETUL-BETUL BERKAITAN** dengan apa yang dilihat dalam gambar ${pictureIndex}.
+    2. Sediakan campuran perkataan tunggal dan **frasa yang lebih panjang**.
     3. **ANALISIS WATAK DALAM GAMBAR SEBENAR (PENTING):**
-       - **Jika hanya ada seorang watak lelaki:** Guna nama **Dani** (Jangan masukkan "kawan-kawannya" atau "Siti").
-       - **Jika hanya ada seorang watak perempuan:** Guna nama **Siti** (Jangan masukkan "kawan-kawannya" atau "Dani").
-       - **Jika ada dua orang atau lebih (berkumpulan):** Boleh guna **Dani**, **Siti**, dan **"kawan-kawannya"** atau "mereka".
-    4. JANGAN guna perkataan umum yang malas seperti "budak-budak". Guna nama watak, kata ganti nama (dia, mereka), atau frasa spesifik.
-    5. Berikan jawapan dalam format JSON tulen mengikut struktur ini tanpa sebarang teks tambahan:
+       - Jika hanya ada seorang watak lelaki: Guna nama **Dani**.
+       - Jika hanya ada seorang watak perempuan: Guna nama **Siti**.
+       - Jika ada dua orang atau lebih (berkumpulan): Boleh guna **Dani**, **Siti**, dan **"kawan-kawannya"**.
+    4. **TERJEMAHAN BAHASA INGGERIS:** Setiap elemen mestilah dalam bentuk objek JSON yang mengandungi perkataan/frasa Bahasa Melayu ("bm") dan terjemahan Bahasa Inggerisnya ("bi").
+    5. JANGAN tiru contoh perkataan di bawah secara bulat-bulat; cipta perkataan baharu yang sesuai dengan gambar semasa.
+    
+    Berikan jawapan dalam format JSON tulen mengikut struktur bentuk ini tanpa sebarang teks tambahan:
     {
-      "kataNama": ["frasa 1", "frasa 2", "frasa 3", "Dani/Siti", "frasa 5"],
-      "kataKerja": ["frasa kerja 1", "frasa 2", "frasa 3", "frasa 4", "frasa 5"],
-      "kataAdjektif": ["frasa adjektif 1", "frasa 2", "frasa 3", "frasa 4", "frasa 5"]
+      "kataNama": [
+        { "bm": "perkataan/frasa melayu berkaitan gambar", "bi": "english translation" }
+      ],
+      "kataKerja": [
+        { "bm": "perkataan/frasa melayu berkaitan gambar", "bi": "english translation" }
+      ],
+      "kataAdjektif": [
+        { "bm": "perkataan/frasa melayu berkaitan gambar", "bi": "english translation" }
+      ]
     }`;
 
     // 3. Hantar ke model Gemini
