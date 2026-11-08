@@ -23,15 +23,23 @@ export default async function handler(req, res) {
     const mimeType = imageRes.headers.get("content-type") || "image/jpeg";
 
     // 2. Sediakan arahan (prompt) khusus untuk fokus pada nombor gambar tertentu
-    const prompt = `Anda ialah seorang guru Bahasa Melayu sekolah rendah di Singapura. 
+    const prompt = `Anda ialah seorang guru Bahasa Melayu sekolah rendah di Singapura yang bijak. 
     Rujuk fail imej/PDF karangan berpandukan gambar ini. 
     Fokus HANYA pada petak nombor ${pictureIndex} sahaja (abaikan petak lain).
-    Sila jana kosa kata ringkas yang sangat sesuai untuk murid lemah bagi petak nombor ${pictureIndex} ini.
-    Berikan jawapan dalam format JSON tulen mengikut struktur berikut tanpa sebarang teks tambahan:
+    
+    Sila jana senarai kosa kata dan frasa yang kaya untuk murid lemah dengan syarat ketat berikut:
+    1. Berikan **sekurang-kurangnya 5 hingga 6 pilihan** bagi setiap kategori (Kata Nama, Kata Kerja, Kata Adjektif).
+    2. Sediakan campuran perkataan tunggal dan **frasa yang lebih panjang** (contoh: "mengulang kaji pelajaran di meja belajar").
+    3. **ANALISIS WATAK DALAM GAMBAR SEBENAR (PENTING):**
+       - **Jika hanya ada seorang watak lelaki:** Guna nama **Dani** (Jangan masukkan "kawan-kawannya" atau "Siti").
+       - **Jika hanya ada seorang watak perempuan:** Guna nama **Siti** (Jangan masukkan "kawan-kawannya" atau "Dani").
+       - **Jika ada dua orang atau lebih (berkumpulan):** Boleh guna **Dani**, **Siti**, dan **"kawan-kawannya"** atau "mereka".
+    4. JANGAN guna perkataan umum yang malas seperti "budak-budak". Guna nama watak, kata ganti nama (dia, mereka), atau frasa spesifik.
+    5. Berikan jawapan dalam format JSON tulen mengikut struktur ini tanpa sebarang teks tambahan:
     {
-      "kataNama": ["perkataan1", "perkataan2", "perkataan3"],
-      "kataKerja": ["perkataan1", "perkataan2", "perkataan3"],
-      "kataAdjektif": ["perkataan1", "perkataan2", "perkataan3"]
+      "kataNama": ["frasa 1", "frasa 2", "frasa 3", "Dani/Siti", "frasa 5"],
+      "kataKerja": ["frasa kerja 1", "frasa 2", "frasa 3", "frasa 4", "frasa 5"],
+      "kataAdjektif": ["frasa adjektif 1", "frasa 2", "frasa 3", "frasa 4", "frasa 5"]
     }`;
 
     // 3. Hantar ke model Gemini
