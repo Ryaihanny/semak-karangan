@@ -93,28 +93,6 @@ export default function UrusKelasPage() {
     }
   };
 
-  const handleCreateAssignment = async (classId, title, instructions, imageUrl) => {
-    if (!classId || !title) { 
-      alert("Maklumat tidak lengkap!"); 
-      return; 
-    }
-    try {
-      await addDoc(collection(db, 'assignments'), {
-        classId, 
-        teacherId: user.uid, 
-        title, 
-        instructions: instructions || "",
-        imageUrl: imageUrl || "", 
-        createdAt: new Date().toISOString(), 
-        status: 'active'
-      });
-      alert("Tugasan berjaya dihantar!");
-      refreshData();
-    } catch (err) { 
-      alert("Gagal: " + err.message); 
-    }
-  };
-
   const handleEditAssignment = async (e, task) => {
     e.stopPropagation();
     const newTitle = prompt("Kemaskini Tajuk:", task.title);
@@ -219,16 +197,6 @@ export default function UrusKelasPage() {
                     </div>
                   ))}
                 </div>
-                
-                <button className="btn-add-task" onClick={async (e) => {
-                    e.stopPropagation();
-                    const title = prompt("Tajuk Tugasan:");
-                    if (title) {
-                      const instructions = prompt("Arahan:");
-                      const img = prompt("URL Gambar (Jika ada):");
-                      await handleCreateAssignment(c.id, title, instructions, img);
-                    }
-                }}>+ Tugasan Baru</button>
               </div>
             ))}
           </div>
@@ -262,7 +230,6 @@ export default function UrusKelasPage() {
         .class-grid-layout { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
         .class-card h4 { margin: 0; }
         .class-label { font-size: 0.65rem; font-weight: 800; color: #48A6A7; }
-        .btn-add-task { width: 100%; margin-top: 15px; padding: 8px; background: transparent; border: 1px dashed #48A6A7; color: #48A6A7; border-radius: 8px; font-weight: 600; font-size: 0.8rem; cursor: pointer; }
         .task-list-mini { margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px; }
         .task-item-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 0.85rem; }
         .task-btns button { background: none; border: none; cursor: pointer; margin-left: 5px; }
