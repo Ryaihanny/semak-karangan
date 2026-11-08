@@ -562,130 +562,180 @@ export default function SemakanPage() {
         </div>
       )}
 
-      {/* THE GAME SCALED STORYBOARD SCATTER BUILDER POPUP MODAL */}
-      {isBuilderOpen && (
-        <div style={styles.modalOverlay}>
-          {/* Requirement 2: Expanded width layout to place the picture panel side by side */}
-          <div style={{ ...styles.modalContent, maxWidth: '1100px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={styles.modalHeader}>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h2 style={{ margin: 0, fontSize: '20px' }}>🧩 Susun Ayat Pintar (Subjek & Predikat)</h2>
-                <span style={{ fontSize: '12px', opacity: 0.9 }}>Rujuk gambar di sebelah kiri untuk bantu murid membina 1 perenggan bagi setiap gambar</span>
-              </div>
-              <button onClick={() => setIsBuilderOpen(false)} style={styles.modalCloseX}>✖</button>
-            </div>
+      {/* MODAL PEMBINA AYAT BERSTRUKTUR GAMBAR DEMI GAMBAR */}
+{isBuilderOpen && (
+  <div style={styles.modalOverlay}>
+    <div style={{ ...styles.modalContent, maxWidth: '1100px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+      
+      {/* Header Modal */}
+      <div style={styles.modalHeader}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <h2 style={{ margin: 0, fontSize: '20px' }}>🧩 Studio Bina Ayat Pintar (Gambar demi Gambar)</h2>
+          <span style={{ fontSize: '12px', opacity: 0.9 }}>
+            Fokus 1 gambar pada satu masa. Tulis 4 hingga 5 ayat sebelum ke gambar seterusnya.
+          </span>
+        </div>
+        <button onClick={() => setIsBuilderOpen(false)} style={styles.modalCloseX}>✖</button>
+      </div>
 
-            <div style={styles.modalBodyLayout}>
-              {/* Requirement 2: Side Picture reference viewer */}
-              <div style={styles.modalImagePanel}>
-                <h4 style={{ margin: '0 0 10px 0', color: '#1E293B' }}>🖼️ Rujukan Gambar Karangan:</h4>
-                {taskData?.imageUrl ? (
-                  taskData.imageUrl.split('?')[0].toLowerCase().endsWith('.pdf') ? (
-                    <iframe
-                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(taskData.imageUrl)}&embedded=true`}
-                      style={{ width: '100%', height: '100%', minHeight: '350px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
-                      frameBorder="0"
-                    />
-                  ) : (
-                    <img src={taskData.imageUrl} alt="Reference Panel" style={styles.modalInlineImg} />
-                  )
-                ) : (
-                  <div style={styles.noImagePlaceholder}>Tiada gambar dimuat naik untuk tugasan ini.</div>
-                )}
-              </div>
+      <div style={styles.modalBodyLayout}>
+        
+        {/* PANEL KIRI: Rujukan Gambar Asal */}
+        <div style={styles.modalImagePanel}>
+          <h4 style={{ margin: '0 0 10px 0', color: '#1E293B' }}>🖼️ Rujukan Soalan Karangan:</h4>
+          {taskData?.imageUrl ? (
+            taskData.imageUrl.split('?')[0].toLowerCase().endsWith('.pdf') ? (
+              <iframe
+                src={`https://docs.google.com/viewer?url=${encodeURIComponent(taskData.imageUrl)}&embedded=true`}
+                style={{ width: '100%', height: '100%', minHeight: '350px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
+                frameBorder="0"
+              />
+            ) : (
+              <img src={taskData.imageUrl} alt="Reference Panel" style={styles.modalInlineImg} />
+            )
+          ) : (
+            <div style={styles.noImagePlaceholder}>Tiada gambar dimuat naik.</div>
+          )}
+        </div>
 
-              {/* Game interaction panel: Dynamic Subjek & Predikat based on totalPictures */}
-              <div style={{ ...styles.modalGamePanel, display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' }}>
-                  <h3 style={{ margin: 0, fontSize: '15px', color: '#1E293B' }}>
-                    ✨ Bina Ayat Berpandukan Gambar (Jumlah: {totalPictures} Gambar)
-                  </h3>
-                  <span style={{ fontSize: '11px', background: '#EFF6FF', color: '#1D4ED8', padding: '4px 8px', borderRadius: '6px', fontWeight: 'bold' }}>
-                    1 Perenggan / Gambar
-                  </span>
-                </div>
-
-                <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
-                  Bimbing murid mengisi ruangan <strong>Subjek</strong> dan <strong>Predikat</strong> secara berperingkat untuk setiap gambar.
-                </p>
-
-                {/* Gelung dinamik mengikut totalPictures (P3/P4 = 4 gambar, P5/P6 = 6 gambar) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '4px' }}>
-                  {Array.from({ length: totalPictures }, (_, index) => {
-                    const pictureNumber = index + 1;
-                    return (
-                      <div 
-                        key={pictureNumber}
-                        style={{
-                          background: '#F8FAFC',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '8px',
-                          padding: '10px 12px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '6px'
-                        }}
-                      >
-                        <div style={{ fontWeight: 'bold', fontSize: '12px', color: '#334155' }}>
-                          🖼️ Gambar {pictureNumber} dari {totalPictures} (Perenggan {pictureNumber})
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                          <input
-                            type="text"
-                            placeholder={`Subjek ${pictureNumber} (Cth: Ali)`}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid #CBD5E1',
-                              fontSize: '13px',
-                              background: 'white'
-                            }}
-                          />
-                          <input
-                            type="text"
-                            placeholder={`Predikat ${pictureNumber} (Cth: membaca buku)`}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid #CBD5E1',
-                              fontSize: '13px',
-                              background: 'white'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Butang Simpan / Selesai */}
+        {/* PANEL KANAN: Panduan & Ruang Menulis Aktif */}
+        <div style={{ ...styles.modalGamePanel, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          
+          {/* Bar Navigasi Nombor Gambar (1 hingga totalPictures) */}
+          <div>
+            <label style={{ ...styles.sectionLabel, marginBottom: '6px', display: 'block' }}>
+              🎯 Pilih Petak Gambar Semasa:
+            </label>
+            <div style={styles.milestoneContainer}>
+              {Array.from({ length: totalPictures }, (_, i) => i + 1).map((idx) => (
                 <button
+                  key={idx}
                   onClick={() => {
-                    // Logik menyimpan atau menutup modal selepas siap
-                    setIsBuilderOpen(false);
+                    setSelectedPictureIndex(idx);
+                    // Tambah fungsi fetch kosa kata AI untuk gambar `idx` di sini jika perlu
                   }}
                   style={{
-                    marginTop: 'auto',
-                    padding: '10px',
-                    backgroundColor: '#2563EB',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    fontSize: '13px'
+                    ...styles.milestoneNode,
+                    backgroundColor: selectedPictureIndex === idx ? '#6C5CE7' : '#F1F5F9',
+                    color: selectedPictureIndex === idx ? '#FFF' : '#475569',
+                    borderColor: selectedPictureIndex === idx ? '#5A4AD1' : '#CBD5E1',
+                    fontWeight: 'bold'
                   }}
                 >
-                  📥 Simpan & Masukkan ke Karangan Saya
+                  Gambar {idx}
                 </button>
+              ))}
+            </div>
+          </div>
 
+          {/* KOTAK 1: Jadual Kosa Kata Dijana AI (Kata Nama, Kata Kerja, Kata Adjektif) */}
+          <div style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '10px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1E293B', marginBottom: '8px' }}>
+              💡 Kosa Kata Cadangan untuk Gambar {selectedPictureIndex}:
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '12px' }}>
+              {/* Kotak Kata Nama */}
+              <div style={{ background: '#DBEAFE', padding: '8px', borderRadius: '6px', border: '1px solid #93C5FD' }}>
+                <strong style={{ color: '#1E40AF', display: 'block', marginBottom: '4px' }}>📌 Kata Nama</strong>
+                <span style={{ color: '#334155' }}>Cth: Murid, bas, cikgu</span>
+              </div>
+              {/* Kotak Kata Kerja */}
+              <div style={{ background: '#FEE2E2', padding: '8px', borderRadius: '6px', border: '1px solid #FCA5A5' }}>
+                <strong style={{ color: '#991B1B', display: 'block', marginBottom: '4px' }}>⚡ Kata Kerja</strong>
+                <span style={{ color: '#334155' }}>Cth: Berbaris, menaiki</span>
+              </div>
+              {/* Kotak Kata Adjektif */}
+              <div style={{ background: '#FEF3C7', padding: '8px', borderRadius: '6px', border: '1px solid #FDE68A' }}>
+                <strong style={{ color: '#92400E', display: 'block', marginBottom: '4px' }}>✨ Kata Adjektif</strong>
+                <span style={{ color: '#334155' }}>Cth: Teruja, gembira</span>
               </div>
             </div>
           </div>
+
+          {/* KOTAK 2: Ruang Menulis 4 hingga 5 Ayat untuk Gambar Semasa */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>
+                ✍️ Tulis 4 hingga 5 Ayat (Perenggan Gambar {selectedPictureIndex}):
+              </span>
+              <span style={{ fontSize: '11px', color: '#64748B', background: '#E2E8F0', padding: '2px 6px', borderRadius: '4px' }}>
+                Sasaran: 4-5 Ayat
+              </span>
+            </div>
+
+            {/* Gelung 4 baris input ayat */}
+            {[1, 2, 3, 4].map((sentenceNum) => (
+              <div key={sentenceNum} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748B', minWidth: '45px' }}>
+                  Ayat {sentenceNum}:
+                </span>
+                <input
+                  type="text"
+                  placeholder={`Tulis ayat ke-${sentenceNum} berkaitan Gambar ${selectedPictureIndex}...`}
+                  style={{
+                    flex: 1,
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '12px',
+                    background: 'white'
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Butang Tindakan Beralih Gambar / Selesai */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'auto', paddingTop: '10px' }}>
+            <button
+              onClick={() => {
+                if (selectedPictureIndex < totalPictures) {
+                  setSelectedPictureIndex(selectedPictureIndex + 1);
+                } else {
+                  alert("Tahniah! Anda telah siap semua gambar. Sila masukkan ke karangan utama.");
+                }
+              }}
+              style={{
+                padding: '10px 16px',
+                backgroundColor: '#3B82F6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '13px'
+              }}
+            >
+              {selectedPictureIndex < totalPictures ? "Seterusnya ke Gambar Seterusnya ➡️" : "Selesai Semua Gambar ✨"}
+            </button>
+
+            <button
+              onClick={() => {
+                // Logik menggabungkan ayat-ayat ini ke dalam textarea karangan utama (`setEssay`)
+                setIsBuilderOpen(false);
+              }}
+              style={{
+                padding: '10px 16px',
+                backgroundColor: '#10B981',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '13px'
+              }}
+            >
+              📥 Masukkan ke Karangan Utama
+            </button>
+          </div>
+
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
+
       {loading && (
         <div style={styles.overlay}>
           <div style={styles.loaderBox}>
