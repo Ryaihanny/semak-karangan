@@ -74,23 +74,6 @@ export default function UrusKelasPage() {
   };
 
   // --- ASSIGNMENT ACTIONS ---
-  const handleCreateAssignment = async (classId, title, instructions, imageUrl) => {
-    if (!classId || !title) { alert("Maklumat tidak lengkap!"); return; }
-    try {
-      await addDoc(collection(db, 'assignments'), {
-        classId, 
-        teacherId: auth.currentUser.uid, 
-        title, 
-        instructions: instructions || "",
-        imageUrl: imageUrl || "", 
-        createdAt: new Date().toISOString(), 
-        status: 'active'
-      });
-      alert("Tugasan berjaya dihantar!");
-      refreshData(auth.currentUser.uid);
-    } catch (err) { alert("Gagal: " + err.message); }
-  };
-
   const handleEditAssignment = async (e, task) => {
     e.stopPropagation();
     const newTitle = prompt("Kemaskini Tajuk:", task.title);
@@ -171,12 +154,6 @@ export default function UrusKelasPage() {
                     </div>
                   ))}
                 </div>
-                
-                <button className="btn-add-task" onClick={async (e) => {
-                    e.stopPropagation();
-                    const title = prompt("Tajuk Tugasan:");
-                    if (title) await handleCreateAssignment(c.id, title, prompt("Arahan:"), prompt("URL Gambar:"));
-                }}>+ Tugasan Baru</button>
               </div>
               
               <button className="btn-delete-class" onClick={() => handleDeleteClass(c.id)}>Padam Kelas</button>
@@ -216,9 +193,6 @@ export default function UrusKelasPage() {
         .task-item { display: flex; justify-content: space-between; align-items: center; background: #fff; border: 1px solid #f1f5f9; padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; font-size: 13px; }
         .task-actions button { background: none; border: none; cursor: pointer; padding: 2px 5px; opacity: 0.6; }
         .task-actions button:hover { opacity: 1; }
-
-        .btn-add-task { width: 100%; padding: 10px; background: none; border: 1px dashed #cbd5e1; border-radius: 8px; color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-add-task:hover { border-color: #48A6A7; color: #48A6A7; background: #f0fbfc; }
         
         .btn-delete-class { margin-top: auto; padding-top: 15px; background: none; border: none; color: #f87171; font-size: 11px; font-weight: 600; cursor: pointer; text-align: left; }
         .btn-delete-class:hover { text-decoration: underline; }
